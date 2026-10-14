@@ -75,6 +75,7 @@ function rf_get_seo_data() {
 		$data['title']       = 'Receipt & Invoice Guides | ' . RF_BRAND_NAME . ' Blog';
 		$data['description'] = 'Practical, country-specific guides on making receipts, record-keeping and tax rules for small businesses in the US, UK, Canada, Australia and India.';
 		$data['canonical']   = get_permalink( get_option( 'page_for_posts' ) );
+		$data                = rf_seo_paginate( $data );
 	} elseif ( is_page() ) {
 		$data['title']       = get_the_title() . ' | ' . RF_BRAND_NAME;
 		$data['description'] = has_excerpt() ? get_the_excerpt() : rf_default_page_description( get_post_field( 'post_name' ) );
@@ -94,7 +95,7 @@ function rf_get_seo_data() {
 		$data['robots'] = 'noindex, follow';
 	} elseif ( is_category() || is_tag() ) {
 		$term               = get_queried_object();
-		$data['title']       = $term->name . ' Articles | ' . RF_BRAND_NAME . ' Blog';
+		$data['title']       = ucfirst( $term->name ) . ' Articles | ' . RF_BRAND_NAME . ' Blog';
 		$data['description'] = $term->description ? wp_strip_all_tags( $term->description ) : rf_default_term_description( $term );
 		$data['canonical']   = get_term_link( $term );
 
@@ -110,6 +111,12 @@ function rf_get_seo_data() {
 		if ( $term->count < RF_THIN_ARCHIVE_MIN ) {
 			$data['robots'] = 'noindex, follow';
 		}
+		// Oct 2026 audit (SEO-03): tag archives are never indexed, whatever
+		// their size — they are already left out of the sitemap.
+		if ( is_tag() ) {
+			$data['robots'] = 'noindex, follow';
+		}
+		$data = rf_seo_paginate( $data );
 	} elseif ( is_404() ) {
 		$data['title']     = 'Page Not Found | ' . RF_BRAND_NAME;
 		$data['robots']    = 'noindex, follow';
@@ -121,6 +128,20 @@ function rf_get_seo_data() {
 	}
 
 	return apply_filters( 'rf_seo_data', $data );
+}
+
+/**
+ * Oct 2026 audit (SEO-01): page 2+ of the blog and of term archives
+ * canonicalizes to itself (not page 1) and gets its own title/description.
+ */
+function rf_seo_paginate( $data ) {
+	$paged = (int) get_query_var( 'paged' );
+	if ( $paged > 1 ) {
+		$data['canonical']    = get_pagenum_link( $paged );
+		$data['title']       .= ' – Page ' . $paged;
+		$data['description'] .= ' – Page ' . $paged;
+	}
+	return $data;
 }
 
 function rf_output_seo_meta_tags() {
@@ -146,6 +167,10 @@ function rf_output_seo_meta_tags() {
 	<meta property="og:url" content="<?php echo esc_url( $seo['canonical'] ); ?>">
 	<?php endif; ?>
 	<meta property="og:image" content="<?php echo esc_url( $seo['image'] ); ?>">
+	<?php if ( false !== strpos( $seo['image'], '/assets/img/og-default.png' ) ) : ?>
+	<meta property="og:image:width" content="1200">
+	<meta property="og:image:height" content="630">
+	<?php endif; ?>
 	<meta property="og:locale" content="en_US">
 
 	<!-- Twitter Card -->
@@ -154,7 +179,8 @@ function rf_output_seo_meta_tags() {
 	<meta name="twitter:description" content="<?php echo esc_attr( $seo['description'] ); ?>">
 	<meta name="twitter:image" content="<?php echo esc_url( $seo['image'] ); ?>">
 
-	<?php if ( is_singular() ) : ?>
+	<?php if ( is_singular( 'post' ) ) : ?>
+	<meta property="article:published_time" content="<?php echo esc_attr( get_the_date( 'c' ) ); ?>">
 	<meta property="article:modified_time" content="<?php echo esc_attr( get_the_modified_date( 'c' ) ); ?>">
 	<?php endif; ?>
 	<?php

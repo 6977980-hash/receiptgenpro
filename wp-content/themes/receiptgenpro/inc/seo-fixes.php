@@ -201,9 +201,9 @@ function rf_flush_rewrites_v110() {
 }
 add_action( 'init', 'rf_flush_rewrites_v110', 99 );
 
-// Never add a trailing slash to *.txt endpoints (/ads.txt → /ads.txt/ bug).
+// Never add a trailing slash to *.txt / *.webmanifest endpoints (/ads.txt → /ads.txt/ bug).
 function rf_no_slash_for_txt( $redirect_url, $requested_url ) {
-	if ( preg_match( '#\.txt/?$#', (string) wp_parse_url( $requested_url, PHP_URL_PATH ) ) ) {
+	if ( preg_match( '#\.(txt|webmanifest)/?$#', (string) wp_parse_url( $requested_url, PHP_URL_PATH ) ) ) {
 		return false;
 	}
 	return $redirect_url;
@@ -335,6 +335,11 @@ function rf_render_indexnow_key() {
 		echo esc_html( $req );
 		exit;
 	}
+	// Oct 2026 audit (SEO-02): any other 32-hex .txt is a real 404, not the blog page with a 200.
+	global $wp_query;
+	$wp_query->set_404();
+	status_header( 404 );
+	nocache_headers();
 }
 add_action( 'template_redirect', 'rf_render_indexnow_key', 0 );
 
