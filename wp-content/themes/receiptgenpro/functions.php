@@ -27,7 +27,7 @@ define( 'RF_LOGO_TEXT', 'Receipt<span class="rf-accent">GenPro</span>' );
 define( 'RF_SOCIAL_TWITTER', '' );  // e.g. 'https://x.com/receiptgenpro'
 define( 'RF_SOCIAL_FACEBOOK', '' ); // e.g. 'https://facebook.com/receiptgenpro'
 define( 'RF_SOCIAL_LINKEDIN', '' ); // e.g. 'https://linkedin.com/company/receiptgenpro'
-define( 'RF_THEME_VERSION', '1.1.4' );
+define( 'RF_THEME_VERSION', '1.1.5' );
 
 /* ==========================================================================
    2. THEME SETUP
@@ -327,19 +327,3 @@ function rf_remove_users_sitemap( $provider, $name ) {
 }
 add_filter( 'wp_sitemaps_add_provider', 'rf_remove_users_sitemap', 10, 2 );
 
-/**
- * Register the two theme widget areas used in footer.php.
- */
-function rf_widgets_init() {
-	register_sidebar(
-		array(
-			'name'          => __( 'Blog Sidebar', 'receiptgenpro' ),
-			'id'            => 'blog-sidebar',
-			'before_widget' => '<div class="rf-widget">',
-			'after_widget'  => '</div>',
-			'before_title'  => '<h3 class="rf-widget-title">',
-			'after_title'   => '</h3>',
-		)
-	);
-}
-add_action( 'widgets_init', 'rf_widgets_init' );

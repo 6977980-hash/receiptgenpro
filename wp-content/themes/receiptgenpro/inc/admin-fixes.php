@@ -46,11 +46,17 @@ function rf_fixes_apply_patch( $content, $patch ) {
 	if ( ! empty( $patch['skip'] ) ) {
 		return array( $content, 'skipped' );
 	}
+	// 'unless': the patch has already been applied (or written by hand).
+	if ( ! empty( $patch['unless'] ) && false !== strpos( $content, $patch['unless'] ) ) {
+		return array( $content, 'not-found' );
+	}
 	if ( ! empty( $patch['regex'] ) ) {
 		if ( ! preg_match( $patch['find'], $content ) ) {
 			return array( $content, 'not-found' );
 		}
-		return array( preg_replace( $patch['find'], str_replace( '$', '\$', $patch['replace'] ), $content, 1 ), 'applied' );
+		// 'backrefs' keeps $1 etc. in the replacement working.
+		$replace = empty( $patch['backrefs'] ) ? str_replace( '$', '\$', $patch['replace'] ) : $patch['replace'];
+		return array( preg_replace( $patch['find'], $replace, $content, 1 ), 'applied' );
 	}
 	if ( false === strpos( $content, $patch['find'] ) ) {
 		return array( $content, 'not-found' );
@@ -203,6 +209,25 @@ function rf_fixes_handle() {
 			}
 			break;
 
+		case 'titles':
+			foreach ( rf_seo_title_patches() as $slug => $title ) {
+				$found = get_posts( array( 'name' => $slug, 'post_type' => 'post', 'post_status' => 'publish', 'numberposts' => 1 ) );
+				if ( ! $found ) {
+					$log[] = array( 'warn', "/$slug/ — post not found" );
+					continue;
+				}
+				$current = get_post_meta( $found[0]->ID, 'rf_seo_title', true );
+				if ( $current === $title ) {
+					$log[] = array( 'info', "/$slug/ — already set" );
+					continue;
+				}
+				$log[] = array( $apply ? 'ok' : 'todo', sprintf( '/%s/ — "%s" → "%s" (%d characters)', $slug, $current ? $current : get_the_title( $found[0] ), $title, mb_strlen( $title ) ) );
+				if ( $apply ) {
+					update_post_meta( $found[0]->ID, 'rf_seo_title', $title );
+				}
+			}
+			break;
+
 		case 'editorial':
 			$existing = get_page_by_path( 'editorial-policy', OBJECT, 'page' );
 			if ( $existing ) {
@@ -300,7 +325,7 @@ function rf_fixes_page() {
 		<?php $form_open( 'dates' ); $buttons(); ?>
 
 		<h2>2. Page text — placeholders &amp; issuer framing</h2>
-		<p>Fixes About, Contact, Terms, Privacy and Cookie placeholders, and rewrites the taxi, hotel and restaurant copy that suggested recreating lost receipts for expense claims.</p>
+		<p>Fixes About, Contact, Terms, Privacy and Cookie placeholders, and rewrites the taxi, hotel and restaurant copy that suggested recreating lost receipts for expense claims. Oct 2026: also cross-links the rent and HRA rent pages in their first paragraph and adds a short "what we never store" section to About and a "how to reach us" section to Contact.</p>
 		<?php $form_open( 'content' ); ?>
 			<table class="form-table" style="max-width:900px">
 				<tr><th><label for="rf_owner">Your name (shown on About / Contact)</label></th><td><input class="regular-text" id="rf_owner" name="rf_owner" value="<?php echo esc_attr( $owner['owner'] ); ?>" placeholder="e.g. Ali Ahmad"> <p class="description">Leave empty to just remove the notes. After applying, open Pages → About Us and add a few lines about yourself.</p></td></tr>
@@ -324,6 +349,10 @@ function rf_fixes_page() {
 		<h2>5. Editorial Policy page</h2>
 		<p>Creates a <strong>draft</strong> at /editorial-policy/ explaining who writes the guides, which official sources are used, how often they are checked, and how to report errors. Read it before you publish — it describes commitments you'll need to keep. Links to it appear automatically once it is published.</p>
 		<?php $form_open( 'editorial' ); $buttons(); ?>
+
+		<h2>6. Shorter search titles</h2>
+		<p>Sets the SEO title (<code>rf_seo_title</code>) of three guides whose titles are longer than 60 characters, so Google shows them in full. The post headline on the page doesn't change.</p>
+		<?php $form_open( 'titles' ); $buttons(); ?>
 
 		<h2>After applying</h2>
 		<ol>

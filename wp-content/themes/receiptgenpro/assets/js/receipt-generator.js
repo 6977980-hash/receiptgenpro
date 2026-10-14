@@ -1,5 +1,5 @@
 /**
- * ReceiptGenPro — Receipt Generator (v1.1.4)
+ * ReceiptGenPro — Receipt Generator (v1.1.5)
  *
  * 100% client-side: no fetch(), no form submission, no data ever leaves
  * the browser.
@@ -34,7 +34,7 @@
 		document.addEventListener( 'DOMContentLoaded', init );
 	}
 
-	var LIBS = ( window.rfReceipt && window.rfReceipt.libs ) || {
+	var LIBS = ( typeof window !== 'undefined' && window.rfReceipt && window.rfReceipt.libs ) || {
 		html2canvas: {
 			url: 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
 			integrity: 'sha512-BNaRQnYJYiPSqHHDb58B0yaPfCu+Wgds8Gp/gU33kqBtgNS4tSPHuGibyoeqMV/TJlSKda6FXzoEyYGjTe+vXA=='
@@ -194,7 +194,13 @@
 
 	// Lets a Node check exercise the pure helpers without a browser.
 	if ( typeof module !== 'undefined' && module.exports ) {
-		module.exports = { amountInWords: amountInWords, intToWordsIndian: intToWordsIndian };
+		module.exports = {
+			amountInWords: amountInWords,
+			intToWords: intToWords,
+			intToWordsIndian: intToWordsIndian,
+			toCents: toCents,
+			nonNegative: nonNegative
+		};
 	}
 
 	function init() {
