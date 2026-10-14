@@ -61,3 +61,15 @@ After updating: go to **Tools → ReceiptGenPro Fixes** and run sections 1–5 (
 - `currency` option per template; `month` field type printed as "April 2026".
 - Hub page: new templates + comparison rows; description updated to 16 templates.
 (Applied on the live site through Appearance → Theme File Editor on 26 Sept 2026.)
+
+## Technical SEO fixes — 14 Oct 2026 (audit phase 2)
+No CSS/JS or rewrite-rule changes, so the theme version is unchanged.
+- Blog and category/tag page 2+ canonicalize to themselves and get " – Page N" in title and description (SEO-01).
+- Tag archives are always `noindex, follow`; term names are capitalized in titles and breadcrumbs (SEO-03).
+- JSON-LD text is entity-decoded (headline, description, WebPage name, breadcrumbs) (SEO-04).
+- Template pages use the H1 label ("Rent Receipt Generator") as breadcrumb and WebPage name (SEO-05).
+- JSON-LD encoded with `JSON_HEX_TAG` (SEC-03).
+- Unknown 32-hex `.txt` URLs return a real 404 (SEO-02); `/site.webmanifest` no longer redirects to a trailing slash (SEO-06).
+- Hub FAQ: deposits point to /deposit-receipt/, general payments to /payment-receipt/ (CNT-01).
+- `article:published_time`/`modified_time` only on posts; `og:image:width/height` for the default image (SEO-07).
+- Article `citation` honours the per-post `rf_sources` custom field (WP-04).

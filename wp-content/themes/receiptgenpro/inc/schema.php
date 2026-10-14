@@ -27,6 +27,14 @@ if ( ! defined( 'ABSPATH' ) ) {
  * is the single most important GEO signal for a small brand: it tells
  * generative engines unambiguously who "ReceiptGenPro" is.
  */
+/**
+ * Oct 2026 audit (SEO-04): plain text for JSON-LD — WordPress titles carry
+ * HTML entities (&#8217;, &#038;) that would otherwise show up literally.
+ */
+function rf_schema_text( $text ) {
+	return html_entity_decode( wp_strip_all_tags( (string) $text ), ENT_QUOTES, 'UTF-8' );
+}
+
 function rf_schema_organization() {
 	return array(
 		'@type' => 'Organization',
@@ -116,7 +124,7 @@ function rf_schema_breadcrumbs() {
 		$item = array(
 			'@type'    => 'ListItem',
 			'position' => $i + 1,
-			'name'     => wp_strip_all_tags( $crumb['title'] ),
+			'name'     => rf_schema_text( $crumb['title'] ),
 		);
 		if ( ! empty( $crumb['url'] ) ) {
 			$item['item'] = $crumb['url'];
@@ -238,7 +246,7 @@ function rf_hub_faqs() {
 	return array(
 		array( 'Are these receipt templates free?', 'Yes. Every template is free to fill in and download as PDF, PNG or JPEG, with no signup and no watermark.' ),
 		array( 'Can I edit a template after downloading it?', 'The download is a finished PDF or image. To change something, edit the form on the template page and download again — the form keeps your entries until you close the tab.' ),
-		array( 'Which template do I need for a deposit or advance payment?', 'Use the <a href="' . esc_url( home_url( '/cash-receipt/' ) ) . '">cash receipt</a> for a deposit paid in cash, or the template for your business type, and fill in “Amount Paid” so the balance due is calculated for you.' ),
+		array( 'Which template do I need for a deposit or advance payment?', 'Use the <a href="' . esc_url( home_url( '/deposit-receipt/' ) ) . '">deposit receipt</a> for a deposit or advance payment, or the <a href="' . esc_url( home_url( '/payment-receipt/' ) ) . '">payment receipt</a> for a general payment, and fill in “Amount Paid” so the balance due is calculated for you.' ),
 		array( 'Who should issue a receipt?', 'The business or person who received the money. A receipt should never be created on behalf of another business or for a payment that did not happen.' ),
 	);
 }
@@ -336,8 +344,8 @@ function rf_schema_article() {
 
 	$article = array(
 		'@type'            => 'Article',
-		'headline'         => get_the_title(),
-		'description'      => has_excerpt() ? get_the_excerpt() : wp_trim_words( wp_strip_all_tags( $post->post_content ), 30 ),
+		'headline'         => rf_schema_text( get_the_title() ),
+		'description'      => rf_schema_text( has_excerpt() ? get_the_excerpt() : wp_trim_words( wp_strip_all_tags( $post->post_content ), 30 ) ),
 		'author'           => $person,
 		'publisher'        => array( '@id' => home_url( '/#organization' ) ),
 		'datePublished'    => get_the_date( 'c' ),
@@ -352,7 +360,7 @@ function rf_schema_article() {
 	}
 	// v1.1.0 (audit H2): the official sources shown in the "Sources" box
 	// are also exposed as schema.org citations (useful for AI engines).
-	$sources = rf_get_post_sources( $post->post_name );
+	$sources = rf_get_post_sources( $post->post_name, $post->ID );
 	if ( ! empty( $sources['sources'] ) ) {
 		$article['citation'] = array_map(
 			function ( $src ) {
@@ -409,10 +417,10 @@ function rf_output_schema() {
 		$graph[] = array(
 			'@type'    => 'WebPage',
 			'@id'      => get_permalink() . '#webpage',
-			'name'     => get_the_title(),
+			'name'     => $cat ? rf_category_label( $cat ) : rf_schema_text( get_the_title() ),
 			'url'      => get_permalink(),
 			'isPartOf' => array( '@id' => home_url( '/#website' ) ),
-			'about'    => $cat['h1'] ?? get_the_title(),
+			'about'    => rf_schema_text( $cat['h1'] ?? get_the_title() ),
 		);
 		// v1.1.0 (audit H5): each template page describes its own tool.
 		if ( $cat ) {
@@ -460,6 +468,6 @@ function rf_output_schema() {
 		'@graph'   => $graph,
 	);
 
-	echo "\n<script type=\"application/ld+json\">\n" . wp_json_encode( $json, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT ) . "\n</script>\n";
+	echo "\n<script type=\"application/ld+json\">\n" . wp_json_encode( $json, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT ) . "\n</script>\n";
 }
 add_action( 'wp_head', 'rf_output_schema', 5 );

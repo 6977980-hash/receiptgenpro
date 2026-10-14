@@ -252,12 +252,14 @@ function rf_get_breadcrumbs() {
 		$trail[] = array( 'title' => 'Blog', 'url' => get_permalink( get_option( 'page_for_posts' ) ) );
 	} elseif ( is_page_template( 'page-receipt-category.php' ) ) {
 		$trail[] = array( 'title' => 'Receipt Templates', 'url' => home_url( '/receipt-templates/' ) );
-		$trail[] = array( 'title' => get_the_title(), 'url' => get_permalink() );
+		// Oct 2026 audit (SEO-05): same name as the page's H1, not the long SEO title.
+		$cat     = rf_get_category_data( get_post_field( 'post_name' ) );
+		$trail[] = array( 'title' => $cat ? rf_category_label( $cat ) : get_the_title(), 'url' => get_permalink() );
 	} elseif ( rf_is_templates_hub() ) {
 		$trail[] = array( 'title' => 'Receipt Templates', 'url' => home_url( '/receipt-templates/' ) );
 	} elseif ( is_category() || is_tag() ) {
 		$trail[] = array( 'title' => 'Blog', 'url' => get_permalink( get_option( 'page_for_posts' ) ) );
-		$trail[] = array( 'title' => single_term_title( '', false ), 'url' => get_term_link( get_queried_object() ) );
+		$trail[] = array( 'title' => ucfirst( single_term_title( '', false ) ), 'url' => get_term_link( get_queried_object() ) );
 	} elseif ( is_page() ) {
 		$trail[] = array( 'title' => get_the_title(), 'url' => get_permalink() );
 	} elseif ( is_author() ) {
