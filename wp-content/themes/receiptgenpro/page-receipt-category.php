@@ -42,6 +42,7 @@ while ( have_posts() ) :
 			array(
 				'heading' => ( $cat['h1'] ?? get_the_title() ) . ' — Fill in the Details',
 				'form'    => $cat['form'] ?? array(),
+				'purpose' => $cat['purpose'] ?? '',
 			)
 		);
 		?>

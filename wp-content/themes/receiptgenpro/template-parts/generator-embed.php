@@ -15,6 +15,11 @@
  *   'heading'      (string)  Form heading, defaults to "Receipt Details"
  *   'item_default' (string)  Placeholder for item rows (legacy, homepage)
  *   'form'         (array)   Template config from rf_get_category_data()
+ *   'purpose'      (string)  Requirement check selected by default
+ *                            (inc/requirements.php), '' for none
+ *
+ * v1.2.0: requirement checker under the preview, optional verification
+ * QR code, a custom number label and a second signature line.
  */
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -37,9 +42,13 @@ $form    = wp_parse_args(
 		'paid'           => false,
 		'words'          => false,
 		'signature'      => '',
+		'signature2'     => '',
+		'number_label'   => 'Receipt #',
 		'statement'      => array(),
 	)
 );
+$purpose  = (string) ( $args['purpose'] ?? '' );
+$purposes = rf_receipt_purposes();
 $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Cheque' );
 ?>
 <section class="rf-generator" id="rf-generator">
@@ -51,6 +60,8 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 			data-currency="<?php echo esc_attr( $form['currency'] ?? '' ); ?>"
 			data-words="<?php echo $form['words'] ? '1' : '0'; ?>"
 			data-signature="<?php echo esc_attr( $form['signature'] ); ?>"
+			data-signature2="<?php echo esc_attr( $form['signature2'] ); ?>"
+			data-number-label="<?php echo esc_attr( $form['number_label'] ); ?>"
 			data-business-label="<?php echo esc_attr( $form['business_label'] ); ?>"
 			data-client-label="<?php echo esc_attr( $form['client_label'] ); ?>">
 			<h2><?php echo esc_html( $heading ); ?></h2>
@@ -73,7 +84,7 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 					<input type="text" id="rf-client-name" placeholder="<?php echo esc_attr( $form['client_ph'] ); ?>">
 				</div>
 				<div class="rf-field">
-					<label for="rf-receipt-number">Receipt #</label>
+					<label for="rf-receipt-number"><?php echo esc_html( $form['number_label'] ); ?></label>
 					<input type="text" id="rf-receipt-number" value="1001" aria-describedby="rf-receipt-number-hint">
 					<p class="rf-field-hint" id="rf-receipt-number-hint">Next time, this starts after the last number you downloaded on this device.</p>
 				</div>
@@ -201,6 +212,14 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 				<label for="rf-notes">Notes (optional)</label>
 				<textarea id="rf-notes" rows="2" placeholder="<?php echo esc_attr( $form['notes_ph'] ); ?>"></textarea>
 			</div>
+
+			<div class="rf-field rf-field-check">
+				<label>
+					<input type="checkbox" id="rf-qr" checked aria-describedby="rf-qr-hint">
+					Add a verification QR code
+				</label>
+				<p class="rf-field-hint" id="rf-qr-hint">Scanning it shows the details as you issued them, so anyone can spot a receipt that was changed later. <a href="<?php echo esc_url( home_url( '/verify-receipt/' ) ); ?>">How it works</a></p>
+			</div>
 		</form>
 
 		<div class="rf-generator-preview">
@@ -212,6 +231,17 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 				<button type="button" class="rf-btn rf-btn-secondary" id="rf-download-jpg">Download JPEG</button>
 			</div>
 			<p class="rf-privacy-note">🔒 Nothing is uploaded — your receipt is generated entirely in your browser.</p>
+			<div class="rf-checker" id="rf-checker">
+				<label for="rf-purpose" class="rf-checker-label">Check this receipt for</label>
+				<select id="rf-purpose">
+					<option value="">— Choose what it's for —</option>
+					<?php foreach ( $purposes as $rf_key => $rf_p ) : ?>
+						<option value="<?php echo esc_attr( $rf_key ); ?>"<?php selected( $purpose, $rf_key ); ?>><?php echo esc_html( $rf_p['label'] ); ?></option>
+					<?php endforeach; ?>
+				</select>
+				<div id="rf-checker-result" class="rf-checker-result"></div>
+				<p class="rf-checker-more"><a href="<?php echo esc_url( home_url( '/receipt-requirements/' ) ); ?>">What each check is based on</a></p>
+			</div>
 			<p class="rf-usage-note">For receipts you issue for your own business or property. Never create a receipt on behalf of a business you don't own, or for a payment that didn't happen — see our <a href="<?php echo esc_url( home_url( '/terms-and-conditions/' ) ); ?>">Terms</a>.</p>
 		</div>
 

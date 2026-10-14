@@ -65,6 +65,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 						echo '<ul class="rf-footer-menu">';
 						$links = array(
 							'/receipt-templates/' => 'All Receipt Templates',
+							'/receipt-requirements/' => 'Receipt Requirements',
+							'/verify-receipt/'   => 'Verify a Receipt',
+							'/rent-receipt-laws/' => 'Rent Receipt Laws',
+							'/receipt-generator-widget/' => 'Free Widget',
 							'/blog/'             => 'Blog',
 							'/about-us/'         => 'About Us',
 							'/contact-us/'       => 'Contact Us',

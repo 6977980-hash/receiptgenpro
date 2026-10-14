@@ -31,5 +31,5 @@ jobs:
           node-version: '20'
       - name: Syntax check
         run: for f in wp-content/themes/receiptgenpro/assets/js/*.js; do node --check "$f"; done
-      - name: Unit tests (money and amount-in-words helpers)
+      - name: Unit tests (generator, verify and widget helpers)
         run: node --test tests/*.test.js

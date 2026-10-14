@@ -1,5 +1,5 @@
 /**
- * ReceiptGenPro — Receipt Generator (v1.1.6)
+ * ReceiptGenPro — Receipt Generator (v1.2.0)
  *
  * 100% client-side: no fetch(), no form submission, no data ever leaves
  * the browser.
@@ -31,6 +31,12 @@
  * off before tax), a named first tax and an optional second tax (e.g.
  * CGST + SGST), and the receipt number continues from the last one you
  * downloaded in this browser (localStorage, never uploaded).
+ *
+ * v1.2.0: requirement checker ("Check this receipt for: an HRA claim…",
+ * rules from inc/requirements.php), an optional verification QR code that
+ * carries the receipt's details in the link's #fragment (never sent to
+ * the server; see /verify-receipt/), a custom number label and a second
+ * signature line.
  */
 ( function () {
 	'use strict';
@@ -47,6 +53,10 @@
 		jspdf: {
 			url: 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
 			integrity: 'sha512-qZvrmS2ekKPF2mSznTQsxqPgnpkI4DNTlrdUmTzrDgektczlKNRRhy5X5AAOnx5S09ydFYWWNSfcEqDTTHgtNA=='
+		},
+		qrcode: {
+			url: 'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js',
+			integrity: 'sha512-ZDSPMa/JM1D+7kdg2x3BsruQ6T/JpJo3jWDWkCZsP+5yVyp1KfESqLI+7RqB5k24F7p2cV7i2YHh/890y6P6Sw=='
 		}
 	};
 	var loading = {};
@@ -230,6 +240,102 @@
 		return text.charAt( 0 ).toUpperCase() + text.slice( 1 ) + ' only';
 	}
 
+	// ---- Requirement checks (rules: inc/requirements.php) -----------------
+	// facts: { business, client, date, items, total, words, signature,
+	//          statement: true | false | null (null = not on this template),
+	//          x: { <extra field id>: true | false }, amount, cash }
+	// Returns one { label, status, optional } per check, where status is
+	// ok | missing | nofield | manual | na.
+	function factFor( facts, key ) {
+		if ( key.indexOf( 'x:' ) === 0 ) {
+			var id = key.slice( 2 );
+			return Object.prototype.hasOwnProperty.call( facts.x || {}, id ) ? !! facts.x[ id ] : null;
+		}
+		return facts[ key ] === undefined ? null : facts[ key ];
+	}
+
+	function evaluateChecks( checks, facts ) {
+		return ( checks || [] ).map( function ( c ) {
+			var out = { label: c.label, optional: !! c.optional, status: 'ok' };
+			var when = c.when || {};
+			if ( ( when.total_over !== undefined && ! ( facts.amount > when.total_over ) ) || ( when.cash && ! facts.cash ) ) {
+				out.status = 'na';
+				return out;
+			}
+			if ( c.manual ) {
+				out.status = 'manual';
+				return out;
+			}
+			var keys = [].concat( c.field || [] );
+			var vals = keys.map( function ( k ) {
+				return factFor( facts, k );
+			} );
+			var present = vals.filter( function ( v ) {
+				return v !== null;
+			} );
+			if ( c.all ) {
+				out.status = present.length < vals.length ? 'nofield' : ( present.every( Boolean ) ? 'ok' : 'missing' );
+			} else {
+				out.status = present.some( Boolean ) ? 'ok' : ( present.length ? 'missing' : 'nofield' );
+			}
+			return out;
+		} );
+	}
+
+	// ---- Verification QR payload -------------------------------------------
+	// The receipt's details as compact JSON, base64url-encoded, placed after
+	// the # of the /verify-receipt/ link. Browsers never send the # part to
+	// the server, so the details stay between the issuer and whoever scans.
+	function clip( str, max ) {
+		str = String( str || '' );
+		return str.length > max ? str.slice( 0, max - 1 ) + '…' : str;
+	}
+
+	function b64urlEncode( str ) {
+		var bytes = new TextEncoder().encode( str );
+		var bin = '';
+		for ( var i = 0; i < bytes.length; i++ ) {
+			bin += String.fromCharCode( bytes[ i ] );
+		}
+		return btoa( bin ).replace( /\+/g, '-' ).replace( /\//g, '_' ).replace( /=+$/, '' );
+	}
+
+	var QR_MAX = 1200; // characters of payload; keeps the code scannable when printed
+
+	function buildPayload( r ) {
+		var p = {
+			v: 1,
+			t: clip( r.title, 40 ),
+			b: clip( r.business, 80 ),
+			c: clip( r.client, 80 ),
+			n: clip( r.number, 30 ),
+			d: r.date,
+			cu: r.currency,
+			i: ( r.items || [] ).map( function ( it ) {
+				return [ clip( it.name, 60 ), it.qty, it.priceCents ];
+			} ),
+			tot: r.totalCents,
+			pm: r.payMethod,
+			x: ( r.extras || [] ).map( function ( e ) {
+				return [ clip( e[0], 40 ), clip( e[1], 80 ) ];
+			} )
+		};
+		if ( r.paidCents !== null && r.paidCents !== undefined ) {
+			p.pd = r.paidCents;
+		}
+		var enc = b64urlEncode( JSON.stringify( p ) );
+		while ( enc.length > QR_MAX && ( p.x.length || p.i.length > 3 ) ) {
+			if ( p.x.length ) {
+				p.x.pop();
+			} else {
+				p.i.pop();
+				p.more = 1; // tells the verify page that not every line fit
+			}
+			enc = b64urlEncode( JSON.stringify( p ) );
+		}
+		return enc;
+	}
+
 	// Lets a Node check exercise the pure helpers without a browser.
 	if ( typeof module !== 'undefined' && module.exports ) {
 		module.exports = {
@@ -239,7 +345,10 @@
 			toCents: toCents,
 			nonNegative: nonNegative,
 			calcTotals: calcTotals,
-			nextReceiptNumber: nextReceiptNumber
+			nextReceiptNumber: nextReceiptNumber,
+			evaluateChecks: evaluateChecks,
+			buildPayload: buildPayload,
+			b64urlEncode: b64urlEncode
 		};
 	}
 
@@ -266,6 +375,8 @@
 			title: form.dataset.receiptTitle || 'RECEIPT',
 			words: form.dataset.words === '1',
 			signature: form.dataset.signature || '',
+			signature2: form.dataset.signature2 || '',
+			numberLabel: form.dataset.numberLabel || 'Receipt #',
 			businessLabel: form.dataset.businessLabel || 'From',
 			clientLabel: form.dataset.clientLabel || 'Received From'
 		};
@@ -277,6 +388,106 @@
 		}
 
 		var state = { logoDataUrl: null };
+
+		// ---- Verification QR code ---------------------------------------------
+		var qrToggle   = document.getElementById( 'rf-qr' );
+		var verifyBase = ( window.rfReceipt && window.rfReceipt.verifyUrl ) || 'https://receiptgenpro.com/verify-receipt/';
+		var qrCache    = { text: '', url: '' };
+
+		function qrDataUrl( text ) {
+			if ( typeof window.qrcode !== 'function' ) {
+				ensureQrLib();
+				return '';
+			}
+			if ( qrCache.text !== text ) {
+				var qr = window.qrcode( 0, 'L' );
+				qr.addData( text, 'Byte' );
+				qr.make();
+				// 4 px per module, scaled down in CSS with crisp edges.
+				qrCache = { text: text, url: qr.createDataURL( 4, 0 ) };
+			}
+			return qrCache.url;
+		}
+
+		var qrLoading = false;
+		function ensureQrLib() {
+			if ( qrLoading ) {
+				return;
+			}
+			qrLoading = true;
+			loadScript( LIBS.qrcode ).then( function () {
+				renderReceipt();
+			}, function () {
+				qrLoading = false; // try again on the next change
+			} );
+		}
+
+		// ---- Requirement checker ----------------------------------------------
+		var purposeSel    = document.getElementById( 'rf-purpose' );
+		var checkerResult = document.getElementById( 'rf-checker-result' );
+		var purposes      = ( window.rfReceipt && window.rfReceipt.purposes ) || {};
+		var lastFacts     = null;
+
+		if ( purposeSel ) {
+			var urlPurpose = ( window.location.search.match( /[?&]purpose=([a-z0-9-]+)/ ) || [] )[1];
+			if ( urlPurpose && purposes[ urlPurpose ] ) {
+				purposeSel.value = urlPurpose;
+			}
+			purposeSel.addEventListener( 'change', function () {
+				renderChecker( lastFacts );
+			} );
+		}
+
+		function extraFacts() {
+			var x = {};
+			form.querySelectorAll( '[data-rf-extra]' ).forEach( function ( el ) {
+				x[ el.id.replace( /^rf-x-/, '' ) ] = !! ( el.value || '' ).trim();
+			} );
+			return x;
+		}
+
+		var STATUS_TEXT = {
+			ok: '',
+			missing: 'Fill this in',
+			nofield: 'Not on this template',
+			manual: 'Do this on the printed receipt',
+			na: 'Not needed for this amount'
+		};
+
+		function renderChecker( facts ) {
+			lastFacts = facts;
+			if ( ! purposeSel || ! checkerResult || ! facts ) {
+				return;
+			}
+			var p = purposes[ purposeSel.value ];
+			if ( ! p ) {
+				checkerResult.innerHTML = '';
+				return;
+			}
+			var results = evaluateChecks( p.checks, facts );
+			var needed  = results.filter( function ( r ) {
+				return ! r.optional && ( r.status === 'ok' || r.status === 'missing' || r.status === 'nofield' );
+			} );
+			var done = needed.filter( function ( r ) {
+				return r.status === 'ok';
+			} ).length;
+			var onOtherTemplate = p.templateUrl && p.templateUrl.replace( /\/$/, '' ) !== ( window.location.origin + window.location.pathname ).replace( /\/$/, '' );
+			var html = '<p class="rf-checker-summary' + ( done === needed.length ? ' rf-checker-all-done' : '' ) + '">' +
+				( done === needed.length ? 'Everything required is on the receipt.' : done + ' of ' + needed.length + ' required details are on the receipt.' ) + '</p><ul>';
+			results.forEach( function ( r ) {
+				var status = r.status === 'missing' && r.optional ? 'optional' : r.status;
+				var note = r.status === 'missing' && r.optional ? 'Recommended' : STATUS_TEXT[ r.status ];
+				html += '<li class="rf-check-' + status + '"><span class="rf-check-label">' + escapeHtml( r.label ) + '</span>' +
+					( note ? '<span class="rf-check-note">' + escapeHtml( note ) + '</span>' : '' ) + '</li>';
+			} );
+			html += '</ul>';
+			if ( onOtherTemplate && results.some( function ( r ) {
+				return r.status === 'nofield' && ! r.optional;
+			} ) ) {
+				html += '<p class="rf-checker-switch">The <a href="' + escapeHtml( p.templateUrl ) + '?purpose=' + encodeURIComponent( purposeSel.value ) + '#rf-generator">' + escapeHtml( p.templateName || 'matching template' ) + '</a> has every field this needs.</p>';
+			}
+			checkerResult.innerHTML = html;
+		}
 
 		// ---- Currency dropdown ---------------------------------------------
 		var currencies = ( window.rfReceipt && window.rfReceipt.currencies ) || { USD: '$ — US Dollar' };
@@ -576,7 +787,7 @@
 				.join( '' );
 
 			var meta = [
-				'<div><strong>Receipt #:</strong> ' + escapeHtml( number ) + '</div>',
+				'<div><strong>' + escapeHtml( cfg.numberLabel.replace( /:$/, '' ) ) + ':</strong> ' + escapeHtml( number ) + '</div>',
 				'<div><strong>Date:</strong> ' + escapeHtml( date ) + '</div>'
 			];
 			if ( client ) {
@@ -584,11 +795,13 @@
 			}
 			meta.push( '<div><strong>Payment Method:</strong> ' + escapeHtml( payMethod ) + '</div>' );
 
+			var extras = [];
 			form.querySelectorAll( '[data-rf-extra]' ).forEach( function ( el ) {
 				var val = formatExtra( el );
 				if ( val ) {
 					var label = ( el.dataset.label || '' ).replace( / \(optional\)$/i, '' );
 					meta.push( '<div><strong>' + escapeHtml( label ) + ':</strong> ' + escapeHtml( val ) + '</div>' );
+					extras.push( [ label, val ] );
 				}
 			} );
 
@@ -617,8 +830,35 @@
 			var statementHtml = ( statement && statement.checked ) ?
 				'<p class="rf-receipt-statement">' + escapeHtml( statement.dataset.text ) + '</p>' : '';
 
-			var signatureHtml = cfg.signature ?
-				'<div class="rf-receipt-signature"><span class="rf-sig-line"></span><span>' + escapeHtml( cfg.signature ) + '</span></div>' : '';
+			var signatureHtml = [ cfg.signature, cfg.signature2 ].filter( Boolean ).map( function ( label ) {
+				return '<div class="rf-receipt-signature"><span class="rf-sig-line"></span><span>' + escapeHtml( label ) + '</span></div>';
+			} ).join( '' );
+			if ( cfg.signature && cfg.signature2 ) {
+				signatureHtml = '<div class="rf-receipt-signatures">' + signatureHtml + '</div>';
+			}
+
+			var qrHtml = '';
+			if ( qrToggle && qrToggle.checked ) {
+				var verifyLink = verifyBase + '#r=' + buildPayload( {
+					title: cfg.title,
+					business: document.getElementById( 'rf-business-name' ).value.trim(),
+					client: client,
+					number: number,
+					date: date,
+					currency: currency,
+					items: items.map( function ( it ) {
+						return { name: it.name, qty: it.qty, priceCents: toCents( it.price ) };
+					} ),
+					totalCents: totalCents,
+					paidCents: paid === null ? null : toCents( paid ),
+					payMethod: payMethod,
+					extras: extras
+				} );
+				var qrImg = qrDataUrl( verifyLink );
+				if ( qrImg ) {
+					qrHtml = '<div class="rf-receipt-qr"><img src="' + qrImg + '" width="112" height="112" alt="Verification QR code"><span>Scan to verify this receipt<br>' + escapeHtml( verifyBase.replace( /^https?:\/\//, '' ) ) + '</span></div>';
+				}
+			}
 
 			preview.innerHTML =
 				'<div class="rf-receipt-inner">' +
@@ -635,6 +875,7 @@
 				statementHtml +
 				( notes ? '<div class="rf-receipt-notes">' + escapeHtml( notes ) + '</div>' : '' ) +
 				signatureHtml +
+				qrHtml +
 				'<p class="rf-receipt-footer">Generated with ' + escapeHtml( ( window.rfReceipt && window.rfReceipt.brand ) || 'ReceiptGenPro' ) + '</p>' +
 				'</div>';
 
@@ -642,6 +883,22 @@
 				logoRemove.style.display = state.logoDataUrl ? '' : 'none';
 			}
 			saveForm();
+
+			renderChecker( {
+				business: !! document.getElementById( 'rf-business-name' ).value.trim(),
+				client: !! client,
+				date: !! dateInput.value,
+				items: items.some( function ( it ) {
+					return it.name && it.name !== 'Item';
+				} ),
+				total: totalCents > 0,
+				words: cfg.words ? true : null,
+				signature: ( cfg.signature || cfg.signature2 ) ? true : null,
+				statement: statement ? statement.checked : null,
+				x: extraFacts(),
+				amount: total,
+				cash: payMethod === 'Cash'
+			} );
 
 			// Screen readers hear only the new total, once typing pauses,
 			// instead of the whole receipt on every keystroke.
@@ -719,6 +976,7 @@
 			var link = document.createElement( 'a' );
 			link.download = filename;
 			link.href = href;
+			link.target = '_self'; // the /embed/ page sets <base target="_blank">
 			document.body.appendChild( link );
 			link.click();
 			link.remove();

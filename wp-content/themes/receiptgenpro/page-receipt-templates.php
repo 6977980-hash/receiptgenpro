@@ -19,6 +19,7 @@ get_header();
 $rf_groups = array(
 	'By type of business' => array( 'rent-receipt', 'hotel-receipt', 'restaurant-receipt', 'taxi-receipt', 'mechanic-receipt', 'cleaning-receipt', 'salon-spa-receipt', 'hardware-store-receipt', 'construction-receipt', 'childcare-receipt', 'freelance-receipt' ),
 	'By kind of payment'  => array( 'payment-receipt', 'cash-receipt', 'deposit-receipt', 'hra-rent-receipt', 'donation-receipt' ),
+	'For expense reports' => array( 'missing-receipt-form' ),
 );
 ?>
 
@@ -80,6 +81,7 @@ $rf_groups = array(
 						<tr><td>A contractor taking a progress payment</td><td><a href="<?php echo esc_url( home_url( '/construction-receipt/' ) ); ?>">Contractor receipt</a></td><td>Project address, phase, balance remaining</td></tr>
 						<tr><td>A taxi driver or cab company</td><td><a href="<?php echo esc_url( home_url( '/taxi-receipt/' ) ); ?>">Taxi receipt</a></td><td>Vehicle no., pickup, drop-off, distance, tip</td></tr>
 						<tr><td>A hotel, guesthouse or B&amp;B</td><td><a href="<?php echo esc_url( home_url( '/hotel-receipt/' ) ); ?>">Hotel receipt</a></td><td>Room, check-in / check-out, nightly rate</td></tr>
+						<tr><td>An employee who lost a receipt</td><td><a href="<?php echo esc_url( home_url( '/missing-receipt-form/' ) ); ?>">Missing receipt form</a></td><td>Vendor, business purpose, reason it's missing, approver signature</td></tr>
 						<tr><td>A café, food truck or caterer</td><td><a href="<?php echo esc_url( home_url( '/restaurant-receipt/' ) ); ?>">Restaurant receipt</a></td><td>Table, server, tip</td></tr>
 					</tbody>
 				</table>
@@ -94,6 +96,16 @@ $rf_groups = array(
 					<p><?php echo wp_kses_post( $rf_faq[1] ); ?></p>
 				<?php endforeach; ?>
 			</div>
+		</section>
+
+		<section class="rf-section rf-narrow">
+			<h2>Free Receipt Tools</h2>
+			<ul>
+				<li><a href="<?php echo esc_url( home_url( '/receipt-requirements/' ) ); ?>">Receipt requirements checker</a>: what a receipt needs for HRA, FSA, $250+ donations and expense reports.</li>
+				<li><a href="<?php echo esc_url( home_url( '/verify-receipt/' ) ); ?>">Verify a receipt</a>: scan the QR code on a receipt to see whether it was changed.</li>
+				<li><a href="<?php echo esc_url( home_url( '/rent-receipt-laws/' ) ); ?>">Rent receipt laws by state</a>: when a US landlord must give a receipt.</li>
+				<li><a href="<?php echo esc_url( home_url( '/receipt-generator-widget/' ) ); ?>">Receipt generator widget</a>: put any template on your own website.</li>
+			</ul>
 		</section>
 
 		<?php

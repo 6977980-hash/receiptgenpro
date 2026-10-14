@@ -74,7 +74,7 @@ add_filter( 'author_link', 'rf_author_link_to_about' );
 /* ==========================================================================
    3. Security headers (M7)
    ========================================================================== */
-function rf_security_headers() {
+function rf_security_headers( $wp = null ) {
 	if ( headers_sent() ) {
 		return;
 	}
@@ -83,7 +83,12 @@ function rf_security_headers() {
 	}
 	header( 'X-Content-Type-Options: nosniff' );
 	header( 'Referrer-Policy: strict-origin-when-cross-origin' );
-	header( 'X-Frame-Options: SAMEORIGIN' );
+	// v1.2.0: /embed/<template>/ is made to be shown in other sites' iframes.
+	if ( $wp instanceof WP && ! empty( $wp->query_vars['rf_embed'] ) ) {
+		header( "Content-Security-Policy: frame-ancestors *" );
+	} else {
+		header( 'X-Frame-Options: SAMEORIGIN' );
+	}
 	header( 'Permissions-Policy: camera=(), microphone=(), geolocation=()' );
 	if ( is_ssl() ) {
 		header( 'Strict-Transport-Security: max-age=31536000' );
@@ -231,6 +236,10 @@ function rf_render_llms_txt() {
 	foreach ( rf_receipt_categories() as $slug => $cat ) {
 		$lines[] = '- [' . rf_category_label( $cat ) . '](' . home_url( '/' . $slug . '/' ) . '): ' . $cat['meta_description'];
 	}
+	$lines[] = '- [Receipt Requirements Checker](' . home_url( '/receipt-requirements/' ) . '): what a receipt must show for an HRA claim, a dependent care FSA, a $250+ donation, an expense report or a US rent payment, with official sources';
+	$lines[] = '- [Verify a Receipt](' . home_url( '/verify-receipt/' ) . '): reads the verification QR code printed on ' . RF_BRAND_NAME . ' receipts to show the details as issued';
+	$lines[] = '- [Rent Receipt Laws by State](' . home_url( '/rent-receipt-laws/' ) . '): US states that require landlords to give rent receipts, with statute citations';
+	$lines[] = '- [Receipt Generator Widget](' . home_url( '/receipt-generator-widget/' ) . '): free embed code to put any template on another website';
 	$lines[] = '';
 	$lines[] = '## Guides';
 	$posts = get_posts(
