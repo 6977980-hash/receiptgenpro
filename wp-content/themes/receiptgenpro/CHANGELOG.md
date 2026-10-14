@@ -1,5 +1,12 @@
 # ReceiptGenPro theme — Changelog
 
+## 1.1.6 — 14 Oct 2026 (site audit, Phase 5: generator extras)
+
+### Generator
+- New "Discount and a second tax" section (collapsed by default): a discount as a percentage or a fixed amount, taken off the subtotal before tax; a name for the first tax; and an optional second tax with its own name and rate (for example CGST 9% + SGST 9%). Each prints on its own line.
+- The receipt number continues from the last one downloaded in this browser (1001 → 1002, INV-0099 → INV-0100). Only that number is kept, in localStorage; nothing is uploaded.
+- Unit tests cover the new totals and numbering.
+
 ## 1.1.5 — 14 Oct 2026 (site audit, Phase 5: content and housekeeping)
 
 ### Content (Tools → ReceiptGenPro Fixes)

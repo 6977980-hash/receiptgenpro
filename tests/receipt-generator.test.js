@@ -41,3 +41,36 @@ test( 'amountInWords', () => {
 	assert.equal( rg.amountInWords( 120000, 'INR' ), 'One lakh twenty thousand Indian rupees only' );
 	assert.equal( rg.amountInWords( 150000.5, 'PKR' ), 'One lakh fifty thousand Pakistani rupees and fifty paisa only' );
 } );
+
+test( 'calcTotals: discount comes off before tax, two taxes on the discounted amount', () => {
+	// 1000.00 subtotal, 10% discount, CGST 9% + SGST 9%.
+	const r = rg.calcTotals( 100000, 10, 'percent', [ 9, 9 ], 0 );
+	assert.equal( r.discountCents, 10000 );
+	assert.deepEqual( r.taxCents, [ 8100, 8100 ] );
+	assert.equal( r.totalCents, 90000 + 16200 );
+} );
+
+test( 'calcTotals: fixed discount is capped at the subtotal, tip is added untaxed', () => {
+	assert.equal( rg.calcTotals( 5000, 80, 'amount', [ 10, 0 ], 0 ).totalCents, 0 );
+	const r = rg.calcTotals( 5000, 5, 'amount', [ 10, 0 ], 300 );
+	assert.equal( r.discountCents, 500 );
+	assert.deepEqual( r.taxCents, [ 450, 0 ] );
+	assert.equal( r.totalCents, 4500 + 450 + 300 );
+	// A percentage above 100 counts as 100.
+	assert.equal( rg.calcTotals( 5000, 150, 'percent', [ 0, 0 ], 0 ).discountCents, 5000 );
+} );
+
+test( 'calcTotals: no discount and one tax matches the old single-tax maths', () => {
+	const r = rg.calcTotals( 1999, 0, 'percent', [ 8.25, 0 ], 0 );
+	assert.equal( r.taxCents[0], rg.toCents( 1999 * 8.25 / 10000 ) );
+	assert.equal( r.totalCents, 1999 + r.taxCents[0] );
+} );
+
+test( 'nextReceiptNumber keeps prefixes and zero padding', () => {
+	assert.equal( rg.nextReceiptNumber( '1001' ), '1002' );
+	assert.equal( rg.nextReceiptNumber( 'INV-0099' ), 'INV-0100' );
+	assert.equal( rg.nextReceiptNumber( '2026-009' ), '2026-010' );
+	assert.equal( rg.nextReceiptNumber( '999' ), '1000' );
+	assert.equal( rg.nextReceiptNumber( 'ABC' ), 'ABC-2' );
+	assert.equal( rg.nextReceiptNumber( '' ), '1001' );
+} );

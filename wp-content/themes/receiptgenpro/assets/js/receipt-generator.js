@@ -1,5 +1,5 @@
 /**
- * ReceiptGenPro — Receipt Generator (v1.1.5)
+ * ReceiptGenPro — Receipt Generator (v1.1.6)
  *
  * 100% client-side: no fetch(), no form submission, no data ever leaves
  * the browser.
@@ -26,6 +26,11 @@
  *
  * v1.1.4 (Oct 2026 audit, Phase 4): the preview is no longer an aria-live
  * region; a hidden status line announces only the new total, debounced.
+ *
+ * v1.1.6 (Oct 2026 audit, Phase 5): optional discount (% or amount, taken
+ * off before tax), a named first tax and an optional second tax (e.g.
+ * CGST + SGST), and the receipt number continues from the last one you
+ * downloaded in this browser (localStorage, never uploaded).
  */
 ( function () {
 	'use strict';
@@ -96,6 +101,39 @@
 			n = fallback || 0;
 		}
 		return n > 0 ? n : 0;
+	}
+
+	// Subtotal → discount → taxes → tip → total, all in whole cents.
+	// discountType is 'percent' or 'amount'; a discount never exceeds the
+	// subtotal, and every tax is charged on the discounted amount.
+	function calcTotals( subtotalCents, discount, discountType, taxRates, tipCents ) {
+		var discountCents = discountType === 'percent' ?
+			toCents( subtotalCents * Math.min( discount, 100 ) / 10000 ) :
+			toCents( discount );
+		discountCents = Math.min( discountCents, subtotalCents );
+		var taxableCents = subtotalCents - discountCents;
+		var taxCents = taxRates.map( function ( rate ) {
+			return toCents( taxableCents * rate / 10000 );
+		} );
+		var totalCents = taxableCents + tipCents + taxCents.reduce( function ( a, b ) {
+			return a + b;
+		}, 0 );
+		return { discountCents: discountCents, taxCents: taxCents, totalCents: totalCents };
+	}
+
+	// The receipt number after this one: 1001 → 1002, INV-0099 → INV-0100,
+	// 2026-009 → 2026-010. A number without trailing digits gets "-2".
+	function nextReceiptNumber( current ) {
+		var str = String( current || '' ).trim();
+		var m = str.match( /^(.*?)(\d+)$/ );
+		if ( ! m ) {
+			return str ? str + '-2' : '1001';
+		}
+		var next = String( parseInt( m[2], 10 ) + 1 );
+		while ( next.length < m[2].length ) {
+			next = '0' + next;
+		}
+		return m[1] + next;
 	}
 
 	// Today's date in the visitor's own time zone (toISOString() is UTC).
@@ -199,7 +237,9 @@
 			intToWords: intToWords,
 			intToWordsIndian: intToWordsIndian,
 			toCents: toCents,
-			nonNegative: nonNegative
+			nonNegative: nonNegative,
+			calcTotals: calcTotals,
+			nextReceiptNumber: nextReceiptNumber
 		};
 	}
 
@@ -411,7 +451,30 @@
 			}
 		}
 
+		// ---- Receipt number continues from the last download ----------------
+		// localStorage keeps only the last downloaded number, in this browser.
+		var LAST_NUMBER_KEY = 'rgp-last-receipt-number';
+		var numberInput = document.getElementById( 'rf-receipt-number' );
+		try {
+			var lastNumber = window.localStorage.getItem( LAST_NUMBER_KEY );
+			if ( lastNumber && numberInput ) {
+				numberInput.value = nextReceiptNumber( lastNumber );
+			}
+		} catch ( e ) {}
+
+		function rememberNumber() {
+			try {
+				window.localStorage.setItem( LAST_NUMBER_KEY, numberInput.value.trim() || '1001' );
+			} catch ( e ) {}
+		}
+
 		restoreForm();
+
+		// Show the extra options when a restored form uses them.
+		var moreOptions = document.getElementById( 'rf-more-options' );
+		if ( moreOptions && ( nonNegative( ( document.getElementById( 'rf-discount' ) || {} ).value ) || nonNegative( ( document.getElementById( 'rf-tax2-rate' ) || {} ).value ) ) ) {
+			moreOptions.open = true;
+		}
 
 		// ---- Live re-render on any field change ------------------------------
 		form.addEventListener( 'input', renderReceipt );
@@ -426,6 +489,11 @@
 			var div = document.createElement( 'div' );
 			div.textContent = str || '';
 			return div.innerHTML;
+		}
+
+		function fieldValue( id ) {
+			var el = document.getElementById( id );
+			return el ? el.value.trim() : '';
 		}
 
 		function money( symbol, n ) {
@@ -473,6 +541,11 @@
 			var currency  = currencySel.value || 'USD';
 			var symbol    = getCurrencySymbol( currency );
 			var taxRate   = nonNegative( document.getElementById( 'rf-tax-rate' ).value );
+			var taxLabel  = fieldValue( 'rf-tax-label' ) || 'Tax';
+			var tax2Rate  = nonNegative( fieldValue( 'rf-tax2-rate' ) );
+			var tax2Label = fieldValue( 'rf-tax2-label' ) || 'Tax 2';
+			var discount  = nonNegative( fieldValue( 'rf-discount' ) );
+			var discType  = fieldValue( 'rf-discount-type' ) === 'amount' ? 'amount' : 'percent';
 			var payMethod = document.getElementById( 'rf-payment-method' ).value;
 			var notes     = document.getElementById( 'rf-notes' ).value.trim();
 			var items     = collectItems();
@@ -482,10 +555,9 @@
 			var subtotalCents = items.reduce( function ( sum, it ) {
 				return sum + it.lineCents;
 			}, 0 );
-			var taxCents   = toCents( subtotalCents * taxRate / 10000 );
-			var totalCents = subtotalCents + taxCents + tipCents;
+			var calc       = calcTotals( subtotalCents, discount, discType, [ taxRate, tax2Rate ], tipCents );
+			var totalCents = calc.totalCents;
 			var subtotal   = subtotalCents / 100;
-			var tax        = taxCents / 100;
 			var tip        = tipCents / 100;
 			var total      = totalCents / 100;
 			var paid       = paidRaw === '' ? null : toCents( nonNegative( paidRaw ) ) / 100;
@@ -522,7 +594,9 @@
 
 			var totalsHtml =
 				'<div><span>Subtotal</span><span>' + money( symbol, subtotal ) + '</span></div>' +
-				( taxRate ? '<div><span>Tax (' + taxRate + '%)</span><span>' + money( symbol, tax ) + '</span></div>' : '' ) +
+				( calc.discountCents ? '<div><span>Discount' + ( discType === 'percent' ? ' (' + Math.min( discount, 100 ) + '%)' : '' ) + '</span><span>-' + money( symbol, calc.discountCents / 100 ) + '</span></div>' : '' ) +
+				( taxRate ? '<div><span>' + escapeHtml( taxLabel ) + ' (' + taxRate + '%)</span><span>' + money( symbol, calc.taxCents[0] / 100 ) + '</span></div>' : '' ) +
+				( tax2Rate ? '<div><span>' + escapeHtml( tax2Label ) + ' (' + tax2Rate + '%)</span><span>' + money( symbol, calc.taxCents[1] / 100 ) + '</span></div>' : '' ) +
 				( tip ? '<div><span>Tip</span><span>' + money( symbol, tip ) + '</span></div>' : '' ) +
 				'<div class="rf-receipt-total-final"><span>Total</span><span>' + money( symbol, total ) + '</span></div>';
 
@@ -619,6 +693,7 @@
 				.then( function () {
 					return renderCanvas()
 						.then( cb )
+						.then( rememberNumber )
 						.catch( function ( err ) {
 							if ( window.console ) {
 								window.console.error( err );
