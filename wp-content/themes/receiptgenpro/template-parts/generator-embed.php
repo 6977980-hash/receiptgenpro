@@ -169,7 +169,8 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 		</form>
 
 		<div class="rf-generator-preview">
-			<div id="rf-receipt-preview" class="rf-receipt-paper" aria-live="polite"></div>
+			<div id="rf-receipt-preview" class="rf-receipt-paper"></div>
+			<p id="rf-total-live" class="screen-reader-text" role="status" aria-live="polite"></p>
 			<div class="rf-preview-actions">
 				<button type="button" class="rf-btn rf-btn-primary" id="rf-download-pdf">Download PDF</button>
 				<button type="button" class="rf-btn rf-btn-secondary" id="rf-download-png">Download PNG</button>

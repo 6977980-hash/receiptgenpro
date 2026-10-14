@@ -6,6 +6,10 @@
  * a stable URL showing everything one credentialed person has written).
  * This is the page the Person schema's "url" field points to.
  */
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 get_header();
 $author_id = get_queried_object_id();
 ?>
@@ -13,7 +17,7 @@ $author_id = get_queried_object_id();
 <div class="rf-container rf-blog-index">
 
 	<header class="rf-author-header">
-		<?php echo get_avatar( $author_id, 96, '', get_the_author_meta( 'display_name', $author_id ) . ' avatar' ); ?>
+		<?php echo rf_author_avatar( $author_id, 96 ); // Escaped inside rf_author_avatar(). ?>
 		<h1><?php echo esc_html( get_the_author_meta( 'display_name', $author_id ) ); ?></h1>
 		<?php $job_title = get_the_author_meta( 'rf_job_title', $author_id ); ?>
 		<?php if ( $job_title ) : ?><p class="rf-author-title"><?php echo esc_html( $job_title ); ?></p><?php endif; ?>

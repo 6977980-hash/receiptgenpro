@@ -27,7 +27,7 @@ define( 'RF_LOGO_TEXT', 'Receipt<span class="rf-accent">GenPro</span>' );
 define( 'RF_SOCIAL_TWITTER', '' );  // e.g. 'https://x.com/receiptgenpro'
 define( 'RF_SOCIAL_FACEBOOK', '' ); // e.g. 'https://facebook.com/receiptgenpro'
 define( 'RF_SOCIAL_LINKEDIN', '' ); // e.g. 'https://linkedin.com/company/receiptgenpro'
-define( 'RF_THEME_VERSION', '1.1.3' );
+define( 'RF_THEME_VERSION', '1.1.4' );
 
 /* ==========================================================================
    2. THEME SETUP
@@ -207,9 +207,38 @@ function rf_user_contact_fields( $fields ) {
 	$fields['rf_job_title']  = __( 'Job Title / Credentials (e.g. "Certified Public Accountant, 12 yrs experience")', 'receiptgenpro' );
 	$fields['rf_expertise']  = __( 'One-line expertise statement (shown in author box + Person schema)', 'receiptgenpro' );
 	$fields['linkedin']      = __( 'LinkedIn URL', 'receiptgenpro' );
+	$fields['rf_avatar_url'] = __( 'Author photo URL (upload to Media Library, paste its URL; square, 96 px or larger)', 'receiptgenpro' );
 	return $fields;
 }
 add_filter( 'user_contactmethods', 'rf_user_contact_fields' );
+
+/**
+ * Author avatar without Gravatar (audit phase 4, PERF-02): get_avatar()
+ * made every blog post request secure.gravatar.com. This shows the photo
+ * set in the profile field "Author photo URL", or the author's initials.
+ */
+function rf_author_avatar( $author_id, $size = 96 ) {
+	$name = (string) get_the_author_meta( 'display_name', $author_id );
+	$url  = (string) get_the_author_meta( 'rf_avatar_url', $author_id );
+	if ( '' !== $url ) {
+		return sprintf(
+			'<img src="%1$s" width="%2$d" height="%2$d" alt="%3$s" class="rf-avatar" loading="lazy" decoding="async">',
+			esc_url( $url ),
+			(int) $size,
+			esc_attr( $name . ' avatar' )
+		);
+	}
+	$initials = '';
+	foreach ( array_slice( preg_split( '/\s+/', trim( $name ) ), 0, 2 ) as $part ) {
+		$initials .= function_exists( 'mb_substr' ) ? mb_substr( $part, 0, 1 ) : substr( $part, 0, 1 );
+	}
+	return sprintf(
+		'<span class="rf-avatar rf-avatar-initials" style="width:%1$dpx;height:%1$dpx;font-size:%2$dpx" aria-hidden="true">%3$s</span>',
+		(int) $size,
+		(int) round( $size * 0.38 ),
+		esc_html( strtoupper( $initials ) )
+	);
+}
 
 function rf_extra_profile_fields( $user ) {
 	?>

@@ -1,5 +1,26 @@
 # ReceiptGenPro theme — Changelog
 
+## 1.1.4 — 14 Oct 2026 (site audit, Phase 4: performance, accessibility, hardening)
+
+### Accessibility
+- Grey meta text (post meta, blog card meta, author label, receipt footer and empty hint) changed from `#94a3b8` to `#64748b` (4.76:1 on white).
+- Form inputs, selects, textareas, item rows and the currency picker get a darker border (`#8492a6`, 3.16:1); cards keep the light border.
+- The receipt preview is no longer an `aria-live` region (it was read out in full on every keystroke). A hidden status line announces only "Total: …" once typing pauses.
+- Links inside post, page, template, FAQ and archive text are underlined.
+- Visible `:focus-visible` outline on links, buttons, inputs and `.rf-btn`.
+- Receipt Templates hub cards: only the title is a link, stretched over the card, so screen readers no longer read the whole card as one link.
+
+### Performance
+- Author box and author page no longer load Gravatar. They show the photo from the new profile field "Author photo URL", or the author's initials.
+- Removed the `WP_POST_REVISIONS` define from the theme (core defines it first, so it did nothing). Put `define( 'WP_POST_REVISIONS', 5 );` in `wp-config.php` if wanted.
+
+### Security
+- The `Link: …?p=123` shortlink HTTP header is removed.
+- Top-level templates exit when requested directly instead of returning HTTP 500.
+
+### Deploy helper (`rgp-deploy-helper.php` 1.1.1)
+- The webhook also accepts the key in an `X-RGP-Key` header. `?key=` keeps working.
+
 ## 1.1.3 — 14 Oct 2026 (site audit, Phase 3: functionality and UX)
 
 After the update goes live: **LiteSpeed Cache → Purge All** (from this release on, the deploy helper purges it automatically after each deploy).

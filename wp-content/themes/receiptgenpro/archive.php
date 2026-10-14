@@ -4,6 +4,10 @@
  * Category / tag archives. Same card grid as home.php for visual
  * consistency, with the archive title/description as an SEO-relevant H1.
  */
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 get_header();
 ?>
 

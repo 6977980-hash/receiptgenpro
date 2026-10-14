@@ -20,7 +20,7 @@ $description  = get_the_author_meta( 'description', $author_id );
 ?>
 <div class="rf-author-box">
 	<div class="rf-author-avatar">
-		<?php echo get_avatar( $author_id, 96, '', get_the_author_meta( 'display_name', $author_id ) . ' avatar' ); ?>
+		<?php echo rf_author_avatar( $author_id, 96 ); // Escaped inside rf_author_avatar(). ?>
 	</div>
 	<div class="rf-author-body">
 		<?php

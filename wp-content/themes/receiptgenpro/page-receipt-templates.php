@@ -10,6 +10,10 @@
  * The page is created automatically (inc/seo-fixes.php) with this template.
  * Anything typed into the page in the editor is printed below the grid.
  */
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 get_header();
 
 $rf_groups = array(
@@ -43,16 +47,16 @@ $rf_groups = array(
 							continue;
 						}
 						?>
-						<a class="rf-hub-card" href="<?php echo esc_url( home_url( '/' . $rf_slug . '/' ) ); ?>">
+						<div class="rf-hub-card">
 							<span class="rf-template-icon" aria-hidden="true"><?php echo esc_html( $rf_cat['icon'] ); ?></span>
-							<h3><?php echo esc_html( rf_category_label( $rf_cat ) ); ?></h3>
+							<h3><a class="rf-hub-card-link" href="<?php echo esc_url( home_url( '/' . $rf_slug . '/' ) ); ?>"><?php echo esc_html( rf_category_label( $rf_cat ) ); ?></a></h3>
 							<p><?php echo esc_html( $rf_cat['meta_description'] ); ?></p>
 							<ul class="rf-hub-fields">
 								<?php foreach ( array_slice( (array) $rf_cat['default_fields'], 0, 4 ) as $rf_field ) : ?>
 									<li><?php echo esc_html( $rf_field ); ?></li>
 								<?php endforeach; ?>
 							</ul>
-						</a>
+						</div>
 					<?php endforeach; ?>
 				</div>
 			</section>
