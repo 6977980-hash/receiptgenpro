@@ -1,5 +1,10 @@
 # ReceiptGenPro theme — Changelog
 
+## 1.1.7 — 14 Oct 2026 (site audit, Phase 5: content goes live)
+
+- One-time migration on the first request after deploy (approved by the owner): applies the Phase 5 page text (rent/HRA cross-links, About "What We Never Store", Contact "What to Include in Your Email") and the three shorter SEO titles, then purges LiteSpeed. Pages are changed with `wp_update_post()`, so each keeps a revision. Runs once (option `rf_migration_phase5`, which also stores a log).
+- `rf_fixes_apply_patch()` moved to `inc/content-patches.php` so the migration can use it outside wp-admin.
+
 ## 1.1.6 — 14 Oct 2026 (site audit, Phase 5: generator extras)
 
 ### Generator
