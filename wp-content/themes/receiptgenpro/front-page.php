@@ -8,6 +8,10 @@
  * title tags — that single rule is what prevents the keyword-
  * cannibalization problem found in the competitor audit.
  */
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 get_header();
 ?>
 

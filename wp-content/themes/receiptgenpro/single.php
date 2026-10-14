@@ -5,6 +5,10 @@
  * intro convention, FAQ block (auto-schema'd), HowTo steps where relevant,
  * author box with real credentials, related posts for internal linking.
  */
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 get_header();
 
 while ( have_posts() ) :

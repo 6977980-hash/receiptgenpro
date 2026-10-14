@@ -2,6 +2,10 @@
 /**
  * ReceiptGenPro — search.php
  */
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 get_header();
 ?>
 <div class="rf-container rf-blog-index">

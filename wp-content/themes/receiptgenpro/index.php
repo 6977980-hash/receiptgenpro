@@ -6,6 +6,10 @@
  * home.php and archive.php cover every real URL on this site, so this
  * file is a safety net for anything unmatched.
  */
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 get_header();
 ?>
 <div class="rf-container">

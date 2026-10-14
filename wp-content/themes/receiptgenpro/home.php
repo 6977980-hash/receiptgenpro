@@ -9,6 +9,10 @@
  * satisfies the "new posts should show up on the blog page automatically"
  * requirement.
  */
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 get_header();
 ?>
 

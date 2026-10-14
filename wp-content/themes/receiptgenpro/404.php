@@ -2,6 +2,10 @@
 /**
  * ReceiptGenPro — 404.php
  */
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 get_header();
 ?>
 <div class="rf-container rf-narrow rf-text-center rf-404">

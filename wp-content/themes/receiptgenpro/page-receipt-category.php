@@ -12,6 +12,10 @@
  * page targets exactly one keyword, which is the fix for the
  * cannibalization issue found on competitor sites.
  */
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 get_header();
 
 while ( have_posts() ) :

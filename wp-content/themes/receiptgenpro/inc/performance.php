@@ -23,6 +23,7 @@ remove_action( 'admin_print_styles', 'print_emoji_styles' );
 remove_action( 'wp_head', 'rsd_link' );                     // EditURI link
 remove_action( 'wp_head', 'wlwmanifest_link' );              // Windows Live Writer
 remove_action( 'wp_head', 'wp_shortlink_wp_head' );          // Shortlink
+remove_action( 'template_redirect', 'wp_shortlink_header', 11 ); // Shortlink HTTP header
 remove_action( 'wp_head', 'adjacent_posts_rel_link_wp_head' ); // prev/next link noise
 
 // Disable oEmbed discovery JS (saves a request on every page).
@@ -106,10 +107,9 @@ function rf_defer_scripts( $tag, $handle, $src ) {
 }
 add_filter( 'script_loader_tag', 'rf_defer_scripts', 10, 3 );
 
-// Limit post revisions (keeps the DB — and therefore admin/query speed — lean).
-if ( ! defined( 'WP_POST_REVISIONS' ) ) {
-	define( 'WP_POST_REVISIONS', 5 );
-}
+// Post revisions: WordPress core defines WP_POST_REVISIONS before themes
+// load, so a theme cannot change it. To limit revisions, add
+// define( 'WP_POST_REVISIONS', 5 ); to wp-config.php instead.
 
 // Disable self-pingbacks (common source of comment-table junk that never
 // helps SEO).

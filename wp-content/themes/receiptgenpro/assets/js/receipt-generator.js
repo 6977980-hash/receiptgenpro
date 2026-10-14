@@ -1,5 +1,5 @@
 /**
- * ReceiptGenPro — Receipt Generator (v1.1.3)
+ * ReceiptGenPro — Receipt Generator (v1.1.4)
  *
  * 100% client-side: no fetch(), no form submission, no data ever leaves
  * the browser.
@@ -23,6 +23,9 @@
  * an 800 px off-screen copy (sharp on phones), "Change / Credit" when the
  * amount paid exceeds the total, a "Remove logo" button, separate error
  * messages, and files named receipt-<number>.<ext>.
+ *
+ * v1.1.4 (Oct 2026 audit, Phase 4): the preview is no longer an aria-live
+ * region; a hidden status line announces only the new total, debounced.
  */
 ( function () {
 	'use strict';
@@ -210,6 +213,8 @@
 		var tipInput    = document.getElementById( 'rf-tip' );
 		var paidInput   = document.getElementById( 'rf-amount-paid' );
 		var statement   = document.getElementById( 'rf-statement' );
+		var totalLive   = document.getElementById( 'rf-total-live' );
+		var totalLiveTimer = null;
 
 		var cfg = {
 			title: form.dataset.receiptTitle || 'RECEIPT',
@@ -557,6 +562,18 @@
 				logoRemove.style.display = state.logoDataUrl ? '' : 'none';
 			}
 			saveForm();
+
+			// Screen readers hear only the new total, once typing pauses,
+			// instead of the whole receipt on every keystroke.
+			if ( totalLive ) {
+				var totalText = 'Total: ' + money( symbol, total );
+				clearTimeout( totalLiveTimer );
+				totalLiveTimer = setTimeout( function () {
+					if ( totalLive.textContent !== totalText ) {
+						totalLive.textContent = totalText;
+					}
+				}, 800 );
+			}
 		}
 
 		renderReceipt();
@@ -569,7 +586,6 @@
 		function renderCanvas() {
 			var clone = preview.cloneNode( true );
 			clone.removeAttribute( 'id' );
-			clone.removeAttribute( 'aria-live' );
 			clone.setAttribute( 'aria-hidden', 'true' );
 			clone.style.cssText = 'position:absolute;left:-10000px;top:0;width:' + EXPORT_WIDTH + 'px;max-width:none;box-sizing:border-box;box-shadow:none;margin:0;';
 			document.body.appendChild( clone );

@@ -4,6 +4,10 @@
  * Generic fallback for standard pages (About Us, Contact Us, Privacy
  * Policy, Terms, etc.) that don't use the Receipt Category template.
  */
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 get_header();
 
 while ( have_posts() ) :

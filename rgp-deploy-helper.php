@@ -2,7 +2,7 @@
 /**
  * Plugin Name: RGP Deploy Helper
  * Description: Copies the theme and plugin folders from this Git checkout (deployed by Hostinger) into the live wp-content folder whenever a new commit arrives. Deleting this plugin only stops deployment; everything already deployed stays as it is.
- * Version:     1.1.0
+ * Version:     1.1.1
  * Author:      receiptgenpro
  * License:     GPL-2.0-or-later
  * Requires PHP: 7.4
@@ -279,7 +279,8 @@ final class RGP_Deploy_Helper {
 	}
 
 	/* ------------------------------------------------------------------ */
-	/* Webhook: /wp-json/rgp-deploy/v1/sync?key=SECRET                     */
+	/* Webhook: POST /wp-json/rgp-deploy/v1/sync, header X-RGP-Key: SECRET */
+	/* (GET/POST with ?key=SECRET also works)                             */
 	/* ------------------------------------------------------------------ */
 
 	public static function register_route() {
@@ -302,7 +303,12 @@ final class RGP_Deploy_Helper {
 
 	public static function check_key( WP_REST_Request $request ) {
 		$secret = (string) get_option( self::OPT_SECRET, '' );
-		$given  = (string) $request->get_param( 'key' );
+		// Prefer the X-RGP-Key header (keeps the key out of server logs);
+		// ?key= still works so existing webhooks don't break.
+		$given  = (string) $request->get_header( 'x_rgp_key' );
+		if ( '' === $given ) {
+			$given = (string) $request->get_param( 'key' );
+		}
 		return '' !== $secret && hash_equals( $secret, $given );
 	}
 
@@ -376,6 +382,7 @@ final class RGP_Deploy_Helper {
 			<h2>Instant deploy webhook (optional)</h2>
 			<p>The site checks the repo folder once a minute on its own. For instant deploys, add this URL as a second GitHub webhook after Hostinger's one:</p>
 			<p><input type="text" readonly class="large-text code" value="<?php echo esc_attr( $webhook ); ?>" onclick="this.select()"></p>
+			<p class="description">Callers that can send headers (curl, a CI job) can POST to <code><?php echo esc_html( rest_url( 'rgp-deploy/v1/sync' ) ); ?></code> with the header <code>X-RGP-Key: &lt;key&gt;</code> instead, which keeps the key out of server logs.</p>
 
 			<h2>Settings</h2>
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
