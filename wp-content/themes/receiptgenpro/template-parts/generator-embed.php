@@ -63,6 +63,7 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 				<div class="rf-field">
 					<label for="rf-business-logo">Logo (optional)</label>
 					<input type="file" id="rf-business-logo" accept="image/*">
+					<button type="button" class="rf-logo-remove" id="rf-logo-remove" style="display:none">Remove logo</button>
 				</div>
 			</div>
 

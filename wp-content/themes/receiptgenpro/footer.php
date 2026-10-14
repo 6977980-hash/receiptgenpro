@@ -30,15 +30,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 					'container'      => false,
 					'menu_class'     => 'rf-footer-menu',
 					'fallback_cb'    => function () {
-						$slugs = array( 'rent-receipt', 'hotel-receipt', 'restaurant-receipt', 'cash-receipt', 'freelance-receipt', 'mechanic-receipt' );
-						echo '<ul class="rf-footer-menu">';
-						foreach ( $slugs as $slug ) {
-							$cat = rf_get_category_data( $slug );
-							if ( $cat ) {
-								printf( '<li><a href="%s">%s</a></li>', esc_url( home_url( '/' . $slug . '/' ) ), esc_html( rf_category_label( $cat ) ) );
-							}
-						}
-						echo '</ul>';
+						rf_footer_category_list( 0 );
 					},
 				)
 			);
@@ -54,15 +46,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 					'container'      => false,
 					'menu_class'     => 'rf-footer-menu',
 					'fallback_cb'    => function () {
-						$slugs = array( 'cleaning-receipt', 'donation-receipt', 'taxi-receipt', 'childcare-receipt', 'hardware-store-receipt', 'salon-spa-receipt', 'construction-receipt' );
-						echo '<ul class="rf-footer-menu">';
-						foreach ( $slugs as $slug ) {
-							$cat = rf_get_category_data( $slug );
-							if ( $cat ) {
-								printf( '<li><a href="%s">%s</a></li>', esc_url( home_url( '/' . $slug . '/' ) ), esc_html( rf_category_label( $cat ) ) );
-							}
-						}
-						echo '</ul>';
+						rf_footer_category_list( 1 );
 					},
 				)
 			);

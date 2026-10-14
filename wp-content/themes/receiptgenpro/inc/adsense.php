@@ -115,7 +115,7 @@ function rf_enqueue_consent_banner() {
 	if ( ! rf_needs_consent() ) {
 		return;
 	}
-	wp_enqueue_script( 'rf-consent', get_template_directory_uri() . '/assets/js/consent.js', array(), RF_THEME_VERSION, false );
+	wp_enqueue_script( 'rf-consent', get_template_directory_uri() . '/assets/js/consent.js', array(), rf_asset_ver( 'assets/js/consent.js' ), false );
 }
 add_action( 'wp_enqueue_scripts', 'rf_enqueue_consent_banner' );
 

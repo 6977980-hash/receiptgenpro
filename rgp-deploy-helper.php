@@ -2,7 +2,7 @@
 /**
  * Plugin Name: RGP Deploy Helper
  * Description: Copies the theme and plugin folders from this Git checkout (deployed by Hostinger) into the live wp-content folder whenever a new commit arrives. Deleting this plugin only stops deployment; everything already deployed stays as it is.
- * Version:     1.0.0
+ * Version:     1.1.0
  * Author:      receiptgenpro
  * License:     GPL-2.0-or-later
  * Requires PHP: 7.4
@@ -164,7 +164,9 @@ final class RGP_Deploy_Helper {
 					}
 					$abs = wp_normalize_path( $file->getPathname() );
 					$rel = substr( $abs, strlen( $root ) + 1 );
-					if ( preg_match( '#(^|/)(\.git|\.github|node_modules)(/|$)#', $rel ) ) {
+					// Dotfiles/dot-folders (.git, .github, .DS_Store…), node_modules and
+					// Markdown notes (CHANGELOG.md, README.md) are never published.
+					if ( preg_match( '#(^|/)(\.[^/]*|node_modules)(/|$)#', $rel ) || preg_match( '/\.md$/i', $rel ) ) {
 						continue;
 					}
 					$files[ $rel ] = $abs;
@@ -172,7 +174,17 @@ final class RGP_Deploy_Helper {
 			}
 		}
 		ksort( $files );
-		return $files;
+
+		// Copy every functions.php last, so a new inc/ file it requires is
+		// always on disk before the code that loads it.
+		$last = array();
+		foreach ( $files as $rel => $abs ) {
+			if ( 'functions.php' === basename( $rel ) ) {
+				$last[ $rel ] = $abs;
+				unset( $files[ $rel ] );
+			}
+		}
+		return $files + $last;
 	}
 
 	public static function sync( $trigger ) {
@@ -241,6 +253,9 @@ final class RGP_Deploy_Helper {
 			}
 			wp_clean_themes_cache();
 			wp_clean_plugins_cache( false );
+
+			// Clear the LiteSpeed page cache so visitors get the new version.
+			do_action( 'litespeed_purge_all' );
 		}
 
 		delete_transient( self::LOCK );
