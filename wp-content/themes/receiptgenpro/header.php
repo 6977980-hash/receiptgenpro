@@ -66,8 +66,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Fallback menu so the theme looks correct even before the site owner
  * has built a Primary Menu in wp-admin.
+ *
+ * wp_nav_menu() passes its own $args, so the desktop call gets the
+ * horizontal `rf-nav-menu` list and the mobile call gets the vertical
+ * `rf-nav-menu-mobile` list (it used to print `rf-nav-menu` for both,
+ * which made the open mobile menu one wide row off the side of a phone).
  */
-function rf_default_primary_menu() {
+function rf_default_primary_menu( $args = array() ) {
+	$args       = (array) $args;
+	$menu_class = ! empty( $args['menu_class'] ) ? $args['menu_class'] : 'rf-nav-menu';
+
 	$items = array(
 		home_url( '/' )                 => 'Receipt Generator',
 		home_url( '/receipt-templates/' ) => 'Templates',
@@ -75,9 +83,14 @@ function rf_default_primary_menu() {
 		home_url( '/about-us/' )        => 'About Us',
 		home_url( '/contact-us/' )      => 'Contact',
 	);
-	echo '<ul class="rf-nav-menu">';
+	$html = '<ul class="' . esc_attr( $menu_class ) . '">';
 	foreach ( $items as $url => $label ) {
-		printf( '<li><a href="%s">%s</a></li>', esc_url( $url ), esc_html( $label ) );
+		$html .= sprintf( '<li><a href="%s">%s</a></li>', esc_url( $url ), esc_html( $label ) );
 	}
-	echo '</ul>';
+	$html .= '</ul>';
+
+	if ( isset( $args['echo'] ) && ! $args['echo'] ) {
+		return $html;
+	}
+	echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped above.
 }

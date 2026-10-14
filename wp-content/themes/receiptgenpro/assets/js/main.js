@@ -10,10 +10,24 @@
 		if ( ! toggle || ! menu ) {
 			return;
 		}
+		function setOpen( open ) {
+			toggle.setAttribute( 'aria-expanded', String( open ) );
+			menu.classList.toggle( 'is-open', open );
+		}
 		toggle.addEventListener( 'click', function () {
-			var expanded = toggle.getAttribute( 'aria-expanded' ) === 'true';
-			toggle.setAttribute( 'aria-expanded', String( ! expanded ) );
-			menu.classList.toggle( 'is-open' );
+			setOpen( toggle.getAttribute( 'aria-expanded' ) !== 'true' );
+		} );
+		// Close on Escape (focus back on the button) or when a link is tapped.
+		document.addEventListener( 'keydown', function ( e ) {
+			if ( e.key === 'Escape' && menu.classList.contains( 'is-open' ) ) {
+				setOpen( false );
+				toggle.focus();
+			}
+		} );
+		menu.addEventListener( 'click', function ( e ) {
+			if ( e.target.closest( 'a' ) ) {
+				setOpen( false );
+			}
 		} );
 	} );
 } )();

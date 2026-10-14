@@ -1,5 +1,20 @@
 # ReceiptGenPro theme — Changelog
 
+## 1.1.2 — 14 Oct 2026 (site audit, Phase 1)
+
+After the update goes live: **LiteSpeed Cache → Purge All** so cached pages pick up the new files.
+
+### Generator (`assets/js/receipt-generator.js`)
+- Default date is the visitor's local date (was UTC, so evenings in the Americas showed tomorrow).
+- Amounts are rounded to whole cents before they are added up, so Subtotal + Tax + Tip always equals the printed Total (10.25 at 18% showed 10.25 + 1.84 = 12.10).
+- Amount in words no longer says "one hundred cents" (3.00 read "Two US dollars and one hundred cents"); "trillion" added.
+- Negative prices, quantities, tax rate, tip and amount paid count as 0.
+- html2canvas and jsPDF are loaded from cdnjs with Subresource Integrity hashes.
+
+### Theme
+- Mobile menu: the fallback menu (used while no Primary menu is assigned) now prints the vertical mobile list instead of the desktop row, so it no longer runs off the side of a phone. The menu also closes on Escape or when a link is tapped.
+- Blog and archive cards show each post's date (the_date() printed it only on the first card of a day).
+
 ## 1.1.0 — 26 Sept 2026 (SEO / GEO / AEO audit fixes)
 
 After updating: go to **Tools → ReceiptGenPro Fixes** and run sections 1–5 (Preview, then Apply).

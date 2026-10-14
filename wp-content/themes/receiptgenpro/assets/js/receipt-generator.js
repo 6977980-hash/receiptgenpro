@@ -1,5 +1,5 @@
 /**
- * ReceiptGenPro — Receipt Generator (v1.1.0)
+ * ReceiptGenPro — Receipt Generator (v1.1.2)
  *
  * 100% client-side: no fetch(), no form submission, no data ever leaves
  * the browser.
@@ -13,6 +13,10 @@
  *  - M5: jsPDF + html2canvas are no longer loaded on page load; they are
  *    fetched from cdnjs the first time the visitor clicks a download
  *    button (≈550 KB of JS removed from every initial page view).
+ *
+ * v1.1.2 (Oct 2026 audit, Phase 1): local default date, cent-rounded
+ * totals, fixed amount-in-words cents, negatives clamped to 0, SRI on the
+ * cdnjs libraries.
  */
 ( function () {
 	'use strict';
@@ -20,12 +24,20 @@
 	document.addEventListener( 'DOMContentLoaded', init );
 
 	var LIBS = ( window.rfReceipt && window.rfReceipt.libs ) || {
-		html2canvas: 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
-		jspdf: 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'
+		html2canvas: {
+			url: 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
+			integrity: 'sha512-BNaRQnYJYiPSqHHDb58B0yaPfCu+Wgds8Gp/gU33kqBtgNS4tSPHuGibyoeqMV/TJlSKda6FXzoEyYGjTe+vXA=='
+		},
+		jspdf: {
+			url: 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+			integrity: 'sha512-qZvrmS2ekKPF2mSznTQsxqPgnpkI4DNTlrdUmTzrDgektczlKNRRhy5X5AAOnx5S09ydFYWWNSfcEqDTTHgtNA=='
+		}
 	};
 	var loading = {};
 
-	function loadScript( url ) {
+	function loadScript( lib ) {
+		// Accept a plain URL too (older cached localize data).
+		var url = typeof lib === 'string' ? lib : lib.url;
 		if ( loading[ url ] ) {
 			return loading[ url ];
 		}
@@ -34,6 +46,9 @@
 			s.src = url;
 			s.async = true;
 			s.crossOrigin = 'anonymous';
+			if ( lib.integrity ) {
+				s.integrity = lib.integrity;
+			}
 			s.onload = resolve;
 			s.onerror = function () {
 				delete loading[ url ];
@@ -53,6 +68,32 @@
 			jobs.push( loadScript( LIBS.jspdf ) );
 		}
 		return Promise.all( jobs );
+	}
+
+	// ---- Money helpers -----------------------------------------------------
+	// All totals are built from amounts rounded to whole cents, so the figures
+	// printed on the receipt always add up (subtotal + tax + tip = total).
+	function toCents( n ) {
+		// toFixed(6) strips float noise first (1.005 * 100 = 100.49999…).
+		return Math.round( parseFloat( ( n * 100 ).toFixed( 6 ) ) );
+	}
+
+	// Parse a number field; empty, invalid or negative input counts as 0.
+	function nonNegative( value, fallback ) {
+		var n = parseFloat( value );
+		if ( isNaN( n ) ) {
+			n = fallback || 0;
+		}
+		return n > 0 ? n : 0;
+	}
+
+	// Today's date in the visitor's own time zone (toISOString() is UTC).
+	function todayLocal() {
+		var d = new Date();
+		var pad = function ( n ) {
+			return ( n < 10 ? '0' : '' ) + n;
+		};
+		return d.getFullYear() + '-' + pad( d.getMonth() + 1 ) + '-' + pad( d.getDate() );
 	}
 
 	// ---- Number to words (for cash / rent receipts) -----------------------
@@ -77,7 +118,7 @@
 		if ( n === 0 ) {
 			return 'zero';
 		}
-		var scales = [ '', ' thousand', ' million', ' billion' ];
+		var scales = [ '', ' thousand', ' million', ' billion', ' trillion' ];
 		var parts = [];
 		var i = 0;
 		while ( n > 0 && i < scales.length ) {
@@ -99,8 +140,10 @@
 
 	function amountInWords( amount, code ) {
 		var names = CURRENCY_WORDS[ code ] || [ code, 'cents' ];
-		var whole = Math.floor( amount + 1e-9 );
-		var cents = Math.round( ( amount - whole ) * 100 );
+		// Split in integer cents so 2.999 becomes "three … only", never "one hundred cents".
+		var c     = toCents( amount );
+		var whole = Math.floor( c / 100 );
+		var cents = c % 100;
 		var text = intToWords( whole ) + ' ' + names[0];
 		if ( cents ) {
 			text += ' and ' + intToWords( cents ) + ' ' + names[1];
@@ -155,7 +198,7 @@
 
 		// ---- Default date = today ------------------------------------------
 		if ( dateInput && ! dateInput.value ) {
-			dateInput.value = new Date().toISOString().slice( 0, 10 );
+			dateInput.value = todayLocal();
 		}
 
 		// ---- Item rows ------------------------------------------------------
@@ -249,7 +292,7 @@
 		}
 
 		function money( symbol, n ) {
-			return symbol + n.toFixed( 2 );
+			return symbol + ( toCents( n ) / 100 ).toFixed( 2 );
 		}
 
 		function formatExtra( el ) {
@@ -276,11 +319,10 @@
 			var items = [];
 			rows.forEach( function ( row ) {
 				var name  = row.querySelector( '.rf-item-name' ).value.trim();
-				var qtyV  = parseFloat( row.querySelector( '.rf-item-qty' ).value );
-				var price = parseFloat( row.querySelector( '.rf-item-price' ).value ) || 0;
-				var qty   = isNaN( qtyV ) ? 1 : qtyV;
+				var qty   = nonNegative( row.querySelector( '.rf-item-qty' ).value, 1 );
+				var price = nonNegative( row.querySelector( '.rf-item-price' ).value );
 				if ( name || price ) {
-					items.push( { name: name || 'Item', qty: qty, price: price } );
+					items.push( { name: name || 'Item', qty: qty, price: price, lineCents: toCents( qty * price ) } );
 				}
 			} );
 			return items;
@@ -290,22 +332,26 @@
 			var business  = document.getElementById( 'rf-business-name' ).value.trim() || 'Your Business Name';
 			var client    = document.getElementById( 'rf-client-name' ).value.trim();
 			var number    = document.getElementById( 'rf-receipt-number' ).value.trim() || '1001';
-			var date      = dateInput.value || new Date().toISOString().slice( 0, 10 );
+			var date      = dateInput.value || todayLocal();
 			var currency  = currencySel.value || 'USD';
 			var symbol    = getCurrencySymbol( currency );
-			var taxRate   = parseFloat( document.getElementById( 'rf-tax-rate' ).value ) || 0;
+			var taxRate   = nonNegative( document.getElementById( 'rf-tax-rate' ).value );
 			var payMethod = document.getElementById( 'rf-payment-method' ).value;
 			var notes     = document.getElementById( 'rf-notes' ).value.trim();
 			var items     = collectItems();
-			var tip       = tipInput ? ( parseFloat( tipInput.value ) || 0 ) : 0;
+			var tipCents  = tipInput ? toCents( nonNegative( tipInput.value ) ) : 0;
 			var paidRaw   = paidInput ? paidInput.value.trim() : '';
 
-			var subtotal = items.reduce( function ( sum, it ) {
-				return sum + it.qty * it.price;
+			var subtotalCents = items.reduce( function ( sum, it ) {
+				return sum + it.lineCents;
 			}, 0 );
-			var tax   = subtotal * ( taxRate / 100 );
-			var total = subtotal + tax + tip;
-			var paid  = paidRaw === '' ? null : ( parseFloat( paidRaw ) || 0 );
+			var taxCents   = toCents( subtotalCents * taxRate / 10000 );
+			var totalCents = subtotalCents + taxCents + tipCents;
+			var subtotal   = subtotalCents / 100;
+			var tax        = taxCents / 100;
+			var tip        = tipCents / 100;
+			var total      = totalCents / 100;
+			var paid       = paidRaw === '' ? null : toCents( nonNegative( paidRaw ) ) / 100;
 
 			var rowsHtml = items
 				.map( function ( it ) {
@@ -314,7 +360,7 @@
 						'<td>' + escapeHtml( it.name ) + '</td>' +
 						'<td class="rf-num">' + escapeHtml( String( it.qty ) ) + '</td>' +
 						'<td class="rf-num">' + money( symbol, it.price ) + '</td>' +
-						'<td class="rf-num">' + money( symbol, it.qty * it.price ) + '</td>' +
+						'<td class="rf-num">' + money( symbol, it.lineCents / 100 ) + '</td>' +
 						'</tr>'
 					);
 				} )
@@ -344,7 +390,7 @@
 				'<div class="rf-receipt-total-final"><span>Total</span><span>' + money( symbol, total ) + '</span></div>';
 
 			if ( paid !== null ) {
-				var balance = Math.max( 0, total - paid );
+				var balance = Math.max( 0, totalCents - toCents( paid ) ) / 100;
 				totalsHtml +=
 					'<div><span>Amount Paid</span><span>' + money( symbol, paid ) + '</span></div>' +
 					'<div class="rf-receipt-balance"><span>Balance Due</span><span>' + money( symbol, balance ) + '</span></div>';
