@@ -294,6 +294,11 @@ textarea:focus-visible, .rf-btn:focus-visible { outline: 2px solid var(--rf-prim
 .rf-template-fields legend { font-weight: 700; font-size: .9rem; padding: 0 .4rem; color: var(--rf-ink); }
 .rf-field-check label { display: flex; align-items: center; gap: .5rem; font-weight: 600; font-size: .9rem; cursor: pointer; }
 .rf-field-check input { width: 18px; height: 18px; }
+.rf-field-hint { margin: .3rem 0 0; font-size: .8rem; color: #64748b; }
+.rf-more-options { border: 1px solid var(--rf-border); border-radius: var(--rf-radius); padding: .6rem 1rem; margin: 0 0 1.25rem; background: var(--rf-bg-soft); }
+.rf-more-options summary { cursor: pointer; font-weight: 600; font-size: .9rem; color: var(--rf-ink); }
+.rf-more-options[open] summary { margin-bottom: .75rem; }
+.rf-more-options .rf-field-hint { margin-bottom: .4rem; }
 
 /* Receipt extras */
 .rf-receipt-balance { font-weight: 700; color: var(--rf-ink) !important; }

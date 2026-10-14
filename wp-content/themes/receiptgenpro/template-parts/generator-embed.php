@@ -74,7 +74,8 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 				</div>
 				<div class="rf-field">
 					<label for="rf-receipt-number">Receipt #</label>
-					<input type="text" id="rf-receipt-number" value="1001">
+					<input type="text" id="rf-receipt-number" value="1001" aria-describedby="rf-receipt-number-hint">
+					<p class="rf-field-hint" id="rf-receipt-number-hint">Next time, this starts after the last number you downloaded on this device.</p>
 				</div>
 			</div>
 
@@ -135,6 +136,40 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 					</select>
 				</div>
 			</div>
+
+			<details class="rf-more-options" id="rf-more-options">
+				<summary>Discount and a second tax (e.g. CGST + SGST)</summary>
+				<div class="rf-form-row rf-form-row-2col">
+					<div class="rf-field">
+						<label for="rf-discount">Discount</label>
+						<input type="number" id="rf-discount" min="0" step="0.01" placeholder="0">
+					</div>
+					<div class="rf-field">
+						<label for="rf-discount-type">Discount type</label>
+						<select id="rf-discount-type">
+							<option value="percent">% of subtotal</option>
+							<option value="amount">Fixed amount</option>
+						</select>
+					</div>
+				</div>
+				<div class="rf-form-row rf-form-row-2col">
+					<div class="rf-field">
+						<label for="rf-tax-label">Name of the first tax</label>
+						<input type="text" id="rf-tax-label" placeholder="Tax (e.g. CGST, VAT, GST)">
+					</div>
+				</div>
+				<div class="rf-form-row rf-form-row-2col">
+					<div class="rf-field">
+						<label for="rf-tax2-label">Second tax name</label>
+						<input type="text" id="rf-tax2-label" placeholder="e.g. SGST">
+					</div>
+					<div class="rf-field">
+						<label for="rf-tax2-rate">Second tax rate (%)</label>
+						<input type="number" id="rf-tax2-rate" value="0" min="0" step="0.01">
+					</div>
+				</div>
+				<p class="rf-field-hint">The discount comes off the subtotal before tax, and both taxes are charged on the discounted amount.</p>
+			</details>
 
 			<?php if ( $form['tip'] || $form['paid'] ) : ?>
 				<div class="rf-form-row rf-form-row-2col">
