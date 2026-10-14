@@ -69,6 +69,13 @@ function rf_content_patches( $o ) {
 				'find'    => '<a href="/#templates">purpose-built receipt templates</a>',
 				'replace' => '<a href="/receipt-templates/">purpose-built receipt templates</a>',
 			),
+			array(
+				'label'   => 'Add "What We Never Store" (how the generator handles your data)',
+				'regex'   => true,
+				'find'    => '#\z#',
+				'unless'  => 'What We Never Store',
+				'replace' => rf_about_never_store_content(),
+			),
 		),
 
 		'contact-us' => array(
@@ -76,6 +83,13 @@ function rf_content_patches( $o ) {
 				'label'   => 'Replace the "[Site owner: …]" note with who runs the site + reply time',
 				'find'    => '<p><em>[Site owner: add a real business name, and a physical mailing address here if your jurisdiction requires one for a functioning business contact page.]</em></p>',
 				'replace' => $contact_new,
+			),
+			array(
+				'label'   => 'Add "What to Include in Your Email" and our time zone',
+				'regex'   => true,
+				'find'    => '#\z#',
+				'unless'  => 'What to Include in Your Email',
+				'replace' => "\n<h2>What to Include in Your Email</h2>\n<ul>\n<li>The link to the page or template you were using</li>\n<li>If something isn't working: your device and browser (for example \"Android, Chrome\"), and what you clicked</li>\n<li>For a new template: the type of business and the fields its receipt needs</li>\n</ul>\n<p>We're based in " . ( $loc ? $loc : 'Pakistan' ) . ' (Pakistan Standard Time, UTC+5).</p>',
 			),
 		),
 
@@ -122,6 +136,25 @@ function rf_content_patches( $o ) {
 				'label'   => 'FAQ: past-month receipts are issued/signed by the landlord',
 				'find'    => 'This generator works just as well for a receipt covering a past month as it does for the current one.</p>',
 				'replace' => 'Set the rent period to that month; the landlord should check the details and sign it, since the receipt is their confirmation that the payment was received.</p>',
+			),
+			array(
+				'label'   => 'First paragraph: who this page is for + link to the HRA rent receipt (Oct 2026, CNT-05)',
+				'regex'   => true,
+				'backrefs' => true,
+				'find'    => '#(<p class="rf-direct-answer"[^>]*>[\s\S]*?)(</p>)#',
+				'unless'  => 'href="/hra-rent-receipt/"',
+				'replace' => '$1 This template is for landlords, property managers and roommates in any country. Salaried employees in India claiming House Rent Allowance should use the <a href="/hra-rent-receipt/">HRA rent receipt generator</a> instead, which adds the landlord\'s PAN and prints the amount in rupees and in words.$2',
+			),
+		),
+
+		'hra-rent-receipt' => array(
+			array(
+				'label'   => 'First paragraph: who this page is for + link to the general rent receipt (Oct 2026, CNT-05)',
+				'regex'   => true,
+				'backrefs' => true,
+				'find'    => '#(<p class="rf-direct-answer"[^>]*>[\s\S]*?)(</p>)#',
+				'unless'  => 'Not claiming HRA, or renting outside India?',
+				'replace' => '$1 Not claiming HRA, or renting outside India? Use the general <a href="/rent-receipt/">rent receipt generator</a>, made for landlords and property managers in any country.$2',
 			),
 		),
 
@@ -249,6 +282,39 @@ function rf_taxi_page_content() {
 <h3>Does this work for private car services and airport transfers?</h3>
 <p>Yes — the same fields work for private-hire cars, chauffeur and limo services, and airport transfers, not just metered taxis.</p>
 </div>
+HTML;
+}
+
+/**
+ * Shorter SEO titles (Oct 2026 audit, SEO-07): each is 60 characters or
+ * less so search results show it in full. Stored in the rf_seo_title
+ * custom field by Tools → ReceiptGenPro Fixes → 6; the on-page H1 stays.
+ *
+ * @return array post slug => SEO title
+ */
+function rf_seo_title_patches() {
+	return array(
+		'how-long-should-you-keep-business-receipts'                        => 'How Long to Keep Business Receipts: Rules by Country',
+		'digital-receipts-vs-paper-receipts'                                => 'Digital vs Paper Receipts: Pros, Cons & Legal Validity',
+		'receipt-templates-word-vs-excel-vs-google-docs-vs-online-generator' => 'Receipt Templates: Word vs Excel vs Google Docs vs Online',
+	);
+}
+
+/**
+ * "What We Never Store" section appended to About Us (Oct 2026 audit,
+ * CNT-06). Every sentence matches what receipt-generator.js actually does.
+ */
+function rf_about_never_store_content() {
+	return <<<'HTML'
+
+<h2>What We Never Store</h2>
+<p>There are no accounts on ReceiptGenPro, so there is nothing to sign up for and no receipt history kept on our side. Here is what happens to what you type:</p>
+<ul>
+<li><strong>Your receipt details</strong> (names, items, prices, notes) are used only to draw the preview in your browser. They are never sent to our server.</li>
+<li><strong>Your logo</strong> is read by your browser and shown in the preview. It is not uploaded.</li>
+<li><strong>A reload doesn't lose your work:</strong> the form, and your logo, are kept in your browser tab's session storage, which is cleared when you close the tab.</li>
+<li><strong>Your downloads</strong> (PDF, PNG or JPEG) are created on your own device. When you click a download button, your browser fetches two open-source libraries, html2canvas and jsPDF, from the cdnjs CDN and builds the file locally. We never see or keep a copy.</li>
+</ul>
 HTML;
 }
 

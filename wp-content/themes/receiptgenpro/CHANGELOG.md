@@ -1,5 +1,20 @@
 # ReceiptGenPro theme — Changelog
 
+## 1.1.5 — 14 Oct 2026 (site audit, Phase 5: content and housekeeping)
+
+### Content (Tools → ReceiptGenPro Fixes)
+- Section 2 now also adds a "who this page is for" sentence to the first paragraph of /rent-receipt/ and /hra-rent-receipt/ that links each to the other, a "What We Never Store" section to About Us, and a "What to Include in Your Email" section with the time zone to Contact Us. Each runs only once.
+- New section 6 sets shorter SEO titles (60 characters or less) on three guides: how long to keep receipts, digital vs paper, and receipt template formats.
+- The patch tool supports `unless` (skip when text is already there) and `backrefs` (keep `$1` in regex replacements).
+
+### Theme
+- The freelance template prints "FREELANCE PAYMENT RECEIPT", so it no longer looks the same as /payment-receipt/.
+- Removed the unused "Blog Sidebar" widget area and the dead `author.php` (author URLs already redirect to About Us).
+- `Tested up to: 7.1` (the live site runs WordPress 7.1.3).
+
+### CI
+- New GitHub Action: `php -l` on every PHP file, `node --check` on the theme JS, and Node unit tests for the money and amount-in-words helpers (`tests/receipt-generator.test.js`).
+
 ## 1.1.4 — 14 Oct 2026 (site audit, Phase 4: performance, accessibility, hardening)
 
 ### Accessibility

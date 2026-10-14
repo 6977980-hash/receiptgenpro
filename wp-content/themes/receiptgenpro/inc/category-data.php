@@ -189,7 +189,7 @@ function rf_receipt_categories() {
 				'Invoice reference field ties the payment to your invoice',
 			),
 			'form'             => array(
-				'title'          => 'PAYMENT RECEIPT',
+				'title'          => 'FREELANCE PAYMENT RECEIPT',
 				'business_label' => 'Freelancer / Studio Name',
 				'business_ph'    => 'e.g. Ali Design Studio',
 				'client_label'   => 'Client Name',
