@@ -1,5 +1,28 @@
 # ReceiptGenPro theme — Changelog
 
+## 1.1.3 — 14 Oct 2026 (site audit, Phase 3: functionality and UX)
+
+After the update goes live: **LiteSpeed Cache → Purge All** (from this release on, the deploy helper purges it automatically after each deploy).
+
+### Generator (`assets/js/receipt-generator.js`, `template-parts/generator-embed.php`)
+- INR and PKR amounts in words use lakh and crore (1,20,000 reads "One lakh twenty thousand Indian rupees only").
+- The form keeps its entries (fields, item rows, logo) across a reload until the tab is closed, using sessionStorage in the browser only. This makes the hub FAQ's claim true.
+- PNG, JPEG and PDF exports render an off-screen copy at 800 px (1600 px at scale 2), so receipts made on a phone are as sharp as on a laptop.
+- "Change / Credit" is shown instead of "Balance Due" when the amount paid exceeds the total.
+- New "Remove logo" button.
+- A failed export shows its own message instead of "library could not be loaded".
+- Downloads are named `receipt-<number>.<ext>`.
+
+### Theme
+- Footer fallback menus and the 404 page list every template from `rf_receipt_categories()` (HRA, Payment and Deposit were missing).
+- Mechanic template: new "Warranty / Guarantee" field; hotel and mechanic highlights reworded to match what the form does.
+- CSS and JS are versioned by file modification time, so a changed file is never served stale.
+
+### Deploy helper (`rgp-deploy-helper.php` 1.1.0)
+- `functions.php` files are copied last, so a new `inc/` file is in place before the code that loads it.
+- Purges the LiteSpeed page cache after a deploy.
+- Markdown files and dotfiles are no longer published (this CHANGELOG was publicly readable); the copy already on the live site is removed on the next deploy.
+
 ## 1.1.2 — 14 Oct 2026 (site audit, Phase 1)
 
 After the update goes live: **LiteSpeed Cache → Purge All** so cached pages pick up the new files.

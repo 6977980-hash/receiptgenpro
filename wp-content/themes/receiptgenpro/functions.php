@@ -27,7 +27,7 @@ define( 'RF_LOGO_TEXT', 'Receipt<span class="rf-accent">GenPro</span>' );
 define( 'RF_SOCIAL_TWITTER', '' );  // e.g. 'https://x.com/receiptgenpro'
 define( 'RF_SOCIAL_FACEBOOK', '' ); // e.g. 'https://facebook.com/receiptgenpro'
 define( 'RF_SOCIAL_LINKEDIN', '' ); // e.g. 'https://linkedin.com/company/receiptgenpro'
-define( 'RF_THEME_VERSION', '1.1.2' );
+define( 'RF_THEME_VERSION', '1.1.3' );
 
 /* ==========================================================================
    2. THEME SETUP
@@ -72,19 +72,27 @@ add_action( 'after_setup_theme', 'rf_theme_setup' );
    3. ASSETS — deliberately minimal. No page builder, no jQuery UI bloat.
    ========================================================================== */
 
+/**
+ * Asset version = the file's modification time, so browsers and the page
+ * cache pick up a changed file on the next deploy even if RF_THEME_VERSION
+ * was not bumped. Falls back to the theme version if the file is missing.
+ */
+function rf_asset_ver( $rel ) {
+	$mtime = @filemtime( get_template_directory() . '/' . ltrim( $rel, '/' ) );
+	return $mtime ? (string) $mtime : RF_THEME_VERSION;
+}
+
 function rf_enqueue_assets() {
-	$ver = RF_THEME_VERSION;
+	wp_enqueue_style( 'rf-main', get_template_directory_uri() . '/assets/css/main.css', array(), rf_asset_ver( 'assets/css/main.css' ) );
 
-	wp_enqueue_style( 'rf-main', get_template_directory_uri() . '/assets/css/main.css', array(), $ver );
-
-	wp_enqueue_script( 'rf-main', get_template_directory_uri() . '/assets/js/main.js', array(), $ver, true );
+	wp_enqueue_script( 'rf-main', get_template_directory_uri() . '/assets/js/main.js', array(), rf_asset_ver( 'assets/js/main.js' ), true );
 
 	// The receipt generator tool loads ONLY on the pages that contain it.
 	// v1.1.0 (audit M5): jsPDF (~350 KB) and html2canvas (~200 KB) are no
 	// longer enqueued up front — receipt-generator.js lazy-loads them from
 	// cdnjs the first time a visitor clicks a Download button.
 	if ( is_front_page() || is_page_template( 'page-receipt-category.php' ) ) {
-		wp_enqueue_script( 'rf-receipt-generator', get_template_directory_uri() . '/assets/js/receipt-generator.js', array(), $ver, true );
+		wp_enqueue_script( 'rf-receipt-generator', get_template_directory_uri() . '/assets/js/receipt-generator.js', array(), rf_asset_ver( 'assets/js/receipt-generator.js' ), true );
 		wp_localize_script(
 			'rf-receipt-generator',
 			'rfReceipt',

@@ -94,7 +94,7 @@ function rf_receipt_categories() {
 			'default_fields'   => array( 'Guest Name', 'Room Number / Type', 'Check-in / Check-out Dates', 'Nights × Nightly Rate', 'Taxes & Fees', 'Total Paid' ),
 			'highlights'       => array(
 				'Made for small hotels, guesthouses, B&Bs and short-term rental hosts',
-				'Nights × nightly rate as a line item, with occupancy tax on its own line',
+				'Nights × nightly rate as a line item, plus a tax rate or separate lines for taxes and fees',
 				'Gives your guests an itemized folio they can file with their employer',
 			),
 			'form'             => array(
@@ -215,7 +215,7 @@ function rf_receipt_categories() {
 			'icon'             => '🔧',
 			'default_fields'   => array( 'Vehicle (Make / Model / Year)', 'VIN & Odometer', 'Parts Lines', 'Labor Lines (hours × rate)', 'Warranty Notes', 'Total Paid' ),
 			'highlights'       => array(
-				'Separate parts and labor lines, like a real shop invoice',
+				'Use separate lines for parts and labor, like a real shop invoice',
 				'Vehicle identification fields (make, model, VIN, odometer)',
 				'Warranty / guarantee note printed on the receipt',
 			),
@@ -232,6 +232,7 @@ function rf_receipt_categories() {
 					array( 'id' => 'vehicle', 'label' => 'Vehicle (Make / Model / Year)', 'type' => 'text', 'ph' => 'e.g. Toyota Corolla 2019' ),
 					array( 'id' => 'vin', 'label' => 'VIN / Registration No.', 'type' => 'text', 'ph' => 'e.g. 1HGBH41JXMN109186' ),
 					array( 'id' => 'odometer', 'label' => 'Odometer', 'type' => 'text', 'ph' => 'e.g. 58,200 km' ),
+					array( 'id' => 'warranty', 'label' => 'Warranty / Guarantee', 'type' => 'text', 'ph' => 'e.g. 90 days on parts and labor' ),
 				),
 				'signature'      => 'Technician Signature',
 			),
@@ -566,6 +567,22 @@ function rf_receipt_categories() {
 function rf_get_category_data( $slug ) {
 	$all = rf_receipt_categories();
 	return isset( $all[ $slug ] ) ? $all[ $slug ] : null;
+}
+
+/**
+ * Footer fallback menus: every template from rf_receipt_categories(), split
+ * into two halves ($half 0 = first column, 1 = second), so a new template
+ * shows up in the footer without editing a hard-coded list.
+ */
+function rf_footer_category_list( $half ) {
+	$all   = rf_receipt_categories();
+	$split = (int) ceil( count( $all ) / 2 );
+	$cats  = 0 === $half ? array_slice( $all, 0, $split, true ) : array_slice( $all, $split, null, true );
+	echo '<ul class="rf-footer-menu">';
+	foreach ( $cats as $slug => $cat ) {
+		printf( '<li><a href="%s">%s</a></li>', esc_url( home_url( '/' . $slug . '/' ) ), esc_html( rf_category_label( $cat ) ) );
+	}
+	echo '</ul>';
 }
 
 /**

@@ -1,5 +1,5 @@
 /**
- * ReceiptGenPro — Receipt Generator (v1.1.2)
+ * ReceiptGenPro — Receipt Generator (v1.1.3)
  *
  * 100% client-side: no fetch(), no form submission, no data ever leaves
  * the browser.
@@ -17,11 +17,19 @@
  * v1.1.2 (Oct 2026 audit, Phase 1): local default date, cent-rounded
  * totals, fixed amount-in-words cents, negatives clamped to 0, SRI on the
  * cdnjs libraries.
+ *
+ * v1.1.3 (Oct 2026 audit, Phase 3): INR/PKR amounts in words use lakh and
+ * crore, the form is kept in sessionStorage across reloads, exports render
+ * an 800 px off-screen copy (sharp on phones), "Change / Credit" when the
+ * amount paid exceeds the total, a "Remove logo" button, separate error
+ * messages, and files named receipt-<number>.<ext>.
  */
 ( function () {
 	'use strict';
 
-	document.addEventListener( 'DOMContentLoaded', init );
+	if ( typeof document !== 'undefined' ) {
+		document.addEventListener( 'DOMContentLoaded', init );
+	}
 
 	var LIBS = ( window.rfReceipt && window.rfReceipt.libs ) || {
 		html2canvas: {
@@ -132,6 +140,35 @@
 		return parts.join( ' ' );
 	}
 
+	// Indian numbering (lakh = 1,00,000; crore = 1,00,00,000) for INR and PKR.
+	function intToWordsIndian( n ) {
+		if ( n === 0 ) {
+			return 'zero';
+		}
+		var parts = [];
+		var crore = Math.floor( n / 10000000 );
+		n = n % 10000000;
+		if ( crore ) {
+			parts.push( intToWordsIndian( crore ) + ' crore' );
+		}
+		var lakh = Math.floor( n / 100000 );
+		n = n % 100000;
+		if ( lakh ) {
+			parts.push( under1000( lakh ) + ' lakh' );
+		}
+		var thousand = Math.floor( n / 1000 );
+		n = n % 1000;
+		if ( thousand ) {
+			parts.push( under1000( thousand ) + ' thousand' );
+		}
+		if ( n ) {
+			parts.push( under1000( n ) );
+		}
+		return parts.join( ' ' );
+	}
+
+	var INDIAN_GROUPING = { INR: true, PKR: true };
+
 	var CURRENCY_WORDS = {
 		USD: [ 'US dollars', 'cents' ], EUR: [ 'euros', 'cents' ], GBP: [ 'pounds', 'pence' ],
 		PKR: [ 'Pakistani rupees', 'paisa' ], INR: [ 'Indian rupees', 'paise' ], CAD: [ 'Canadian dollars', 'cents' ],
@@ -144,11 +181,17 @@
 		var c     = toCents( amount );
 		var whole = Math.floor( c / 100 );
 		var cents = c % 100;
-		var text = intToWords( whole ) + ' ' + names[0];
+		var toWords = INDIAN_GROUPING[ code ] ? intToWordsIndian : intToWords;
+		var text = toWords( whole ) + ' ' + names[0];
 		if ( cents ) {
-			text += ' and ' + intToWords( cents ) + ' ' + names[1];
+			text += ' and ' + toWords( cents ) + ' ' + names[1];
 		}
 		return text.charAt( 0 ).toUpperCase() + text.slice( 1 ) + ' only';
+	}
+
+	// Lets a Node check exercise the pure helpers without a browser.
+	if ( typeof module !== 'undefined' && module.exports ) {
+		module.exports = { amountInWords: amountInWords, intToWordsIndian: intToWordsIndian };
 	}
 
 	function init() {
@@ -163,6 +206,7 @@
 		var dateInput   = document.getElementById( 'rf-receipt-date' );
 		var preview     = document.getElementById( 'rf-receipt-preview' );
 		var logoInput   = document.getElementById( 'rf-business-logo' );
+		var logoRemove  = document.getElementById( 'rf-logo-remove' );
 		var tipInput    = document.getElementById( 'rf-tip' );
 		var paidInput   = document.getElementById( 'rf-amount-paid' );
 		var statement   = document.getElementById( 'rf-statement' );
@@ -202,7 +246,7 @@
 		}
 
 		// ---- Item rows ------------------------------------------------------
-		function addItemRow( placeholder ) {
+		function addItemRow( placeholder, values ) {
 			var row = document.createElement( 'div' );
 			row.className = 'rf-item-row';
 
@@ -233,6 +277,12 @@
 			remove.className = 'rf-item-remove';
 			remove.setAttribute( 'aria-label', 'Remove item' );
 			remove.innerHTML = '&times;';
+
+			if ( values ) {
+				name.value  = values.name || '';
+				qty.value   = values.qty !== undefined ? values.qty : '1';
+				price.value = values.price || '';
+			}
 
 			row.appendChild( name );
 			row.appendChild( qty );
@@ -275,6 +325,82 @@
 				reader.readAsDataURL( file );
 			} );
 		}
+
+		if ( logoRemove ) {
+			logoRemove.addEventListener( 'click', function () {
+				state.logoDataUrl = null;
+				if ( logoInput ) {
+					logoInput.value = '';
+				}
+				renderReceipt();
+			} );
+		}
+
+		// ---- Keep entries across reloads (until the tab is closed) ------------
+		// sessionStorage stays in this browser tab only; nothing is uploaded.
+		var STORE_KEY = 'rgp-form:' + window.location.pathname;
+
+		function storeFields() {
+			return Array.prototype.filter.call( form.querySelectorAll( 'input[id], select[id], textarea[id]' ), function ( el ) {
+				return el.type !== 'file';
+			} );
+		}
+
+		function saveForm() {
+			var data = { fields: {}, items: [], logo: state.logoDataUrl };
+			storeFields().forEach( function ( el ) {
+				data.fields[ el.id ] = el.type === 'checkbox' ? el.checked : el.value;
+			} );
+			itemsList.querySelectorAll( '.rf-item-row' ).forEach( function ( row ) {
+				data.items.push( {
+					name: row.querySelector( '.rf-item-name' ).value,
+					qty: row.querySelector( '.rf-item-qty' ).value,
+					price: row.querySelector( '.rf-item-price' ).value
+				} );
+			} );
+			try {
+				window.sessionStorage.setItem( STORE_KEY, JSON.stringify( data ) );
+			} catch ( e ) {
+				// A large logo can exceed the quota: keep everything else.
+				try {
+					data.logo = null;
+					window.sessionStorage.setItem( STORE_KEY, JSON.stringify( data ) );
+				} catch ( e2 ) {}
+			}
+		}
+
+		function restoreForm() {
+			var data;
+			try {
+				data = JSON.parse( window.sessionStorage.getItem( STORE_KEY ) || 'null' );
+			} catch ( e ) {
+				data = null;
+			}
+			if ( ! data || ! data.fields ) {
+				return;
+			}
+			storeFields().forEach( function ( el ) {
+				if ( ! Object.prototype.hasOwnProperty.call( data.fields, el.id ) ) {
+					return;
+				}
+				if ( el.type === 'checkbox' ) {
+					el.checked = !! data.fields[ el.id ];
+				} else {
+					el.value = data.fields[ el.id ];
+				}
+			} );
+			if ( Array.isArray( data.items ) ) {
+				itemsList.innerHTML = '';
+				data.items.forEach( function ( it, i ) {
+					addItemRow( itemPlaceholders[ i ] || itemPlaceholders[0], it );
+				} );
+			}
+			if ( data.logo ) {
+				state.logoDataUrl = data.logo;
+			}
+		}
+
+		restoreForm();
 
 		// ---- Live re-render on any field change ------------------------------
 		form.addEventListener( 'input', renderReceipt );
@@ -390,10 +516,13 @@
 				'<div class="rf-receipt-total-final"><span>Total</span><span>' + money( symbol, total ) + '</span></div>';
 
 			if ( paid !== null ) {
-				var balance = Math.max( 0, totalCents - toCents( paid ) ) / 100;
-				totalsHtml +=
-					'<div><span>Amount Paid</span><span>' + money( symbol, paid ) + '</span></div>' +
-					'<div class="rf-receipt-balance"><span>Balance Due</span><span>' + money( symbol, balance ) + '</span></div>';
+				var diffCents = totalCents - toCents( paid );
+				totalsHtml += '<div><span>Amount Paid</span><span>' + money( symbol, paid ) + '</span></div>';
+				if ( diffCents < 0 ) {
+					totalsHtml += '<div class="rf-receipt-balance"><span>Change / Credit</span><span>' + money( symbol, -diffCents / 100 ) + '</span></div>';
+				} else {
+					totalsHtml += '<div class="rf-receipt-balance"><span>Balance Due</span><span>' + money( symbol, diffCents / 100 ) + '</span></div>';
+				}
 			}
 
 			var wordsAmount = paid !== null ? paid : total;
@@ -423,27 +552,70 @@
 				signatureHtml +
 				'<p class="rf-receipt-footer">Generated with ' + escapeHtml( ( window.rfReceipt && window.rfReceipt.brand ) || 'ReceiptGenPro' ) + '</p>' +
 				'</div>';
+
+			if ( logoRemove ) {
+				logoRemove.style.display = state.logoDataUrl ? '' : 'none';
+			}
+			saveForm();
 		}
 
 		renderReceipt();
 
 		// ---- Export helpers ----------------------------------------------------
+		var EXPORT_WIDTH = 800; // px; at scale 2 every export is 1600 px wide.
+
+		// Renders a copy of the preview at a fixed desktop width, off screen, so a
+		// receipt made on a 375 px phone is as sharp as one made on a laptop.
+		function renderCanvas() {
+			var clone = preview.cloneNode( true );
+			clone.removeAttribute( 'id' );
+			clone.removeAttribute( 'aria-live' );
+			clone.setAttribute( 'aria-hidden', 'true' );
+			clone.style.cssText = 'position:absolute;left:-10000px;top:0;width:' + EXPORT_WIDTH + 'px;max-width:none;box-sizing:border-box;box-shadow:none;margin:0;';
+			document.body.appendChild( clone );
+			return window.html2canvas( clone, {
+				scale: 2,
+				backgroundColor: '#ffffff',
+				width: EXPORT_WIDTH,
+				windowWidth: Math.max( 1200, document.documentElement.clientWidth ),
+				scrollX: 0,
+				scrollY: 0
+			} ).then( function ( canvas ) {
+				clone.remove();
+				return canvas;
+			}, function ( err ) {
+				clone.remove();
+				throw err;
+			} );
+		}
+
 		function withCanvas( needPdf, btn, cb ) {
 			var original = btn.textContent;
 			btn.disabled = true;
 			btn.textContent = 'Preparing…';
 			ensureLibs( needPdf )
 				.then( function () {
-					return window.html2canvas( preview, { scale: 2, backgroundColor: '#ffffff' } );
-				} )
-				.then( cb )
-				.catch( function () {
+					return renderCanvas()
+						.then( cb )
+						.catch( function ( err ) {
+							if ( window.console ) {
+								window.console.error( err );
+							}
+							window.alert( 'Sorry, the receipt could not be exported. Please try again, or try another format.' );
+						} );
+				}, function () {
 					window.alert( 'The export library could not be loaded. Please check your connection and try again.' );
 				} )
 				.then( function () {
 					btn.disabled = false;
 					btn.textContent = original;
 				} );
+		}
+
+		// receipt-<number>.<ext>, keeping only filename-safe characters.
+		function fileName( ext ) {
+			var num = document.getElementById( 'rf-receipt-number' ).value.trim().replace( /[^A-Za-z0-9_-]+/g, '-' ).replace( /^-+|-+$/g, '' );
+			return 'receipt' + ( num ? '-' + num : '' ) + '.' + ext;
 		}
 
 		function download( href, filename ) {
@@ -459,7 +631,7 @@
 		if ( pngBtn ) {
 			pngBtn.addEventListener( 'click', function () {
 				withCanvas( false, pngBtn, function ( canvas ) {
-					download( canvas.toDataURL( 'image/png' ), 'receipt.png' );
+					download( canvas.toDataURL( 'image/png' ), fileName( 'png' ) );
 				} );
 			} );
 		}
@@ -468,7 +640,7 @@
 		if ( jpgBtn ) {
 			jpgBtn.addEventListener( 'click', function () {
 				withCanvas( false, jpgBtn, function ( canvas ) {
-					download( canvas.toDataURL( 'image/jpeg', 0.92 ), 'receipt.jpg' );
+					download( canvas.toDataURL( 'image/jpeg', 0.92 ), fileName( 'jpg' ) );
 				} );
 			} );
 		}
@@ -488,7 +660,7 @@
 					}
 					var pdf       = new jsPDF( { orientation: 'portrait', unit: 'mm', format: 'a4' } );
 					pdf.addImage( imgData, 'JPEG', ( 210 - pdfWidth ) / 2, 10, pdfWidth, pdfHeight );
-					pdf.save( 'receipt.pdf' );
+					pdf.save( fileName( 'pdf' ) );
 				} );
 			} );
 		}
