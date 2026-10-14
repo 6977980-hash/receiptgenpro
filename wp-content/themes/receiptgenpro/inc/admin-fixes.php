@@ -42,28 +42,6 @@ function rf_fixes_all_content() {
 	);
 }
 
-function rf_fixes_apply_patch( $content, $patch ) {
-	if ( ! empty( $patch['skip'] ) ) {
-		return array( $content, 'skipped' );
-	}
-	// 'unless': the patch has already been applied (or written by hand).
-	if ( ! empty( $patch['unless'] ) && false !== strpos( $content, $patch['unless'] ) ) {
-		return array( $content, 'not-found' );
-	}
-	if ( ! empty( $patch['regex'] ) ) {
-		if ( ! preg_match( $patch['find'], $content ) ) {
-			return array( $content, 'not-found' );
-		}
-		// 'backrefs' keeps $1 etc. in the replacement working.
-		$replace = empty( $patch['backrefs'] ) ? str_replace( '$', '\$', $patch['replace'] ) : $patch['replace'];
-		return array( preg_replace( $patch['find'], $replace, $content, 1 ), 'applied' );
-	}
-	if ( false === strpos( $content, $patch['find'] ) ) {
-		return array( $content, 'not-found' );
-	}
-	return array( str_replace( $patch['find'], $patch['replace'], $content ), 'applied' );
-}
-
 function rf_fixes_owner_input() {
 	$saved = get_option( 'rf_owner_details', array() );
 	$in    = array();

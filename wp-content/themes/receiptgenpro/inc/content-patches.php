@@ -70,6 +70,7 @@ function rf_content_patches( $o ) {
 				'replace' => '<a href="/receipt-templates/">purpose-built receipt templates</a>',
 			),
 			array(
+				'since'   => '1.1.5',
 				'label'   => 'Add "What We Never Store" (how the generator handles your data)',
 				'regex'   => true,
 				'find'    => '#\z#',
@@ -85,6 +86,7 @@ function rf_content_patches( $o ) {
 				'replace' => $contact_new,
 			),
 			array(
+				'since'   => '1.1.5',
 				'label'   => 'Add "What to Include in Your Email" and our time zone',
 				'regex'   => true,
 				'find'    => '#\z#',
@@ -138,6 +140,7 @@ function rf_content_patches( $o ) {
 				'replace' => 'Set the rent period to that month; the landlord should check the details and sign it, since the receipt is their confirmation that the payment was received.</p>',
 			),
 			array(
+				'since'   => '1.1.5',
 				'label'   => 'First paragraph: who this page is for + link to the HRA rent receipt (Oct 2026, CNT-05)',
 				'regex'   => true,
 				'backrefs' => true,
@@ -149,6 +152,7 @@ function rf_content_patches( $o ) {
 
 		'hra-rent-receipt' => array(
 			array(
+				'since'   => '1.1.5',
 				'label'   => 'First paragraph: who this page is for + link to the general rent receipt (Oct 2026, CNT-05)',
 				'regex'   => true,
 				'backrefs' => true,
@@ -284,6 +288,97 @@ function rf_taxi_page_content() {
 </div>
 HTML;
 }
+
+/**
+ * Applies one patch to a post body. Returns array( new content, status ),
+ * status being 'applied', 'not-found' or 'skipped'.
+ */
+function rf_fixes_apply_patch( $content, $patch ) {
+	if ( ! empty( $patch['skip'] ) ) {
+		return array( $content, 'skipped' );
+	}
+	// 'unless': the patch has already been applied (or written by hand).
+	if ( ! empty( $patch['unless'] ) && false !== strpos( $content, $patch['unless'] ) ) {
+		return array( $content, 'not-found' );
+	}
+	if ( ! empty( $patch['regex'] ) ) {
+		if ( ! preg_match( $patch['find'], $content ) ) {
+			return array( $content, 'not-found' );
+		}
+		// 'backrefs' keeps $1 etc. in the replacement working.
+		$replace = empty( $patch['backrefs'] ) ? str_replace( '$', '\$', $patch['replace'] ) : $patch['replace'];
+		return array( preg_replace( $patch['find'], $replace, $content, 1 ), 'applied' );
+	}
+	if ( false === strpos( $content, $patch['find'] ) ) {
+		return array( $content, 'not-found' );
+	}
+	return array( str_replace( $patch['find'], $patch['replace'], $content ), 'applied' );
+}
+
+/**
+ * One-time migration (Oct 2026 audit, Phase 5). The owner approved these
+ * DB changes going live with the deploy instead of being clicked in
+ * Tools → ReceiptGenPro Fixes. It applies only the patches marked
+ * 'since' => '1.1.5' plus the shorter SEO titles, through wp_update_post()
+ * (so each page keeps a revision), and runs once: the option is added
+ * before any change, so parallel requests can't repeat it.
+ */
+function rf_migrate_phase5_content() {
+	if ( get_option( 'rf_migration_phase5' ) || wp_installing() ) {
+		return;
+	}
+	if ( ! add_option( 'rf_migration_phase5', array( 'started' => gmdate( 'c' ) ), '', false ) ) {
+		return;
+	}
+	$log = array();
+
+	// The visitor who triggers this may not have unfiltered_html; the HTML
+	// below is the theme's own, so kses must not rewrite it.
+	$kses = (bool) has_filter( 'content_save_pre', 'wp_filter_post_kses' );
+	kses_remove_filters();
+
+	foreach ( rf_content_patches( get_option( 'rf_owner_details', array() ) ) as $slug => $list ) {
+		$list = array_filter(
+			$list,
+			function ( $patch ) {
+				return isset( $patch['since'] ) && '1.1.5' === $patch['since'];
+			}
+		);
+		if ( ! $list ) {
+			continue;
+		}
+		$found = get_posts( array( 'name' => $slug, 'post_type' => 'page', 'post_status' => 'publish', 'numberposts' => 1 ) );
+		if ( ! $found ) {
+			$log[] = "/$slug/: page not found";
+			continue;
+		}
+		$content = $found[0]->post_content;
+		foreach ( $list as $patch ) {
+			list( $content, $status ) = rf_fixes_apply_patch( $content, $patch );
+			$log[] = "/$slug/: {$patch['label']}: $status";
+		}
+		if ( $content !== $found[0]->post_content ) {
+			wp_update_post( array( 'ID' => $found[0]->ID, 'post_content' => wp_slash( $content ) ) );
+		}
+	}
+
+	foreach ( rf_seo_title_patches() as $slug => $title ) {
+		$found = get_posts( array( 'name' => $slug, 'post_type' => 'post', 'post_status' => 'publish', 'numberposts' => 1 ) );
+		if ( $found ) {
+			update_post_meta( $found[0]->ID, 'rf_seo_title', $title );
+			$log[] = "/$slug/: SEO title set";
+		} else {
+			$log[] = "/$slug/: post not found";
+		}
+	}
+
+	if ( $kses ) {
+		kses_init_filters();
+	}
+	update_option( 'rf_migration_phase5', array( 'done' => gmdate( 'c' ), 'log' => $log ), false );
+	do_action( 'litespeed_purge_all' );
+}
+add_action( 'init', 'rf_migrate_phase5_content', 20 );
 
 /**
  * Shorter SEO titles (Oct 2026 audit, SEO-07): each is 60 characters or
