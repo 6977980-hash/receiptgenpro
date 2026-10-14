@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: RGP Deploy Helper
- * Description: Copies the theme and plugin folders from the Hostinger Git checkout into the live wp-content folder whenever a new commit arrives. Deleting this plugin only stops deployment; everything already deployed stays as it is.
+ * Description: Copies the theme and plugin folders from this Git checkout (deployed by Hostinger) into the live wp-content folder whenever a new commit arrives. Deleting this plugin only stops deployment; everything already deployed stays as it is.
  * Version:     1.0.0
  * Author:      receiptgenpro
  * License:     GPL-2.0-or-later
@@ -58,7 +58,8 @@ final class RGP_Deploy_Helper {
 		} else {
 			$dir = get_option( self::OPT_REPO_DIR, '' );
 			if ( '' === $dir ) {
-				$dir = ABSPATH . 'rgp-repo';
+				// Hostinger deploys the repo straight into this plugin's folder.
+				$dir = __DIR__;
 			}
 		}
 		return untrailingslashit( wp_normalize_path( $dir ) );
@@ -365,7 +366,7 @@ final class RGP_Deploy_Helper {
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 				<input type="hidden" name="action" value="rgp_deploy_settings">
 				<?php wp_nonce_field( 'rgp_deploy_settings' ); ?>
-				<p><label>Repo folder (absolute path, leave empty for <code><?php echo esc_html( wp_normalize_path( ABSPATH . 'rgp-repo' ) ); ?></code>)<br>
+				<p><label>Repo folder (absolute path, leave empty for this plugin's own folder <code><?php echo esc_html( wp_normalize_path( __DIR__ ) ); ?></code>)<br>
 				<input type="text" name="repo_dir" class="large-text code" value="<?php echo esc_attr( get_option( self::OPT_REPO_DIR, '' ) ); ?>" <?php disabled( defined( 'RGP_DEPLOY_REPO_DIR' ) ); ?>></label></p>
 				<p><label><input type="checkbox" name="new_key" value="1"> Generate a new webhook key</label></p>
 				<?php submit_button( 'Save settings', 'secondary', 'submit', false ); ?>
