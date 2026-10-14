@@ -27,7 +27,7 @@ define( 'RF_LOGO_TEXT', 'Receipt<span class="rf-accent">GenPro</span>' );
 define( 'RF_SOCIAL_TWITTER', '' );  // e.g. 'https://x.com/receiptgenpro'
 define( 'RF_SOCIAL_FACEBOOK', '' ); // e.g. 'https://facebook.com/receiptgenpro'
 define( 'RF_SOCIAL_LINKEDIN', '' ); // e.g. 'https://linkedin.com/company/receiptgenpro'
-define( 'RF_THEME_VERSION', '1.1.1' );
+define( 'RF_THEME_VERSION', '1.1.2' );
 
 /* ==========================================================================
    2. THEME SETUP
@@ -91,9 +91,17 @@ function rf_enqueue_assets() {
 			array(
 				'brand'      => RF_BRAND_NAME,
 				'currencies' => rf_supported_currencies(),
+				// Subresource Integrity: the browser refuses the file if cdnjs ever
+				// serves different bytes. Hashes are cdnjs's own published SRI values.
 				'libs'       => array(
-					'html2canvas' => 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
-					'jspdf'       => 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+					'html2canvas' => array(
+						'url'       => 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
+						'integrity' => 'sha512-BNaRQnYJYiPSqHHDb58B0yaPfCu+Wgds8Gp/gU33kqBtgNS4tSPHuGibyoeqMV/TJlSKda6FXzoEyYGjTe+vXA==',
+					),
+					'jspdf'       => array(
+						'url'       => 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+						'integrity' => 'sha512-qZvrmS2ekKPF2mSznTQsxqPgnpkI4DNTlrdUmTzrDgektczlKNRRhy5X5AAOnx5S09ydFYWWNSfcEqDTTHgtNA==',
+					),
 				),
 			)
 		);

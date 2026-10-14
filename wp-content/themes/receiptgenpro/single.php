@@ -24,7 +24,7 @@ while ( have_posts() ) :
 				<div class="rf-post-meta">
 					<span>By <a href="<?php echo esc_url( get_author_posts_url( get_the_author_meta( 'ID' ) ) ); ?>"><?php the_author(); ?></a></span>
 					<span aria-hidden="true">·</span>
-					<span>Published <?php the_date(); ?></span>
+					<span>Published <?php echo esc_html( get_the_date() ); ?></span>
 					<?php if ( get_the_modified_date() !== get_the_date() ) : ?>
 						<span aria-hidden="true">·</span>
 						<span>Updated <?php the_modified_date(); ?></span>

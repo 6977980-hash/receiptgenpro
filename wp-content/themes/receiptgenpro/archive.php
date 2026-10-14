@@ -39,7 +39,7 @@ get_header();
 						<div class="rf-blog-card-meta">
 							<span><?php the_author(); ?></span>
 							<span aria-hidden="true">·</span>
-							<span><?php the_date(); ?></span>
+							<span><?php echo esc_html( get_the_date() ); ?></span>
 						</div>
 					</div>
 				</a>
