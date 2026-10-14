@@ -1,0 +1,31 @@
+/*
+Theme Name: ReceiptGenPro
+Theme URI: https://receiptgenpro.com
+Author: ReceiptGenPro Team
+Author URI: https://receiptgenpro.com/about-us/
+Description: A fast, lightweight, fully SEO/GEO/AEO-optimized WordPress theme built for a free online receipt generator business. No page builder, no bloat — hand-coded for Core Web Vitals, schema.org structured data, and answer-engine-ready content.
+Version: 1.1.1
+Requires at least: 6.0
+Tested up to: 6.6
+Requires PHP: 7.4
+License: GNU General Public License v2 or later
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
+Text Domain: receiptgenpro
+Tags: e-commerce, custom-menu, featured-images, threaded-comments, translation-ready
+
+============================================================================
+REBRANDING NOTE
+============================================================================
+Every occurrence of the placeholder brand "ReceiptGenPro" and the domain
+"receiptgenpro.com" lives in ONE place: the constants at the top of
+functions.php (RF_BRAND_NAME, RF_BRAND_DOMAIN, RF_BRAND_TAGLINE, etc.).
+Change those constants and the whole site — titles, schema, footer,
+author boxes, emails — updates automatically. You do not need to
+find-and-replace across every file.
+============================================================================
+
+This stylesheet intentionally contains only the WP-required header comment
+above. All actual CSS lives in /assets/css/main.css (enqueued in
+functions.php) so the file is easy to lint, minify and cache-bust
+independently of theme metadata.
+*/
