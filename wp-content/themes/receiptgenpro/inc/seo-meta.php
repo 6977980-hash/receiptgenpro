@@ -40,7 +40,7 @@ function rf_get_seo_data() {
 		$data['canonical']   = home_url( '/' );
 	} elseif ( rf_is_templates_hub() ) {
 		$data['title']       = 'Free Receipt Templates (PDF, PNG & JPEG) – Fill Online';
-		$data['description'] = 'Browse 16 free receipt templates — rent, HRA, payment, deposit, cash, donation, hotel, taxi, freelance and more. Fill online and download as PDF, PNG or JPEG.';
+		$data['description'] = 'Browse ' . count( rf_receipt_categories() ) . ' free receipt templates — rent, HRA, payment, deposit, cash, donation, hotel, taxi, freelance and more. Fill online and download as PDF, PNG or JPEG.';
 		$data['canonical']   = get_permalink();
 	} elseif ( is_page_template( 'page-receipt-category.php' ) ) {
 		global $post;

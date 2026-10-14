@@ -1,5 +1,17 @@
 # ReceiptGenPro theme — Changelog
 
+## 1.2.0 — 14 Oct 2026 (five new SEO tools)
+
+New pages are real WordPress Pages, created automatically on the first request after deploy (`inc/feature-pages.php`, option `rf_feature_pages_hash`); their text lives in the theme templates.
+
+- **Requirement checker.** Under every generator, "Check this receipt for" an HRA claim, a dependent care FSA / child care credit, a $250+ donation, a business expense, a US rent payment or a missing receipt declaration. Each line ticks as you type, and points to the template that has a missing field. Rules live in `inc/requirements.php`, each traced to an official source; `/receipt-requirements/` prints the same lists with sources. Template pages pick a sensible check by default; `?purpose=` preselects one.
+- **Verification QR code.** Receipts carry a QR code (on by default, can be switched off) linking to `/verify-receipt/#r=…`. The details travel after the `#`, so they are never sent to the server; the verify page decodes them in the browser so anyone can spot a receipt changed after it was made. Uses qrcode-generator 1.4.4 from cdnjs with SRI.
+- **Missing receipt form.** New template `/missing-receipt-form/` (lost receipt declaration): vendor, date, business purpose, reason, employee declaration and an approver signature. The generator supports `number_label` and `signature2` for it.
+- **Rent receipt laws by state.** `/rent-receipt-laws/` and one page per jurisdiction (16 states + D.C.) with the statute, when a receipt is required, required contents, records and penalties, plus the rent generator. Data in `inc/rent-laws.php`, read from each statute's text in October 2026.
+- **Embeddable widget.** `/embed/<template>/` serves the generator alone (no ads, consent or plugins, `noindex`, `frame-ancestors *` instead of `X-Frame-Options`). `/receipt-generator-widget/` builds the embed code: iframe, a credit link, and an optional auto-height script.
+- Templates hub, footer and `/llms.txt` link the new tools; the hub description counts templates instead of saying 16.
+- Unit tests for the checks, the QR payload round trip and the embed code (`tests/v120-tools.test.js`).
+
 ## 1.1.7 — 14 Oct 2026 (site audit, Phase 5: content goes live)
 
 - One-time migration on the first request after deploy (approved by the owner): applies the Phase 5 page text (rent/HRA cross-links, About "What We Never Store", Contact "What to Include in Your Email") and the three shorter SEO titles, then purges LiteSpeed. Pages are changed with `wp_update_post()`, so each keeps a revision. Runs once (option `rf_migration_phase5`, which also stores a log).

@@ -27,7 +27,7 @@ define( 'RF_LOGO_TEXT', 'Receipt<span class="rf-accent">GenPro</span>' );
 define( 'RF_SOCIAL_TWITTER', '' );  // e.g. 'https://x.com/receiptgenpro'
 define( 'RF_SOCIAL_FACEBOOK', '' ); // e.g. 'https://facebook.com/receiptgenpro'
 define( 'RF_SOCIAL_LINKEDIN', '' ); // e.g. 'https://linkedin.com/company/receiptgenpro'
-define( 'RF_THEME_VERSION', '1.1.7' );
+define( 'RF_THEME_VERSION', '1.2.0' );
 
 /* ==========================================================================
    2. THEME SETUP
@@ -91,28 +91,19 @@ function rf_enqueue_assets() {
 	// v1.1.0 (audit M5): jsPDF (~350 KB) and html2canvas (~200 KB) are no
 	// longer enqueued up front — receipt-generator.js lazy-loads them from
 	// cdnjs the first time a visitor clicks a Download button.
-	if ( is_front_page() || is_page_template( 'page-receipt-category.php' ) ) {
+	// v1.2.0: also on each /rent-receipt-laws/<state>/ page.
+	$rf_state_law_page = is_page_template( 'page-rent-receipt-laws.php' ) && wp_get_post_parent_id( get_queried_object_id() );
+	if ( is_front_page() || is_page_template( 'page-receipt-category.php' ) || $rf_state_law_page ) {
 		wp_enqueue_script( 'rf-receipt-generator', get_template_directory_uri() . '/assets/js/receipt-generator.js', array(), rf_asset_ver( 'assets/js/receipt-generator.js' ), true );
-		wp_localize_script(
-			'rf-receipt-generator',
-			'rfReceipt',
-			array(
-				'brand'      => RF_BRAND_NAME,
-				'currencies' => rf_supported_currencies(),
-				// Subresource Integrity: the browser refuses the file if cdnjs ever
-				// serves different bytes. Hashes are cdnjs's own published SRI values.
-				'libs'       => array(
-					'html2canvas' => array(
-						'url'       => 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
-						'integrity' => 'sha512-BNaRQnYJYiPSqHHDb58B0yaPfCu+Wgds8Gp/gU33kqBtgNS4tSPHuGibyoeqMV/TJlSKda6FXzoEyYGjTe+vXA==',
-					),
-					'jspdf'       => array(
-						'url'       => 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
-						'integrity' => 'sha512-qZvrmS2ekKPF2mSznTQsxqPgnpkI4DNTlrdUmTzrDgektczlKNRRhy5X5AAOnx5S09ydFYWWNSfcEqDTTHgtNA==',
-					),
-				),
-			)
-		);
+		wp_localize_script( 'rf-receipt-generator', 'rfReceipt', rf_receipt_script_data() );
+	}
+
+	// v1.2.0 tool pages.
+	if ( is_page_template( 'page-verify-receipt.php' ) ) {
+		wp_enqueue_script( 'rf-verify-receipt', get_template_directory_uri() . '/assets/js/verify-receipt.js', array(), rf_asset_ver( 'assets/js/verify-receipt.js' ), true );
+	}
+	if ( is_page_template( 'page-receipt-widget.php' ) ) {
+		wp_enqueue_script( 'rf-widget-builder', get_template_directory_uri() . '/assets/js/widget-builder.js', array(), rf_asset_ver( 'assets/js/widget-builder.js' ), true );
 	}
 }
 add_action( 'wp_enqueue_scripts', 'rf_enqueue_assets' );
@@ -169,6 +160,14 @@ require get_template_directory() . '/inc/adsense.php';
       found on competitor sites where two pages target one keyword).
    ========================================================================== */
 require get_template_directory() . '/inc/category-data.php';
+
+/* ==========================================================================
+   7a. v1.2.0 TOOLS — requirement checker, verify-receipt QR, missing
+       receipt form, rent receipt laws by state, embeddable widget.
+   ========================================================================== */
+require get_template_directory() . '/inc/requirements.php';
+require get_template_directory() . '/inc/rent-laws.php';
+require get_template_directory() . '/inc/feature-pages.php';
 
 /* ==========================================================================
    7b. SEPT 2026 AUDIT FIXES (v1.1.0)
@@ -298,6 +297,9 @@ function rf_get_breadcrumbs() {
 		$trail[] = array( 'title' => 'Blog', 'url' => get_permalink( get_option( 'page_for_posts' ) ) );
 		$trail[] = array( 'title' => ucfirst( single_term_title( '', false ) ), 'url' => get_term_link( get_queried_object() ) );
 	} elseif ( is_page() ) {
+		foreach ( array_reverse( get_post_ancestors( get_queried_object_id() ) ) as $ancestor ) {
+			$trail[] = array( 'title' => get_the_title( $ancestor ), 'url' => get_permalink( $ancestor ) );
+		}
 		$trail[] = array( 'title' => get_the_title(), 'url' => get_permalink() );
 	} elseif ( is_author() ) {
 		$trail[] = array( 'title' => 'Authors', 'url' => '' );

@@ -31,6 +31,11 @@
  *   signature      Label for a signature line (empty = none).
  *   statement      array( label, text, checked ) — optional checkbox
  *                  that prints a fixed statement on the receipt.
+ *   number_label   Label for the number field (default "Receipt #").
+ *   signature2     Label for a second signature line (e.g. an approver).
+ *
+ * 'purpose' (v1.2.0) is the requirement check selected by default on that
+ * page; see inc/requirements.php.
  *
  * Framing rule (audit C5): every template is written for the business or
  * person who ISSUES the receipt (landlord, driver, hotel, restaurant…),
@@ -63,6 +68,7 @@ function rf_receipt_categories() {
 				'Auto-calculates balance due when only part of the rent was paid',
 				'Prints the amount in words and a landlord signature line',
 			),
+			'purpose'          => 'rent-us',
 			'form'             => array(
 				'title'          => 'RENT RECEIPT',
 				'business_label' => 'Landlord / Property Manager',
@@ -97,6 +103,7 @@ function rf_receipt_categories() {
 				'Nights × nightly rate as a line item, plus a tax rate or separate lines for taxes and fees',
 				'Gives your guests an itemized folio they can file with their employer',
 			),
+			'purpose'          => 'expense',
 			'form'             => array(
 				'title'          => 'HOTEL RECEIPT',
 				'business_label' => 'Hotel / Property Name',
@@ -128,6 +135,7 @@ function rf_receipt_categories() {
 				'Separate tax and tip fields, just like a printed restaurant check',
 				'Great for catering bills and private-event invoices',
 			),
+			'purpose'          => 'expense',
 			'form'             => array(
 				'title'          => 'RESTAURANT RECEIPT',
 				'business_label' => 'Restaurant / Café Name',
@@ -281,6 +289,7 @@ function rf_receipt_categories() {
 				'Cash or in-kind: describe non-cash gifts without assigning a value',
 				'Covers what the IRS expects in a written acknowledgment for $250+ gifts',
 			),
+			'purpose'          => 'donation',
 			'form'             => array(
 				'title'          => 'DONATION RECEIPT',
 				'business_label' => 'Organization Name',
@@ -317,6 +326,7 @@ function rf_receipt_categories() {
 				'Pickup, drop-off, distance and vehicle number on every receipt',
 				'Hand passengers a proper printed or WhatsApp receipt on request',
 			),
+			'purpose'          => 'expense',
 			'form'             => array(
 				'title'          => 'TAXI RECEIPT',
 				'business_label' => 'Driver / Taxi Company',
@@ -351,6 +361,7 @@ function rf_receipt_categories() {
 				'Supports daycare centers, nannies and in-home babysitters',
 				'Care-period dates for weekly or monthly billing',
 			),
+			'purpose'          => 'childcare',
 			'form'             => array(
 				'title'          => 'CHILDCARE RECEIPT',
 				'business_label' => 'Childcare Provider',
@@ -474,6 +485,7 @@ function rf_receipt_categories() {
 				'Landlord PAN field (needed when annual rent is above ₹1 lakh)',
 				'Amount in words in rupees and paise, plus a signature line for the landlord',
 			),
+			'purpose'          => 'hra',
 			'form'             => array(
 				'title'          => 'RENT RECEIPT',
 				'currency'       => 'INR',
@@ -557,6 +569,49 @@ function rf_receipt_categories() {
 				'paid'           => true,
 				'words'          => true,
 				'signature'      => 'Received By (Signature)',
+			),
+		),
+
+		// v1.2.0: not a receipt but the form employers ask for when the
+		// original receipt is lost. Written for the employee who really paid.
+		'missing-receipt-form' => array(
+			'h1'               => 'Free Missing Receipt Form',
+			'seo_title'        => 'Missing Receipt Form — Free Lost Receipt Declaration',
+			'meta_description' => 'Lost a receipt? Fill in a free missing receipt declaration for your expense report: vendor, date, amount, business purpose, why the receipt is missing, and signatures.',
+			'primary_keyword'  => 'missing receipt form',
+			'related'          => array( 'payment-receipt', 'cash-receipt', 'taxi-receipt', 'restaurant-receipt' ),
+			'icon'             => '📝',
+			'default_fields'   => array( 'Employee & Department', 'Vendor / Merchant', 'Expense Date & Amount', 'Business Purpose', 'Why the Receipt Is Missing', 'Employee & Approver Signatures' ),
+			'highlights'       => array(
+				'The declaration most expense policies accept when an original receipt is lost',
+				'Lists each lost expense separately, with a total',
+				'Prints the employee declaration and an approver signature line',
+			),
+			'purpose'          => 'missing',
+			'form'             => array(
+				'title'          => 'MISSING RECEIPT DECLARATION',
+				'number_label'   => 'Reference #',
+				'business_label' => 'Employee Name',
+				'business_ph'    => 'e.g. Sara Ahmed',
+				'client_label'   => 'Company / Employer',
+				'client_ph'      => 'e.g. Northwind Traders Ltd.',
+				'item_ph'        => array( 'e.g. Taxi — airport to client office', 'e.g. Lunch with client (2 people)' ),
+				'notes_ph'       => 'e.g. Card statement attached showing the charge.',
+				'payment'        => 'Card',
+				'extra'          => array(
+					array( 'id' => 'department', 'label' => 'Department / Cost Centre', 'type' => 'text', 'ph' => 'e.g. Sales — CC 4410' ),
+					array( 'id' => 'vendor', 'label' => 'Vendor / Merchant', 'type' => 'text', 'ph' => 'e.g. City Cabs' ),
+					array( 'id' => 'expense_date', 'label' => 'Date of Expense', 'type' => 'date' ),
+					array( 'id' => 'purpose', 'label' => 'Business Purpose', 'type' => 'text', 'ph' => 'e.g. Client meeting with Acme Corp.' ),
+					array( 'id' => 'reason', 'label' => 'Why the Receipt Is Missing', 'type' => 'select', 'options' => array( 'Receipt lost', 'Receipt damaged or unreadable', 'Vendor did not provide a receipt', 'Receipt not available (e.g. parking meter, tip)' ) ),
+				),
+				'signature'      => 'Employee Signature',
+				'signature2'     => 'Approved By (Manager)',
+				'statement'      => array(
+					'label'   => 'Print the employee declaration',
+					'text'    => 'I declare that the expenses above were incurred by me for business purposes, that the original receipt is not available for the reason given, and that I have not claimed and will not claim reimbursement for them anywhere else.',
+					'checked' => true,
+				),
 			),
 		),
 	);
