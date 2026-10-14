@@ -1,0 +1,10 @@
+# This folder is the Git checkout Hostinger deploys into. It must never be
+# served to visitors; the RGP Deploy Helper plugin copies files from here
+# into the live wp-content folder.
+<IfModule mod_authz_core.c>
+	Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+	Order allow,deny
+	Deny from all
+</IfModule>
