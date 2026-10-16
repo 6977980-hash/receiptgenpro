@@ -44,7 +44,7 @@ get_header();
 	<!-- =========================================================
 	     THE ACTUAL TOOL (client-side, see assets/js/receipt-generator.js)
 	     ========================================================= -->
-	<?php get_template_part( 'template-parts/generator-embed', null, array( 'heading' => 'Receipt Details', 'item_default' => 'e.g. Service or product name' ) ); ?>
+	<?php get_template_part( 'template-parts/generator-embed', null, array( 'heading' => 'Receipt Details', 'item_default' => 'e.g. Service or product name', 'picker' => true ) ); ?>
 
 	<!-- =========================================================
 	     HOW IT WORKS — also parsed into HowTo schema

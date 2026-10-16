@@ -1,5 +1,5 @@
 /**
- * ReceiptGenPro — Receipt Generator (v1.2.0)
+ * ReceiptGenPro — Receipt Generator (v1.3.0)
  *
  * 100% client-side: no fetch(), no form submission, no data ever leaves
  * the browser.
@@ -37,6 +37,11 @@
  * carries the receipt's details in the link's #fragment (never sent to
  * the server; see /verify-receipt/), a custom number label and a second
  * signature line.
+ *
+ * v1.3.0: nine receipt designs (rf-design-<key> on the preview, kept in
+ * localStorage; "Thermal Slip" exports at 80 mm, "Office + Customer Copy"
+ * prints the receipt twice) and, on the homepage, a receipt type picker
+ * that rebuilds the type-specific fields in place from #rf-type-data.
  */
 ( function () {
 	'use strict';
@@ -336,6 +341,71 @@
 		return enc;
 	}
 
+	// ---- Receipt type fields (homepage picker) -----------------------------
+	// The same markup generator-embed.php renders for a template's extra
+	// fields, tip / amount paid and statement, built from its form config.
+	function esc( str ) {
+		return String( str === undefined || str === null ? '' : str )
+			.replace( /&/g, '&amp;' ).replace( /</g, '&lt;' ).replace( />/g, '&gt;' )
+			.replace( /"/g, '&quot;' ).replace( /'/g, '&#039;' );
+	}
+
+	function titleCase( str ) {
+		return String( str || '' ).toLowerCase().replace( /(^|\s)([a-z])/g, function ( m, sp, ch ) {
+			return sp + ch.toUpperCase();
+		} );
+	}
+
+	function typeFieldsHtml( f ) {
+		f = f || {};
+		var out = { extra: '', tippaid: '', statement: '' };
+		var extra = f.extra || [];
+		if ( extra.length ) {
+			out.extra = '<fieldset class="rf-template-fields"><legend>' + esc( titleCase( f.title || 'Receipt' ) ) + ' Details</legend><div class="rf-form-row rf-form-row-2col">' +
+				extra.map( function ( x ) {
+					var id = 'rf-x-' + String( x.id || '' ).toLowerCase().replace( /[^a-z0-9_-]/g, '' );
+					var type = x.type || 'text';
+					var attrs = ' id="' + esc( id ) + '" data-rf-extra data-label="' + esc( x.label ) + '"';
+					var input;
+					if ( type === 'select' ) {
+						input = '<select' + attrs + '>' + ( x.options || [] ).map( function ( o ) {
+							return '<option>' + esc( o ) + '</option>';
+						} ).join( '' ) + '</select>';
+					} else if ( type === 'textarea' ) {
+						input = '<textarea' + attrs + ' rows="2" placeholder="' + esc( x.ph ) + '"></textarea>';
+					} else {
+						input = '<input type="' + esc( type ) + '"' + attrs + ' data-type="' + esc( type ) + '" placeholder="' + esc( x.ph ) + '">';
+					}
+					return '<div class="rf-field"><label for="' + esc( id ) + '">' + esc( x.label ) + '</label>' + input + '</div>';
+				} ).join( '' ) + '</div></fieldset>';
+		}
+		if ( f.tip || f.paid ) {
+			out.tippaid = '<div class="rf-form-row rf-form-row-2col">' +
+				( f.tip ? '<div class="rf-field"><label for="rf-tip">Tip / Gratuity (amount)</label><input type="number" id="rf-tip" min="0" step="0.01" placeholder="0.00"></div>' : '' ) +
+				( f.paid ? '<div class="rf-field"><label for="rf-amount-paid">Amount Paid (leave blank if paid in full)</label><input type="number" id="rf-amount-paid" min="0" step="0.01" placeholder="0.00"></div>' : '' ) +
+				'</div>';
+		}
+		var st = f.statement;
+		if ( st && st.text ) {
+			out.statement = '<div class="rf-field rf-field-check"><label><input type="checkbox" id="rf-statement" data-text="' + esc( st.text ) + '"' + ( st.checked ? ' checked' : '' ) + '> ' + esc( st.label ) + '</label></div>';
+		}
+		return out;
+	}
+
+	// ---- Designs ---------------------------------------------------------
+	// Export width in px per design (others use the 800 px default).
+	var DESIGN_WIDTH = { thermal: 380 };
+
+	// "Office + Customer Copy" prints the same receipt twice with a cut line.
+	function wrapDesign( design, body ) {
+		if ( design !== 'copies' ) {
+			return '<div class="rf-receipt-inner">' + body + '</div>';
+		}
+		return '<div class="rf-receipt-inner"><p class="rf-copy-label">Office copy</p>' + body + '</div>' +
+			'<div class="rf-copy-cut"><span>&#9986; cut here</span></div>' +
+			'<div class="rf-receipt-inner"><p class="rf-copy-label">Customer copy</p>' + body + '</div>';
+	}
+
 	// Lets a Node check exercise the pure helpers without a browser.
 	if ( typeof module !== 'undefined' && module.exports ) {
 		module.exports = {
@@ -348,7 +418,10 @@
 			nextReceiptNumber: nextReceiptNumber,
 			evaluateChecks: evaluateChecks,
 			buildPayload: buildPayload,
-			b64urlEncode: b64urlEncode
+			b64urlEncode: b64urlEncode,
+			typeFieldsHtml: typeFieldsHtml,
+			wrapDesign: wrapDesign,
+			esc: esc
 		};
 	}
 
@@ -489,6 +562,152 @@
 			checkerResult.innerHTML = html;
 		}
 
+		// ---- Receipt type picker (homepage) ------------------------------------
+		var typeData = null;
+		var currentType = 'general';
+		var typeDataEl = document.getElementById( 'rf-type-data' );
+		if ( typeDataEl ) {
+			try {
+				typeData = JSON.parse( typeDataEl.textContent );
+			} catch ( e ) {
+				typeData = null;
+			}
+		}
+		var typeLinks = document.querySelectorAll( '.rf-type-option' );
+		var typeMore  = document.getElementById( 'rf-type-more' );
+
+		function setLabel( inputId, text, ph ) {
+			var label = form.querySelector( 'label[for="' + inputId + '"]' );
+			var input = document.getElementById( inputId );
+			if ( label && text ) {
+				label.textContent = text;
+			}
+			if ( input && ph !== undefined ) {
+				input.placeholder = ph;
+			}
+		}
+
+		// Swap the form to another receipt type, keeping everything the
+		// types share (business, customer, number, date, items, taxes, notes).
+		function applyType( slug ) {
+			var t = typeData && typeData[ slug ];
+			if ( ! t ) {
+				return false;
+			}
+			var f = t.form || {};
+			currentType = slug;
+			cfg.title         = f.title || 'RECEIPT';
+			cfg.words         = !! f.words;
+			cfg.signature     = f.signature || '';
+			cfg.signature2    = f.signature2 || '';
+			cfg.numberLabel   = f.number_label || 'Receipt #';
+			cfg.businessLabel = f.business_label || 'From';
+			cfg.clientLabel   = f.client_label || 'Received From';
+			itemPlaceholders  = [].concat( f.item_ph || [] );
+
+			setLabel( 'rf-business-name', f.business_label, f.business_ph );
+			setLabel( 'rf-client-name', f.client_label, f.client_ph );
+			setLabel( 'rf-receipt-number', f.number_label );
+			var notesEl = document.getElementById( 'rf-notes' );
+			if ( notesEl ) {
+				notesEl.placeholder = f.notes_ph || '';
+			}
+			var paySel = document.getElementById( 'rf-payment-method' );
+			if ( paySel && f.payment ) {
+				paySel.value = f.payment;
+			}
+			if ( f.currency && currencies[ f.currency ] ) {
+				currencySel.value = f.currency;
+			}
+
+			var parts = typeFieldsHtml( f );
+			[ 'extra', 'tippaid', 'statement' ].forEach( function ( key ) {
+				var box = document.getElementById( 'rf-type-' + key );
+				if ( box ) {
+					box.innerHTML = parts[ key ];
+				}
+			} );
+			tipInput  = document.getElementById( 'rf-tip' );
+			paidInput = document.getElementById( 'rf-amount-paid' );
+			statement = document.getElementById( 'rf-statement' );
+
+			itemsList.querySelectorAll( '.rf-item-name' ).forEach( function ( input, i ) {
+				input.placeholder = itemPlaceholders[ i ] || itemPlaceholders[0] || 'Item or service';
+			} );
+
+			if ( purposeSel ) {
+				purposeSel.value = purposes[ t.purpose ] ? t.purpose : '';
+			}
+
+			typeLinks.forEach( function ( a ) {
+				if ( a.dataset.type === slug ) {
+					a.setAttribute( 'aria-current', 'true' );
+				} else {
+					a.removeAttribute( 'aria-current' );
+				}
+			} );
+			if ( typeMore ) {
+				if ( t.url ) {
+					typeMore.innerHTML = 'Rules, tips and examples: <a href="' + esc( t.url ) + '">' + esc( t.label ) + ' guide</a>';
+					typeMore.hidden = false;
+				} else {
+					typeMore.innerHTML = '';
+					typeMore.hidden = true;
+				}
+			}
+			return true;
+		}
+
+		typeLinks.forEach( function ( a ) {
+			a.addEventListener( 'click', function ( e ) {
+				if ( ! typeData || e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1 ) {
+					return; // no data, or opening in a new tab: follow the link
+				}
+				e.preventDefault();
+				if ( applyType( a.dataset.type ) ) {
+					renderReceipt();
+				}
+			} );
+		} );
+
+		// ---- Design picker ---------------------------------------------------
+		var DESIGN_KEY = 'rgp-design';
+		var designRadios = document.querySelectorAll( 'input[name="rf-design"]' );
+		var design = 'classic';
+
+		function setDesign( key ) {
+			var radio = null;
+			designRadios.forEach( function ( r ) {
+				if ( r.value === key ) {
+					radio = r;
+				}
+			} );
+			if ( ! radio ) {
+				return;
+			}
+			design = key;
+			radio.checked = true;
+			designRadios.forEach( function ( r ) {
+				r.parentNode.classList.toggle( 'is-checked', r === radio );
+			} );
+			preview.className = preview.className.replace( /\brf-design-[a-z]+\b/g, '' ).trim() + ' rf-design-' + key;
+		}
+
+		designRadios.forEach( function ( r ) {
+			r.addEventListener( 'change', function () {
+				setDesign( r.value );
+				try {
+					window.localStorage.setItem( DESIGN_KEY, r.value );
+				} catch ( e ) {}
+				renderReceipt();
+			} );
+		} );
+		try {
+			setDesign( window.localStorage.getItem( DESIGN_KEY ) || 'classic' );
+		} catch ( e ) {
+			setDesign( 'classic' );
+		}
+
 		// ---- Currency dropdown ---------------------------------------------
 		var currencies = ( window.rfReceipt && window.rfReceipt.currencies ) || { USD: '$ — US Dollar' };
 		Object.keys( currencies ).forEach( function ( code ) {
@@ -609,7 +828,7 @@
 		}
 
 		function saveForm() {
-			var data = { fields: {}, items: [], logo: state.logoDataUrl };
+			var data = { type: currentType, fields: {}, items: [], logo: state.logoDataUrl };
 			storeFields().forEach( function ( el ) {
 				data.fields[ el.id ] = el.type === 'checkbox' ? el.checked : el.value;
 			} );
@@ -640,6 +859,9 @@
 			}
 			if ( ! data || ! data.fields ) {
 				return;
+			}
+			if ( data.type && data.type !== 'general' ) {
+				applyType( data.type );
 			}
 			storeFields().forEach( function ( el ) {
 				if ( ! Object.prototype.hasOwnProperty.call( data.fields, el.id ) ) {
@@ -860,8 +1082,7 @@
 				}
 			}
 
-			preview.innerHTML =
-				'<div class="rf-receipt-inner">' +
+			preview.innerHTML = wrapDesign( design,
 				'<div class="rf-receipt-head">' +
 				( state.logoDataUrl ? '<img src="' + state.logoDataUrl + '" class="rf-receipt-logo" alt="">' : '' ) +
 				'<div><h3>' + escapeHtml( business ) + '</h3><p class="rf-receipt-label">' + escapeHtml( cfg.title ) + '</p></div>' +
@@ -876,8 +1097,7 @@
 				( notes ? '<div class="rf-receipt-notes">' + escapeHtml( notes ) + '</div>' : '' ) +
 				signatureHtml +
 				qrHtml +
-				'<p class="rf-receipt-footer">Generated with ' + escapeHtml( ( window.rfReceipt && window.rfReceipt.brand ) || 'ReceiptGenPro' ) + '</p>' +
-				'</div>';
+				'<p class="rf-receipt-footer">Generated with ' + escapeHtml( ( window.rfReceipt && window.rfReceipt.brand ) || 'ReceiptGenPro' ) + '</p>' );
 
 			if ( logoRemove ) {
 				logoRemove.style.display = state.logoDataUrl ? '' : 'none';
@@ -921,15 +1141,16 @@
 		// Renders a copy of the preview at a fixed desktop width, off screen, so a
 		// receipt made on a 375 px phone is as sharp as one made on a laptop.
 		function renderCanvas() {
+			var width = DESIGN_WIDTH[ design ] || EXPORT_WIDTH;
 			var clone = preview.cloneNode( true );
 			clone.removeAttribute( 'id' );
 			clone.setAttribute( 'aria-hidden', 'true' );
-			clone.style.cssText = 'position:absolute;left:-10000px;top:0;width:' + EXPORT_WIDTH + 'px;max-width:none;box-sizing:border-box;box-shadow:none;margin:0;';
+			clone.style.cssText = 'position:absolute;left:-10000px;top:0;width:' + width + 'px;max-width:none;box-sizing:border-box;box-shadow:none;margin:0;';
 			document.body.appendChild( clone );
 			return window.html2canvas( clone, {
 				scale: 2,
 				backgroundColor: '#ffffff',
-				width: EXPORT_WIDTH,
+				width: width,
 				windowWidth: Math.max( 1200, document.documentElement.clientWidth ),
 				scrollX: 0,
 				scrollY: 0
@@ -1007,6 +1228,14 @@
 					// JPEG inside the PDF keeps files ~10x smaller than PNG (was ~5 MB).
 					var imgData   = canvas.toDataURL( 'image/jpeg', 0.92 );
 					var jsPDF     = window.jspdf.jsPDF;
+					if ( design === 'thermal' ) {
+						// A real 80 mm till roll: 72 mm printable, page as long as the slip.
+						var slipHeight = ( canvas.height * 72 ) / canvas.width;
+						var slip = new jsPDF( { orientation: 'portrait', unit: 'mm', format: [ 80, slipHeight + 8 ] } );
+						slip.addImage( imgData, 'JPEG', 4, 4, 72, slipHeight );
+						slip.save( fileName( 'pdf' ) );
+						return;
+					}
 					var pdfWidth  = 190; // A4 width minus 10 mm margins
 					var pdfHeight = ( canvas.height * pdfWidth ) / canvas.width;
 					if ( pdfHeight > 277 ) { // keep aspect ratio on very long receipts

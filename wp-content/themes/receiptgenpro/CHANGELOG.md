@@ -1,5 +1,12 @@
 # ReceiptGenPro theme — Changelog
 
+## 1.3.0 — 16 Oct 2026 (receipt type picker and designs)
+
+- **Receipt type picker on the homepage.** "1. Choose your receipt type" lists the general receipt and every template in `rf_receipt_categories()`. Picking one swaps the form in place (labels, placeholders, extra fields, tip / amount paid, statement, signature lines, default payment method, currency and requirement check) and keeps what the types share. No new URLs: each option is a link to that template's own page, so crawlers and visitors without JavaScript land there, and a "guide" link under the picker points to it. The type is kept with the rest of the form for the tab session.
+- **Nine receipt designs** over every preview (homepage, template pages, rent law pages, embed widget): Classic, Modern Blue, Minimal, Bold Dark, Formal, Thermal Slip, Compact, Green Stripe and Office + Customer Copy. Downloads use the same design. Thermal Slip exports at receipt-roll width and its PDF is an 80 mm page; Office + Customer Copy prints the receipt twice with a cut line. The last design chosen is remembered in this browser (localStorage).
+- `rf_generator_form()` holds the form defaults in one place for the template and the picker; `rf_generator_types()` and `rf_receipt_designs()` are the picker and design registries.
+- Unit tests for the type field markup and the copies layout.
+
 ## 1.2.0 — 14 Oct 2026 (five new SEO tools)
 
 New pages are real WordPress Pages, created automatically on the first request after deploy (`inc/feature-pages.php`, option `rf_feature_pages_hash`); their text lives in the theme templates.
