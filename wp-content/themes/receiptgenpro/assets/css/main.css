@@ -429,3 +429,128 @@ textarea:focus-visible, .rf-btn:focus-visible { outline: 2px solid var(--rf-prim
 .rf-embed-credit { text-align: center; font-size: .8rem; color: #64748b; padding: .5rem 0 1rem; margin: 0; }
 .rf-receipt-signatures { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 .rf-receipt-signatures .rf-sig-line { width: 100%; max-width: 180px; }
+
+/* ==========================================================================
+   v1.3.0 — receipt type picker (homepage) and receipt designs
+   ========================================================================== */
+.rf-type-picker { margin-bottom: 1.75rem; }
+.rf-picker-title { font-size: 1.25rem; margin-bottom: .75rem; }
+.rf-type-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: .5rem; }
+.rf-type-option { display: flex; align-items: center; gap: .5rem; min-height: 48px; padding: .45rem .7rem; border: 1px solid var(--rf-border); border-radius: 8px; background: #fff; color: var(--rf-ink); font-size: .88rem; font-weight: 600; line-height: 1.25; }
+.rf-type-option:hover { border-color: var(--rf-primary); text-decoration: none; }
+.rf-type-option[aria-current="true"] { border-color: var(--rf-primary); background: #eff6ff; box-shadow: inset 0 0 0 1px var(--rf-primary); }
+.rf-type-icon { font-size: 1.25rem; line-height: 1; flex: 0 0 auto; }
+.rf-type-more { margin: .75rem 0 0; font-size: .9rem; }
+@media (max-width: 560px) {
+	.rf-type-list { grid-template-columns: 1fr 1fr; }
+	.rf-type-option { font-size: .8rem; padding: .4rem .5rem; }
+}
+
+.rf-design-picker { border: 0; padding: 0; margin: 0 0 1rem; min-width: 0; }
+.rf-design-picker legend { font-weight: 700; font-size: 1rem; color: var(--rf-ink); margin-bottom: .5rem; padding: 0; }
+.rf-design-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: .45rem; }
+.rf-design-option { position: relative; display: flex; flex-direction: column; align-items: center; gap: .3rem; padding: .45rem .3rem; border: 1px solid var(--rf-border); border-radius: 8px; background: #fff; cursor: pointer; text-align: center; }
+.rf-design-option:hover { border-color: var(--rf-primary); }
+.rf-design-option input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.rf-design-option.is-checked, .rf-design-option:has(input:checked) { border-color: var(--rf-primary); background: #eff6ff; box-shadow: inset 0 0 0 1px var(--rf-primary); }
+.rf-design-option:focus-within { outline: 2px solid var(--rf-primary); outline-offset: 2px; }
+.rf-design-name { font-size: .72rem; font-weight: 600; line-height: 1.2; color: var(--rf-ink); }
+/* Mini receipt: header bar, a line, the total. */
+.rf-design-swatch { display: flex; flex-direction: column; gap: 4px; width: 40px; height: 50px; padding: 5px; border: 1px solid #cbd5e1; border-radius: 3px; background: #fff; }
+.rf-design-swatch i { display: block; height: 5px; background: #cbd5e1; border-radius: 1px; }
+.rf-design-swatch i:first-child { height: 8px; background: #0f172a; }
+.rf-design-swatch i:last-child { margin-top: auto; width: 60%; margin-left: auto; background: #0f172a; }
+.rf-design-swatch-modern .rf-design-swatch i:first-child, .rf-design-swatch-modern .rf-design-swatch i:last-child { background: #2563eb; }
+.rf-design-swatch-minimal .rf-design-swatch i:first-child { height: 4px; background: #94a3b8; }
+.rf-design-swatch-minimal .rf-design-swatch i:last-child { background: #94a3b8; }
+.rf-design-swatch-bold .rf-design-swatch { background: linear-gradient(#0f172a 0 14px, #fff 14px); }
+.rf-design-swatch-bold .rf-design-swatch i:first-child { background: #fff; }
+.rf-design-swatch-formal .rf-design-swatch { border: 3px double #334155; }
+.rf-design-swatch-formal .rf-design-swatch i:first-child { width: 70%; margin: 0 auto; }
+.rf-design-swatch-thermal .rf-design-swatch { width: 26px; border-style: dashed; }
+.rf-design-swatch-thermal .rf-design-swatch i:first-child { background: #475569; }
+.rf-design-swatch-compact .rf-design-swatch { height: 36px; margin-top: 7px; margin-bottom: 7px; gap: 2px; }
+.rf-design-swatch-stripe .rf-design-swatch { border-left: 5px solid #059669; }
+.rf-design-swatch-stripe .rf-design-swatch i:first-child, .rf-design-swatch-stripe .rf-design-swatch i:last-child { background: #059669; }
+.rf-design-swatch-copies .rf-design-swatch { gap: 2px; }
+.rf-design-swatch-copies .rf-design-swatch i:nth-child(2) { height: 0; border-top: 2px dashed #94a3b8; background: none; margin: 6px 0; }
+.rf-design-swatch-copies .rf-design-swatch i:first-child, .rf-design-swatch-copies .rf-design-swatch i:last-child { height: 12px; width: 100%; background: #475569; margin: 0; }
+
+/* ---- Designs (preview AND downloads: the export clones the preview) ---- */
+/* Modern Blue */
+.rf-design-modern .rf-receipt-head { background: #2563eb; border-bottom: 0; border-radius: 8px 8px 0 0; margin: -1.75rem -1.75rem 1rem; padding: 1.2rem 1.75rem; }
+.rf-design-modern .rf-receipt-head h3 { color: #fff; }
+.rf-design-modern .rf-receipt-label { color: #dbeafe; }
+.rf-design-modern .rf-receipt-table th { background: #eff6ff; border-bottom: 0; color: #1d4ed8; }
+.rf-design-modern .rf-receipt-total-final { color: #1d4ed8 !important; border-top-color: #2563eb; }
+.rf-design-modern .rf-sig-line { border-bottom-color: #2563eb; }
+
+/* Minimal */
+.rf-design-minimal { box-shadow: none; }
+.rf-design-minimal .rf-receipt-head { border-bottom: 1px solid var(--rf-border); }
+.rf-design-minimal .rf-receipt-head h3 { font-weight: 600; }
+.rf-design-minimal .rf-receipt-label { font-weight: 500; color: #64748b; }
+.rf-design-minimal .rf-receipt-meta strong { font-weight: 500; color: #64748b; }
+.rf-design-minimal .rf-receipt-table th { border-bottom: 1px solid var(--rf-border); color: #64748b; font-weight: 500; }
+.rf-design-minimal .rf-receipt-table td { border-bottom: 0; }
+.rf-design-minimal .rf-receipt-total-final { font-weight: 700; border-top: 1px solid var(--rf-border); }
+.rf-design-minimal .rf-receipt-notes { border-top-style: solid; }
+
+/* Bold Dark */
+.rf-design-bold .rf-receipt-head { background: #0f172a; border-bottom: 0; border-radius: 8px 8px 0 0; margin: -1.75rem -1.75rem 1rem; padding: 1.2rem 1.75rem; }
+.rf-design-bold .rf-receipt-head h3 { color: #fff; font-size: 1.35rem; font-weight: 800; }
+.rf-design-bold .rf-receipt-label { color: #fbbf24; }
+.rf-design-bold .rf-receipt-table th { border-bottom: 2px solid #0f172a; }
+.rf-design-bold .rf-receipt-total-final { background: #0f172a; color: #fff !important; border-top: 0; border-radius: 6px; padding: .55rem .7rem !important; margin-top: .4rem; }
+
+/* Formal */
+.rf-design-formal { font-family: Georgia, "Times New Roman", Times, serif; }
+.rf-design-formal .rf-receipt-inner { border: 4px double #334155; padding: 1.25rem; }
+.rf-design-formal .rf-receipt-head { flex-direction: column; text-align: center; border-bottom: 1px solid #334155; }
+.rf-design-formal .rf-receipt-head h3 { font-family: inherit; font-size: 1.35rem; }
+.rf-design-formal .rf-receipt-label { letter-spacing: .3em; }
+.rf-design-formal .rf-receipt-table th { border-bottom: 3px double #334155; text-transform: none; letter-spacing: 0; font-size: .85rem; }
+.rf-design-formal .rf-receipt-total-final { border-top: 3px double #334155; }
+
+/* Thermal Slip: an 80 mm till roll */
+.rf-design-thermal { font-family: "Courier New", Courier, monospace; max-width: 360px; margin: 0 auto; border-radius: 0; padding: 1.25rem 1rem; }
+.rf-design-thermal .rf-receipt-head { flex-direction: column; text-align: center; border-bottom: 1px dashed #0f172a; gap: .4rem; }
+.rf-design-thermal .rf-receipt-head h3 { font-family: inherit; font-size: 1.05rem; text-transform: uppercase; }
+.rf-design-thermal .rf-receipt-meta { grid-template-columns: 1fr; font-size: .8rem; gap: .1rem; }
+.rf-design-thermal .rf-receipt-table { font-size: .8rem; }
+.rf-design-thermal .rf-receipt-table th { border-bottom: 1px dashed #0f172a; font-size: .72rem; padding: .3rem .15rem; }
+.rf-design-thermal .rf-receipt-table td { border-bottom: 0; padding: .25rem .15rem; }
+.rf-design-thermal .rf-receipt-totals { max-width: none; font-size: .85rem; border-top: 1px dashed #0f172a; padding-top: .3rem; }
+.rf-design-thermal .rf-receipt-total-final { border-top: 1px dashed #0f172a; }
+.rf-design-thermal .rf-receipt-notes { text-align: center; border-top-color: #0f172a; }
+.rf-design-thermal .rf-receipt-signatures { grid-template-columns: 1fr; gap: 0; }
+.rf-design-thermal .rf-receipt-signature { align-items: center; }
+.rf-design-thermal .rf-receipt-qr { flex-direction: column; text-align: center; }
+
+/* Compact */
+.rf-design-compact { padding: 1rem 1.1rem; min-height: 0; }
+.rf-design-compact .rf-receipt-head { padding-bottom: .5rem; margin-bottom: .5rem; }
+.rf-design-compact .rf-receipt-head h3 { font-size: 1rem; }
+.rf-design-compact .rf-receipt-logo { width: 36px; height: 36px; }
+.rf-design-compact .rf-receipt-meta { font-size: .75rem; gap: .1rem .5rem; margin-bottom: .6rem; }
+.rf-design-compact .rf-receipt-table { font-size: .78rem; }
+.rf-design-compact .rf-receipt-table th, .rf-design-compact .rf-receipt-table td { padding: .2rem .25rem; }
+.rf-design-compact .rf-receipt-totals { font-size: .82rem; }
+.rf-design-compact .rf-receipt-totals > div { padding: .1rem 0; }
+.rf-design-compact .rf-receipt-total-final { font-size: .95rem; }
+.rf-design-compact .rf-receipt-signature { margin-top: 1rem; }
+.rf-design-compact .rf-receipt-footer { margin-top: .6rem; }
+
+/* Green Stripe */
+.rf-design-stripe { border-left: 10px solid #059669; }
+.rf-design-stripe .rf-receipt-head { border-bottom-color: #059669; }
+.rf-design-stripe .rf-receipt-label { color: #047857; }
+.rf-design-stripe .rf-receipt-table th { color: #047857; border-bottom-color: #059669; }
+.rf-design-stripe .rf-receipt-total-final { color: #047857 !important; border-top-color: #059669; }
+.rf-design-stripe .rf-sig-line { border-bottom-color: #059669; }
+
+/* Office + Customer Copy */
+.rf-copy-label { margin: 0 0 .5rem; text-align: right; font-size: .68rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #64748b; }
+.rf-copy-cut { position: relative; margin: 1.25rem 0; border-top: 2px dashed #94a3b8; text-align: center; }
+.rf-copy-cut span { position: relative; top: -.7rem; padding: 0 .5rem; background: #fff; font-size: .72rem; color: #64748b; }
+.rf-design-thermal .rf-receipt-table .rf-num { padding-left: .5rem; }

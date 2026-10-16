@@ -74,3 +74,33 @@ test( 'nextReceiptNumber keeps prefixes and zero padding', () => {
 	assert.equal( rg.nextReceiptNumber( 'ABC' ), 'ABC-2' );
 	assert.equal( rg.nextReceiptNumber( '' ), '1001' );
 } );
+
+test( 'typeFieldsHtml builds the extra fields, tip / paid and statement', () => {
+	const out = rg.typeFieldsHtml( {
+		title: 'RENT RECEIPT',
+		extra: [
+			{ id: 'property', label: 'Property Address', type: 'text', ph: 'e.g. 24 "Oak" St' },
+			{ id: 'Freq', label: 'Frequency', type: 'select', options: [ 'Weekly', 'Monthly' ] },
+		],
+		paid: true,
+		statement: { label: 'Print it', text: 'No goods <or> services', checked: true },
+	} );
+	assert.match( out.extra, /<legend>Rent Receipt Details<\/legend>/ );
+	assert.match( out.extra, /id="rf-x-property"/ );
+	assert.match( out.extra, /placeholder="e.g. 24 &quot;Oak&quot; St"/ );
+	assert.match( out.extra, /<select id="rf-x-freq"[^>]*><option>Weekly<\/option><option>Monthly<\/option><\/select>/ );
+	assert.match( out.tippaid, /id="rf-amount-paid"/ );
+	assert.doesNotMatch( out.tippaid, /id="rf-tip"/ );
+	assert.match( out.statement, /data-text="No goods &lt;or&gt; services" checked/ );
+} );
+
+test( 'typeFieldsHtml returns empty parts for the general receipt', () => {
+	assert.deepEqual( rg.typeFieldsHtml( { title: 'RECEIPT', extra: [] } ), { extra: '', tippaid: '', statement: '' } );
+} );
+
+test( 'wrapDesign prints two copies only for the copies design', () => {
+	assert.equal( rg.wrapDesign( 'modern', 'X' ), '<div class="rf-receipt-inner">X</div>' );
+	const two = rg.wrapDesign( 'copies', 'X' );
+	assert.equal( two.split( 'rf-receipt-inner' ).length - 1, 2 );
+	assert.match( two, /Office copy[\s\S]*cut here[\s\S]*Customer copy/ );
+} );

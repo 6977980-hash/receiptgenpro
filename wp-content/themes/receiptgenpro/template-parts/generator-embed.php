@@ -17,41 +17,48 @@
  *   'form'         (array)   Template config from rf_get_category_data()
  *   'purpose'      (string)  Requirement check selected by default
  *                            (inc/requirements.php), '' for none
+ *   'picker'       (bool)    v1.3.0: show the receipt type picker (homepage)
  *
  * v1.2.0: requirement checker under the preview, optional verification
  * QR code, a custom number label and a second signature line.
+ *
+ * v1.3.0: a design picker over the preview (rf_receipt_designs()) and, on
+ * the homepage, a receipt type picker that swaps the form in place. The
+ * parts that differ by type sit in #rf-type-* wrappers so the JS can
+ * rebuild them from the same config this file renders.
  */
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
 $heading = $args['heading'] ?? 'Receipt Details';
-$form    = wp_parse_args(
-	$args['form'] ?? array(),
-	array(
-		'title'          => 'RECEIPT',
-		'business_label' => 'Your Business / Name',
-		'business_ph'    => 'e.g. Bright Star Cleaning Co.',
-		'client_label'   => 'Received From (Customer)',
-		'client_ph'      => 'e.g. John Miller',
-		'item_ph'        => array( $args['item_default'] ?? 'e.g. Service or product name' ),
-		'notes_ph'       => 'Thank you for your business!',
-		'payment'        => 'Cash',
-		'extra'          => array(),
-		'tip'            => false,
-		'paid'           => false,
-		'words'          => false,
-		'signature'      => '',
-		'signature2'     => '',
-		'number_label'   => 'Receipt #',
-		'statement'      => array(),
-	)
-);
+$form    = rf_generator_form( $args['form'] ?? array(), $args['item_default'] ?? 'e.g. Service or product name' );
+$picker  = ! empty( $args['picker'] ); // v1.3.0: homepage receipt type picker
+$designs = rf_receipt_designs();
 $purpose  = (string) ( $args['purpose'] ?? '' );
 $purposes = rf_receipt_purposes();
 $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Cheque' );
 ?>
 <section class="rf-generator" id="rf-generator">
+	<?php if ( $picker ) :
+		$rf_types = rf_generator_types();
+		?>
+		<div class="rf-container rf-type-picker">
+			<h2 class="rf-picker-title" id="rf-type-picker-title">1. Choose your receipt type</h2>
+			<ul class="rf-type-list" aria-labelledby="rf-type-picker-title">
+				<?php foreach ( $rf_types as $rf_slug => $rf_type ) : ?>
+					<li>
+						<a class="rf-type-option" href="<?php echo esc_url( $rf_type['url'] ? $rf_type['url'] . '#rf-generator' : '#rf-generator' ); ?>" data-type="<?php echo esc_attr( $rf_slug ); ?>"<?php echo 'general' === $rf_slug ? ' aria-current="true"' : ''; ?>>
+							<span class="rf-type-icon" aria-hidden="true"><?php echo esc_html( $rf_type['icon'] ); ?></span>
+							<span class="rf-type-name"><?php echo esc_html( $rf_type['label'] ); ?></span>
+						</a>
+					</li>
+				<?php endforeach; ?>
+			</ul>
+			<p class="rf-type-more" id="rf-type-more" hidden></p>
+			<script type="application/json" id="rf-type-data"><?php echo wp_json_encode( $rf_types, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE ); ?></script>
+		</div>
+	<?php endif; ?>
 	<div class="rf-container rf-generator-grid">
 
 		<form class="rf-generator-form" id="rf-receipt-form" autocomplete="off"
@@ -101,6 +108,7 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 				</div>
 			</div>
 
+			<div id="rf-type-extra">
 			<?php if ( ! empty( $form['extra'] ) ) : ?>
 				<fieldset class="rf-template-fields">
 					<legend><?php echo esc_html( ucwords( strtolower( $form['title'] ) ) ); ?> Details</legend>
@@ -128,6 +136,7 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 					</div>
 				</fieldset>
 			<?php endif; ?>
+			</div>
 
 			<h3>Items</h3>
 			<div id="rf-items-list"></div>
@@ -182,6 +191,7 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 				<p class="rf-field-hint">The discount comes off the subtotal before tax, and both taxes are charged on the discounted amount.</p>
 			</details>
 
+			<div id="rf-type-tippaid">
 			<?php if ( $form['tip'] || $form['paid'] ) : ?>
 				<div class="rf-form-row rf-form-row-2col">
 					<?php if ( $form['tip'] ) : ?>
@@ -198,7 +208,9 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 					<?php endif; ?>
 				</div>
 			<?php endif; ?>
+			</div>
 
+			<div id="rf-type-statement">
 			<?php if ( ! empty( $form['statement'] ) ) : ?>
 				<div class="rf-field rf-field-check">
 					<label>
@@ -207,6 +219,7 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 					</label>
 				</div>
 			<?php endif; ?>
+			</div>
 
 			<div class="rf-field">
 				<label for="rf-notes">Notes (optional)</label>
@@ -223,7 +236,19 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 		</form>
 
 		<div class="rf-generator-preview">
-			<div id="rf-receipt-preview" class="rf-receipt-paper"></div>
+			<fieldset class="rf-design-picker" id="rf-design-picker">
+				<legend><?php echo $picker ? '2. Choose a design' : 'Choose a design'; ?></legend>
+				<div class="rf-design-list">
+					<?php foreach ( $designs as $rf_key => $rf_name ) : ?>
+						<label class="rf-design-option rf-design-swatch-<?php echo esc_attr( $rf_key ); ?>">
+							<input type="radio" name="rf-design" value="<?php echo esc_attr( $rf_key ); ?>"<?php checked( 'classic', $rf_key ); ?>>
+							<span class="rf-design-swatch" aria-hidden="true"><i></i><i></i><i></i></span>
+							<span class="rf-design-name"><?php echo esc_html( $rf_name ); ?></span>
+						</label>
+					<?php endforeach; ?>
+				</div>
+			</fieldset>
+			<div id="rf-receipt-preview" class="rf-receipt-paper rf-design-classic"></div>
 			<p id="rf-total-live" class="screen-reader-text" role="status" aria-live="polite"></p>
 			<div class="rf-preview-actions">
 				<button type="button" class="rf-btn rf-btn-primary" id="rf-download-pdf">Download PDF</button>

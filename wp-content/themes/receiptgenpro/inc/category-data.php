@@ -646,3 +646,80 @@ function rf_footer_category_list( $half ) {
 function rf_category_label( $cat ) {
 	return html_entity_decode( str_replace( 'Free ', '', $cat['h1'] ), ENT_QUOTES, 'UTF-8' );
 }
+
+/**
+ * v1.3.0: a template's generator form with every key filled in. Shared by
+ * template-parts/generator-embed.php (server-rendered fields) and the
+ * homepage type picker (the same configs, as JSON, for receipt-generator.js).
+ */
+function rf_generator_form( $form, $item_default = 'e.g. Service or product name' ) {
+	return wp_parse_args(
+		(array) $form,
+		array(
+			'title'          => 'RECEIPT',
+			'business_label' => 'Your Business / Name',
+			'business_ph'    => 'e.g. Bright Star Cleaning Co.',
+			'client_label'   => 'Received From (Customer)',
+			'client_ph'      => 'e.g. John Miller',
+			'item_ph'        => array( $item_default ),
+			'notes_ph'       => 'Thank you for your business!',
+			'payment'        => 'Cash',
+			'currency'       => '',
+			'extra'          => array(),
+			'tip'            => false,
+			'paid'           => false,
+			'words'          => false,
+			'signature'      => '',
+			'signature2'     => '',
+			'number_label'   => 'Receipt #',
+			'statement'      => array(),
+		)
+	);
+}
+
+/**
+ * v1.3.0: every receipt type for the homepage picker, keyed by slug
+ * ('general' first = the plain receipt). The picker's links point at each
+ * type's own page, so without JavaScript (and for crawlers) they are plain
+ * links; with JavaScript the form switches in place and the page stays put.
+ */
+function rf_generator_types() {
+	$types = array(
+		'general' => array(
+			'label'   => 'General Receipt',
+			'icon'    => '🧾',
+			'url'     => '',
+			'purpose' => '',
+			'form'    => rf_generator_form( array() ),
+		),
+	);
+	foreach ( rf_receipt_categories() as $slug => $cat ) {
+		$types[ $slug ] = array(
+			'label'   => preg_replace( '/ Generator.*$/', '', rf_category_label( $cat ) ),
+			'icon'    => $cat['icon'] ?? '🧾',
+			'url'     => home_url( '/' . $slug . '/' ),
+			'purpose' => $cat['purpose'] ?? '',
+			'form'    => rf_generator_form( $cat['form'] ?? array() ),
+		);
+	}
+	return $types;
+}
+
+/**
+ * v1.3.0: visual designs for the receipt preview and downloads. Each key
+ * is a CSS class (rf-design-<key>, assets/css/main.css); 'copies' prints
+ * an office copy and a customer copy on one page.
+ */
+function rf_receipt_designs() {
+	return array(
+		'classic'   => 'Classic',
+		'modern'    => 'Modern Blue',
+		'minimal'   => 'Minimal',
+		'bold'      => 'Bold Dark',
+		'formal'    => 'Formal',
+		'thermal'   => 'Thermal Slip',
+		'compact'   => 'Compact',
+		'stripe'    => 'Green Stripe',
+		'copies'    => 'Office + Customer Copy',
+	);
+}
