@@ -27,6 +27,7 @@ $rf_theme = get_template_directory_uri();
 <title><?php echo esc_html( $rf_label . ' — ' . RF_BRAND_NAME ); ?></title>
 <meta name="robots" content="noindex, follow">
 <base target="_blank">
+<?php rf_output_favicon_tags(); ?>
 <link rel="stylesheet" href="<?php echo esc_url( $rf_theme . '/assets/css/main.css?ver=' . rf_asset_ver( 'assets/css/main.css' ) ); ?>">
 </head>
 <body class="rf-embed-body">

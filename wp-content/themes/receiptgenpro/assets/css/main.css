@@ -77,7 +77,7 @@ textarea:focus-visible, .rf-btn:focus-visible { outline: 2px solid var(--rf-prim
 .rf-header-inner { display: flex; align-items: center; justify-content: space-between; padding: .9rem 1.25rem; }
 .rf-logo { font-size: 1.4rem; font-weight: 800; color: var(--rf-ink); }
 .rf-logo .rf-accent { color: var(--rf-primary); }
-.rf-nav-menu { list-style: none; display: flex; gap: 1.75rem; margin: 0; padding: 0; }
+.rf-nav-menu { list-style: none; display: flex; flex-wrap: wrap; gap: .25rem 1.75rem; margin: 0; padding: 0; }
 .rf-nav-menu a { color: var(--rf-ink); font-weight: 500; }
 .rf-nav-toggle { display: none; background: none; border: 0; cursor: pointer; padding: .5rem; }
 .rf-nav-toggle span { display: block; width: 22px; height: 2px; background: var(--rf-ink); margin: 5px 0; }
@@ -131,8 +131,9 @@ textarea:focus-visible, .rf-btn:focus-visible { outline: 2px solid var(--rf-prim
 
 .rf-generator-preview { position: sticky; top: 90px; }
 .rf-receipt-paper {
+	--rf-pad: 1.75rem;
 	background: #fff; border: 1px solid var(--rf-border); border-radius: 8px;
-	padding: 1.75rem; box-shadow: 0 6px 24px rgba(15,23,42,.06); min-height: 320px;
+	padding: var(--rf-pad); box-shadow: 0 6px 24px rgba(15,23,42,.06); min-height: 320px;
 }
 .rf-receipt-head { display: flex; align-items: center; gap: .85rem; border-bottom: 2px solid var(--rf-ink); padding-bottom: .85rem; margin-bottom: .85rem; }
 .rf-receipt-logo { width: 48px; height: 48px; object-fit: contain; }
@@ -326,7 +327,7 @@ textarea:focus-visible, .rf-btn:focus-visible { outline: 2px solid var(--rf-prim
 /* Only the title is a link; its ::after stretches over the whole card. */
 .rf-hub-card-link { color: inherit; }
 .rf-hub-card-link::after { content: ""; position: absolute; inset: 0; border-radius: var(--rf-radius); }
-.rf-hub-card:focus-within { outline: 2px solid var(--rf-primary); outline-offset: 2px; }
+.rf-hub-card:has(:focus-visible) { outline: 2px solid var(--rf-primary); outline-offset: 2px; }
 .rf-hub-card-link:focus-visible { outline: none; }
 .rf-hub-card h3 { margin: .5rem 0 .4rem; }
 .rf-hub-card p { font-size: .9rem; }
@@ -481,7 +482,7 @@ textarea:focus-visible, .rf-btn:focus-visible { outline: 2px solid var(--rf-prim
 
 /* ---- Designs (preview AND downloads: the export clones the preview) ---- */
 /* Modern Blue */
-.rf-design-modern .rf-receipt-head { background: #2563eb; border-bottom: 0; border-radius: 8px 8px 0 0; margin: -1.75rem -1.75rem 1rem; padding: 1.2rem 1.75rem; }
+.rf-design-modern .rf-receipt-head { background: #2563eb; border-bottom: 0; border-radius: 8px 8px 0 0; margin: calc(-1 * var(--rf-pad)) calc(-1 * var(--rf-pad)) 1rem; padding: 1.2rem var(--rf-pad); }
 .rf-design-modern .rf-receipt-head h3 { color: #fff; }
 .rf-design-modern .rf-receipt-label { color: #dbeafe; }
 .rf-design-modern .rf-receipt-table th { background: #eff6ff; border-bottom: 0; color: #1d4ed8; }
@@ -500,7 +501,7 @@ textarea:focus-visible, .rf-btn:focus-visible { outline: 2px solid var(--rf-prim
 .rf-design-minimal .rf-receipt-notes { border-top-style: solid; }
 
 /* Bold Dark */
-.rf-design-bold .rf-receipt-head { background: #0f172a; border-bottom: 0; border-radius: 8px 8px 0 0; margin: -1.75rem -1.75rem 1rem; padding: 1.2rem 1.75rem; }
+.rf-design-bold .rf-receipt-head { background: #0f172a; border-bottom: 0; border-radius: 8px 8px 0 0; margin: calc(-1 * var(--rf-pad)) calc(-1 * var(--rf-pad)) 1rem; padding: 1.2rem var(--rf-pad); }
 .rf-design-bold .rf-receipt-head h3 { color: #fff; font-size: 1.35rem; font-weight: 800; }
 .rf-design-bold .rf-receipt-label { color: #fbbf24; }
 .rf-design-bold .rf-receipt-table th { border-bottom: 2px solid #0f172a; }
@@ -557,3 +558,69 @@ textarea:focus-visible, .rf-btn:focus-visible { outline: 2px solid var(--rf-prim
 .rf-copy-cut { position: relative; margin: 1.25rem 0; border-top: 2px dashed #94a3b8; text-align: center; }
 .rf-copy-cut span { position: relative; top: -.7rem; padding: 0 .5rem; background: #fff; font-size: .72rem; color: #64748b; }
 .rf-design-thermal .rf-receipt-table .rf-num { padding-left: .5rem; }
+
+/* ==========================================================================
+   v1.3.3 — audit of 20 Oct, Phase 3 (generator and UX)
+   ========================================================================== */
+/* Number columns line up under their headers in every design (#24). */
+.rf-receipt-table th.rf-num { text-align: right; }
+
+/* Long names and big amounts wrap inside the receipt instead of pushing
+   it past a 375 px screen (#26). Fixed columns: Qty narrow, Price and
+   Total equal, Description takes the rest. */
+.rf-receipt-head > div, .rf-receipt-meta > div, .rf-receipt-totals > div > span,
+.rf-receipt-table td, .rf-receipt-notes, .rf-receipt-words { min-width: 0; overflow-wrap: anywhere; }
+.rf-receipt-head h3 { overflow-wrap: anywhere; }
+.rf-receipt-table { table-layout: fixed; }
+.rf-receipt-table th:nth-child(2) { width: 3.4em; }
+.rf-receipt-table th:nth-child(3), .rf-receipt-table th:nth-child(4) { width: 27%; }
+.rf-receipt-totals > div { gap: .75rem; }
+.rf-receipt-totals > div > span:last-child { text-align: right; }
+@media (max-width: 560px) {
+	.rf-receipt-paper { --rf-pad: 1rem; }
+	.rf-receipt-meta { grid-template-columns: 1fr; }
+	.rf-receipt-table { font-size: .76rem; }
+	.rf-receipt-table th { font-size: .66rem; letter-spacing: 0; }
+	.rf-receipt-table th:nth-child(2) { width: 2.4em; }
+	.rf-receipt-table th:nth-child(3), .rf-receipt-table th:nth-child(4) { width: 33%; }
+	.rf-receipt-table th, .rf-receipt-table td { padding-left: .15rem; padding-right: .15rem; }
+	.rf-receipt-totals { max-width: none; font-size: .85rem; }
+}
+
+/* QR code: sized by the script from its module count; the empty box holds
+   the place while the QR library loads (#27, #44). */
+.rf-receipt-qr { flex-wrap: wrap; }
+.rf-receipt-qr > span { min-width: 0; overflow-wrap: anywhere; }
+.rf-qr-pending { display: block; flex: 0 0 auto; width: 112px; height: 112px; background: #f1f5f9; }
+
+/* Note under the form for entries that were changed (#23, #31). */
+.rf-form-notice { margin: 0 0 1rem; padding: .55rem .75rem; border: 1px solid #fde68a; border-radius: 8px; background: #fffbeb; color: #78350f; font-size: .85rem; }
+.rf-form-notice[hidden] { display: none; }
+
+/* Tap targets of at least 44 px (#43). */
+.rf-hub-card-link { display: inline-block; min-height: 44px; padding: .35rem 0; }
+.rf-field-check label { min-height: 44px; }
+.rf-field-check input { width: 22px; height: 22px; flex: 0 0 auto; }
+.rf-post-meta a { display: inline-block; min-height: 44px; line-height: 44px; }
+
+/* Wide tables in posts scroll sideways on phones (#44). */
+@media (max-width: 700px) {
+	.rf-post-content table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
+
+/* Printing (Ctrl+P) prints only the receipt (#25). */
+@media print {
+	@page { size: A4; margin: 10mm; }
+	.rf-site-header, .rf-breadcrumbs, .rf-site-footer, .rf-consent-banner, .rf-skip-link,
+	.rf-type-picker, .rf-generator-form, .rf-design-picker, .rf-preview-actions, .rf-privacy-note,
+	.rf-checker, .rf-usage-note, .rf-embed-credit, #rf-total-live { display: none !important; }
+	/* Everything else on a page with the generator, except the receipt and
+	   the boxes around it. */
+	body:has(#rf-receipt-preview) *:not(:has(#rf-receipt-preview)):not(#rf-receipt-preview):not(#rf-receipt-preview *) { display: none !important; }
+	html, body { background: #fff !important; margin: 0; padding: 0; }
+	.rf-generator, .rf-generator-grid, .rf-generator-preview, .rf-container { display: block !important; position: static !important; margin: 0 !important; padding: 0 !important; max-width: none !important; }
+	#rf-receipt-preview { box-shadow: none; border: 0; border-radius: 0; margin: 0 auto; min-height: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+	#rf-receipt-preview.rf-design-thermal { max-width: none; width: 100%; padding: 0; }
+	#rf-receipt-preview .rf-receipt-qr, #rf-receipt-preview tr, #rf-receipt-preview .rf-receipt-totals,
+	#rf-receipt-preview .rf-receipt-signature { break-inside: avoid; }
+}

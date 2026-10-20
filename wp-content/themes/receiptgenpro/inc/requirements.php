@@ -24,7 +24,11 @@
  *             'cash' => true (payment method is Cash).
  *   note      Shown under the line on the requirements page.
  *
- * 'symbol' is the currency the purpose's amounts are in (default '$').
+ * 'symbol' is the currency the purpose's amounts are in (default '$'), and
+ * 'currency' its code (default 'USD'): a 'total_over' limit is only checked
+ * on a receipt in that currency (v1.3.3), otherwise the visitor is told to
+ * check it. 'per_month' => true in 'when' compares the amount per month
+ * (rent receipts covering a From–To period) with the limit.
  *
  * 'sources' are array( label, url ); url may be '' when the official page
  * could not be checked (it is then printed without a link).
@@ -45,6 +49,7 @@ function rf_receipt_purposes() {
 			'heading'  => 'Rent receipt for an HRA claim (India)',
 			'template' => 'hra-rent-receipt',
 			'symbol'   => '₹',
+			'currency' => 'INR',
 			'intro'    => 'Employers ask salaried tenants for monthly rent receipts before they allow the House Rent Allowance exemption. The landlord PAN is mandatory once the rent paid in the year is more than ₹1,00,000.',
 			'sources'  => array(
 				array( 'CBDT Circular No. 8/2013 of 10 October 2013 (landlord PAN when rent is above ₹1 lakh a year)', '' ),
@@ -61,7 +66,7 @@ function rf_receipt_purposes() {
 				array(
 					'label' => 'Landlord PAN (rent above ₹1,00,000 a year, i.e. above ₹8,333 a month)',
 					'field' => 'x:landlord_pan',
-					'when'  => array( 'total_over' => 8333 ),
+					'when'  => array( 'total_over' => 8333, 'per_month' => true ),
 					'note'  => 'Needed once the year\'s rent is above ₹1 lakh. If the landlord has no PAN, employers usually ask for a signed declaration from the landlord instead.',
 				),
 				array( 'label' => 'Landlord signature', 'field' => 'signature', 'manual' => true ),
@@ -151,7 +156,7 @@ function rf_receipt_purposes() {
 				array( 'label' => 'Date of the expense', 'field' => 'date' ),
 				array( 'label' => 'What was bought (itemized)', 'field' => 'items' ),
 				array( 'label' => 'Amount paid', 'field' => 'total' ),
-				array( 'label' => 'Place of the expense (the business address)', 'field' => array( 'x:hotel_address', 'x:store_address', 'x:pickup', 'x:service_address', 'x:project_address' ), 'note' => 'If your template has no address field, add the address under your business name or in Notes.' ),
+				array( 'label' => 'Place of the expense (the business address)', 'field' => array( 'x:hotel_address', 'x:restaurant_address', 'x:business_address', 'x:store_address', 'x:pickup', 'x:service_address', 'x:project_address' ), 'note' => 'If your template has no address field, add the address under your business name or in Notes.' ),
 				array( 'label' => 'Name of the customer', 'field' => 'client', 'optional' => true ),
 			),
 		),
@@ -192,6 +197,7 @@ function rf_receipt_purposes_for_js() {
 	foreach ( rf_receipt_purposes() as $key => $p ) {
 		$out[ $key ] = array(
 			'label'        => $p['label'],
+			'currency'     => $p['currency'] ?? 'USD',
 			'templateUrl'  => home_url( '/' . $p['template'] . '/' ),
 			'templateName' => ( $cat = rf_get_category_data( $p['template'] ) ) ? rf_category_label( $cat ) : '',
 			'checks'       => array_map(

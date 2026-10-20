@@ -149,6 +149,7 @@ function rf_receipt_categories() {
 					array( 'id' => 'table', 'label' => 'Table No.', 'type' => 'text', 'ph' => 'e.g. 7' ),
 					array( 'id' => 'server', 'label' => 'Server', 'type' => 'text', 'ph' => 'e.g. Daniel' ),
 					array( 'id' => 'time', 'label' => 'Time', 'type' => 'time' ),
+					array( 'id' => 'restaurant_address', 'label' => 'Restaurant Address', 'type' => 'text', 'ph' => 'e.g. 5 Harbour Street, Leeds' ),
 				),
 				'tip'            => true,
 			),
@@ -531,6 +532,7 @@ function rf_receipt_categories() {
 				'payment'        => 'Bank Transfer',
 				'extra'          => array(
 					array( 'id' => 'txn_ref', 'label' => 'Transaction / Reference No.', 'type' => 'text', 'ph' => 'e.g. bank ref, cheque no. or payment ID' ),
+					array( 'id' => 'business_address', 'label' => 'Business Address', 'type' => 'text', 'ph' => 'e.g. 40 King Street, Manchester' ),
 					array( 'id' => 'invoice_ref', 'label' => 'Invoice Reference (optional)', 'type' => 'text', 'ph' => 'e.g. INV-2026-031' ),
 				),
 				'paid'           => true,

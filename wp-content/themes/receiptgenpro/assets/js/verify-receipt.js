@@ -4,6 +4,9 @@
  * Reads the receipt details that receipt-generator.js put after the # of
  * the QR code's link (/verify-receipt/#r=<base64url JSON>) and shows them.
  * Runs entirely in the browser: the # part never reaches the server.
+ *
+ * v1.3.3: shows the discount, tax lines and tip (dc, tx, tp), amounts with
+ * thousands separators, and strips bidi control characters from the text.
  */
 ( function () {
 	'use strict';
@@ -49,6 +52,14 @@
 			if ( p.pd !== undefined && p.pd !== null && ! isCents( p.pd ) ) {
 				return null;
 			}
+			if ( ( p.dc !== undefined && ! isCents( p.dc ) ) || ( p.tp !== undefined && ! isCents( p.tp ) ) ) {
+				return null;
+			}
+			if ( p.tx !== undefined && ! ( isRows( p.tx ) && p.tx.every( function ( t ) {
+				return isCents( t[2] );
+			} ) ) ) {
+				return null;
+			}
 			for ( var k = 0; k < p.i.length; k++ ) {
 				if ( ! isCents( p.i[ k ][2] ) ) {
 					return null;
@@ -60,8 +71,20 @@
 		}
 	}
 
+	// Bidirectional overrides could make "1000" read as "0001".
+	function stripBidi( str ) {
+		return String( str === undefined || str === null ? '' : str ).replace( /[\u202A-\u202E\u2066-\u2069]/g, '' );
+	}
+
+	// "$1,234.50"; INR and PKR group in lakh and crore ("₹12,34,567.00").
+	function money( p, cents ) {
+		var locale = p.cu === 'INR' || p.cu === 'PKR' ? 'en-IN' : 'en-US';
+		var num = new Intl.NumberFormat( locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 } ).format( cents / 100 );
+		return ( SYMBOLS[ p.cu ] || ( p.cu ? stripBidi( p.cu ) + ' ' : '' ) ) + num;
+	}
+
 	if ( typeof module !== 'undefined' && module.exports ) {
-		module.exports = { decodePayload: decodePayload, b64urlDecode: b64urlDecode };
+		module.exports = { decodePayload: decodePayload, b64urlDecode: b64urlDecode, money: money, stripBidi: stripBidi };
 	}
 
 	if ( typeof document === 'undefined' ) {
@@ -70,12 +93,8 @@
 
 	function esc( str ) {
 		var d = document.createElement( 'div' );
-		d.textContent = str === undefined || str === null ? '' : String( str );
+		d.textContent = stripBidi( str );
 		return d.innerHTML;
-	}
-
-	function money( p, cents ) {
-		return ( SYMBOLS[ p.cu ] || ( p.cu ? p.cu + ' ' : '' ) ) + ( cents / 100 ).toFixed( 2 );
 	}
 
 	function show( hashOrUrl ) {
@@ -124,6 +143,15 @@
 		( p.x || [] ).forEach( function ( e ) {
 			rows.push( [ e[0], e[1] ] );
 		} );
+		if ( p.dc ) {
+			rows.push( [ 'Discount', '-' + money( p, p.dc ) ] );
+		}
+		( p.tx || [] ).forEach( function ( t ) {
+			rows.push( [ String( t[0] || 'Tax' ) + ( t[1] !== undefined && t[1] !== '' ? ' (' + t[1] + '%)' : '' ), money( p, t[2] ) ] );
+		} );
+		if ( p.tp ) {
+			rows.push( [ 'Tip', money( p, p.tp ) ] );
+		}
 		rows.push( [ 'Total', money( p, p.tot ) ] );
 		if ( typeof p.pd === 'number' ) {
 			rows.push( [ 'Amount paid', money( p, p.pd ) ] );

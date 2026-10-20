@@ -1,5 +1,5 @@
 /**
- * ReceiptGenPro — Receipt Generator (v1.3.0)
+ * ReceiptGenPro — Receipt Generator (v1.3.3)
  *
  * 100% client-side: no fetch(), no form submission, no data ever leaves
  * the browser.
@@ -42,6 +42,17 @@
  * localStorage; "Thermal Slip" exports at 80 mm, "Office + Customer Copy"
  * prints the receipt twice) and, on the homepage, a receipt type picker
  * that rebuilds the type-specific fields in place from #rf-type-data.
+ *
+ * v1.3.3 (audit of 20 Oct, Phase 3): amounts capped at 999,999,999,999.99
+ * and rates at 100 % (no more "Infinity"), a note under the form for
+ * negative or capped entries and a discount larger than the subtotal,
+ * unit prices rounded to cents before × quantity, thousands separators,
+ * singular currency words, a QR payload kept under ~500 characters (and
+ * without tax IDs, with discount / taxes / tip) drawn at whole px per
+ * module, long A4 PDFs split into pages, a canvas scale that stays under
+ * iOS's limit, logos shrunk to 400 px, values carried over between
+ * receipt types, ?type= in the address bar, bidi controls stripped, and
+ * checker limits applied only in their own currency (HRA PAN per month).
  */
 ( function () {
 	'use strict';
@@ -109,22 +120,48 @@
 		return Math.round( parseFloat( ( n * 100 ).toFixed( 6 ) ) );
 	}
 
-	// Parse a number field; empty, invalid or negative input counts as 0.
+	// Highest amount and rate the form accepts (also the inputs' HTML max).
+	// Capping keeps every figure printable: 1e21 or 1e400 printed as
+	// "999999999999999868928.00" or "Infinity" before.
+	var MAX_AMOUNT = 999999999999.99;
+	var MAX_CENTS  = 99999999999999;
+	var MAX_RATE   = 100;
+
+	// Parse a number field; empty, invalid, non-finite or negative input
+	// counts as 0 (or `fallback` when the field is empty or invalid).
 	function nonNegative( value, fallback ) {
 		var n = parseFloat( value );
-		if ( isNaN( n ) ) {
+		if ( isNaN( n ) || ! isFinite( n ) ) {
 			n = fallback || 0;
 		}
 		return n > 0 ? n : 0;
 	}
 
+	// nonNegative() limited to `max`.
+	function capped( value, max, fallback ) {
+		return Math.min( nonNegative( value, fallback ), max );
+	}
+
+	// A tax or discount rate for display: 8.875 → "8.875", 5 → "5".
+	function formatRate( rate ) {
+		return String( parseFloat( Number( rate ).toFixed( 4 ) ) );
+	}
+
+	// One line's total in cents. The unit price is rounded to cents first,
+	// so the printed price × quantity is what the line shows (3 × 0.33).
+	function lineCents( qty, price ) {
+		return Math.min( toCents( qty * ( toCents( price ) / 100 ) ), MAX_CENTS );
+	}
+
 	// Subtotal → discount → taxes → tip → total, all in whole cents.
 	// discountType is 'percent' or 'amount'; a discount never exceeds the
-	// subtotal, and every tax is charged on the discounted amount.
+	// subtotal (discountClamped says when it was cut), and every tax is
+	// charged on the discounted amount.
 	function calcTotals( subtotalCents, discount, discountType, taxRates, tipCents ) {
 		var discountCents = discountType === 'percent' ?
 			toCents( subtotalCents * Math.min( discount, 100 ) / 10000 ) :
 			toCents( discount );
+		var discountClamped = discountCents > subtotalCents;
 		discountCents = Math.min( discountCents, subtotalCents );
 		var taxableCents = subtotalCents - discountCents;
 		var taxCents = taxRates.map( function ( rate ) {
@@ -133,7 +170,25 @@
 		var totalCents = taxableCents + tipCents + taxCents.reduce( function ( a, b ) {
 			return a + b;
 		}, 0 );
-		return { discountCents: discountCents, taxCents: taxCents, totalCents: totalCents };
+		return { discountCents: discountCents, discountClamped: discountClamped, taxCents: taxCents, totalCents: totalCents };
+	}
+
+	// 1234567.89 → "1,234,567.89"; INR and PKR group in lakh and crore
+	// ("12,34,567.89").
+	var INDIAN_GROUPING = { INR: true, PKR: true };
+	var amountFormats = {};
+	function formatAmount( cents, code ) {
+		var locale = INDIAN_GROUPING[ code ] ? 'en-IN' : 'en-US';
+		if ( ! amountFormats[ locale ] ) {
+			amountFormats[ locale ] = new Intl.NumberFormat( locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 } );
+		}
+		return amountFormats[ locale ].format( cents / 100 );
+	}
+
+	// Bidirectional overrides (U+202A–202E, U+2066–2069) can make a printed
+	// "1000" read as "0001", so they never reach the receipt.
+	function stripBidi( str ) {
+		return String( str === undefined || str === null ? '' : str ).replace( /[‪-‮⁦-⁩]/g, '' );
 	}
 
 	// Splits a receipt number into { pre, digits, post } around its counter:
@@ -276,34 +331,43 @@
 		return parts.join( ' ' );
 	}
 
-	var INDIAN_GROUPING = { INR: true, PKR: true };
-
+	// [ plural, plural of the cent, singular, singular of the cent ]
 	var CURRENCY_WORDS = {
-		USD: [ 'US dollars', 'cents' ], EUR: [ 'euros', 'cents' ], GBP: [ 'pounds', 'pence' ],
-		PKR: [ 'Pakistani rupees', 'paisa' ], INR: [ 'Indian rupees', 'paise' ], CAD: [ 'Canadian dollars', 'cents' ],
-		AUD: [ 'Australian dollars', 'cents' ], AED: [ 'UAE dirhams', 'fils' ], SAR: [ 'Saudi riyals', 'halalas' ]
+		USD: [ 'US dollars', 'cents', 'US dollar', 'cent' ], EUR: [ 'euros', 'cents', 'euro', 'cent' ],
+		GBP: [ 'pounds', 'pence', 'pound', 'penny' ], PKR: [ 'Pakistani rupees', 'paisa', 'Pakistani rupee', 'paisa' ],
+		INR: [ 'Indian rupees', 'paise', 'Indian rupee', 'paisa' ], CAD: [ 'Canadian dollars', 'cents', 'Canadian dollar', 'cent' ],
+		AUD: [ 'Australian dollars', 'cents', 'Australian dollar', 'cent' ], AED: [ 'UAE dirhams', 'fils', 'UAE dirham', 'fils' ],
+		SAR: [ 'Saudi riyals', 'halalas', 'Saudi riyal', 'halala' ]
 	};
 
 	function amountInWords( amount, code ) {
-		var names = CURRENCY_WORDS[ code ] || [ code, 'cents' ];
+		var names = CURRENCY_WORDS[ code ] || [ code, 'cents', code, 'cent' ];
 		// Split in integer cents so 2.999 becomes "three … only", never "one hundred cents".
 		var c     = toCents( amount );
 		var whole = Math.floor( c / 100 );
 		var cents = c % 100;
 		var toWords = INDIAN_GROUPING[ code ] ? intToWordsIndian : intToWords;
-		var text = toWords( whole ) + ' ' + names[0];
-		if ( cents ) {
-			text += ' and ' + toWords( cents ) + ' ' + names[1];
+		var parts = [];
+		// "Fifty cents only", not "Zero US dollars and fifty cents only".
+		if ( whole || ! cents ) {
+			parts.push( toWords( whole ) + ' ' + names[ whole === 1 ? 2 : 0 ] );
 		}
+		if ( cents ) {
+			parts.push( toWords( cents ) + ' ' + names[ cents === 1 ? 3 : 1 ] );
+		}
+		var text = parts.join( ' and ' );
 		return text.charAt( 0 ).toUpperCase() + text.slice( 1 ) + ' only';
 	}
 
 	// ---- Requirement checks (rules: inc/requirements.php) -----------------
 	// facts: { business, client, date, items, total, words, signature,
 	//          statement: true | false | null (null = not on this template),
-	//          x: { <extra field id>: true | false }, amount, cash }
+	//          x: { <extra field id>: true | false }, amount, cash,
+	//          currency, months (rent months the receipt covers, default 1) }
+	// `currency` is the one the purpose's amounts are in (default USD).
 	// Returns one { label, status, optional } per check, where status is
-	// ok | missing | nofield | manual | na.
+	// ok | missing | nofield | manual | na | currency (an amount limit in
+	// another currency than the receipt's, which the visitor must judge).
 	function factFor( facts, key ) {
 		if ( key.indexOf( 'x:' ) === 0 ) {
 			var id = key.slice( 2 );
@@ -312,11 +376,19 @@
 		return facts[ key ] === undefined ? null : facts[ key ];
 	}
 
-	function evaluateChecks( checks, facts ) {
+	function evaluateChecks( checks, facts, currency ) {
+		currency = currency || 'USD';
 		return ( checks || [] ).map( function ( c ) {
 			var out = { label: c.label, optional: !! c.optional, status: 'ok' };
 			var when = c.when || {};
-			if ( ( when.total_over !== undefined && ! ( facts.amount > when.total_over ) ) || ( when.cash && ! facts.cash ) ) {
+			if ( when.total_over !== undefined && facts.currency && facts.currency !== currency ) {
+				out.status = 'currency';
+				out.currency = currency;
+				return out;
+			}
+			// A monthly limit is compared with the amount per month.
+			var amount = when.per_month ? facts.amount / Math.max( 1, facts.months || 1 ) : facts.amount;
+			if ( ( when.total_over !== undefined && ! ( amount > when.total_over ) ) || ( when.cash && ! facts.cash ) ) {
 				out.status = 'na';
 				return out;
 			}
@@ -344,9 +416,21 @@
 	// The receipt's details as compact JSON, base64url-encoded, placed after
 	// the # of the /verify-receipt/ link. Browsers never send the # part to
 	// the server, so the details stay between the issuer and whoever scans.
+	// Rent months between two YYYY-MM-DD dates (1 Jan – 31 Mar = 3), at least
+	// 1; 1 when either date is missing.
+	function monthsBetween( from, to ) {
+		var a = Date.parse( from );
+		var b = Date.parse( to );
+		if ( isNaN( a ) || isNaN( b ) || b < a ) {
+			return 1;
+		}
+		return Math.max( 1, Math.round( ( ( b - a ) / 86400000 + 1 ) / 30.44 ) );
+	}
+
+	// Cuts by code point, so an emoji or a CJK surrogate pair is never split.
 	function clip( str, max ) {
-		str = String( str || '' );
-		return str.length > max ? str.slice( 0, max - 1 ) + '…' : str;
+		var chars = Array.from( stripBidi( str ) );
+		return chars.length > max ? chars.slice( 0, max - 1 ).join( '' ) + '…' : chars.join( '' );
 	}
 
 	function b64urlEncode( str ) {
@@ -358,8 +442,16 @@
 		return btoa( bin ).replace( /\+/g, '-' ).replace( /\//g, '_' ).replace( /=+$/, '' );
 	}
 
-	var QR_MAX = 1200; // characters of payload; keeps the code scannable when printed
+	// Characters of encoded payload (≈375 bytes of JSON). With the link
+	// around it the code stays near version 15 (77 modules), which prints
+	// sharp at 2 px a module; 1200 gave 145 modules for Hindi or CJK text.
+	var QR_MAX = 500;
 
+	// Tax IDs (PAN, EIN, SSN) are left out of the code: anyone who scans a
+	// receipt could read them.
+	var TAX_ID_FIELDS = { landlord_pan: true, ein: true, provider_tax_id: true, tax_id: true };
+
+	// r.extras are [ label, value, field id ]; r.taxes [ { label, rate, cents } ].
 	function buildPayload( r ) {
 		var p = {
 			v: 1,
@@ -374,31 +466,104 @@
 			} ),
 			tot: r.totalCents,
 			pm: r.payMethod,
-			x: ( r.extras || [] ).map( function ( e ) {
+			x: ( r.extras || [] ).filter( function ( e ) {
+				return ! TAX_ID_FIELDS[ e[2] ];
+			} ).map( function ( e ) {
 				return [ clip( e[0], 40 ), clip( e[1], 80 ) ];
 			} )
 		};
+		if ( r.discountCents ) {
+			p.dc = r.discountCents;
+		}
+		var taxes = ( r.taxes || [] ).filter( function ( t ) {
+			return t.rate;
+		} );
+		if ( taxes.length ) {
+			p.tx = taxes.map( function ( t ) {
+				return [ clip( t.label, 16 ), formatRate( t.rate ), t.cents ];
+			} );
+		}
+		if ( r.tipCents ) {
+			p.tp = r.tipCents;
+		}
 		if ( r.paidCents !== null && r.paidCents !== undefined ) {
 			p.pd = r.paidCents;
 		}
-		var enc = b64urlEncode( JSON.stringify( p ) );
-		while ( enc.length > QR_MAX && ( p.x.length || p.i.length > 3 ) ) {
-			if ( p.x.length ) {
-				p.x.pop();
-			} else {
+
+		// Over the limit: shorten the texts, then drop extra fields, then
+		// shorten item names, then drop items from the end (p.more tells the
+		// verify page that not every line fit) down to one, then shorten
+		// the business and customer names and drop the last item. Each step runs only while
+		// the code is still too long.
+		var steps = [
+			function () {
+				p.t = clip( p.t, 24 );
+				p.b = clip( p.b, 40 );
+				p.c = clip( p.c, 40 );
+				p.n = clip( p.n, 20 );
+			},
+			function () {
+				p.x = p.x.map( function ( e ) {
+					return [ clip( e[0], 20 ), clip( e[1], 30 ) ];
+				} );
+			},
+			function () {
+				return p.x.length ? !! p.x.pop() : false;
+			},
+			function () {
+				p.i = p.i.map( function ( it ) {
+					return [ clip( it[0], 24 ), it[1], it[2] ];
+				} );
+			},
+			function () {
+				p.i = p.i.map( function ( it ) {
+					return [ clip( it[0], 12 ), it[1], it[2] ];
+				} );
+			},
+			function () {
+				if ( p.i.length <= 1 ) {
+					return false;
+				}
 				p.i.pop();
-				p.more = 1; // tells the verify page that not every line fit
+				p.more = 1;
+				return true;
+			},
+			function () {
+				p.t = clip( p.t, 16 );
+				p.b = clip( p.b, 20 );
+				p.c = clip( p.c, 20 );
+			},
+			function () {
+				if ( ! p.i.length ) {
+					return false;
+				}
+				p.i.pop();
+				p.more = 1;
+				return true;
 			}
-			enc = b64urlEncode( JSON.stringify( p ) );
+		];
+		var enc = b64urlEncode( JSON.stringify( p ) );
+		for ( var s = 0; s < steps.length && enc.length > QR_MAX; s++ ) {
+			var again;
+			do {
+				again = steps[ s ]();
+				enc = b64urlEncode( JSON.stringify( p ) );
+			} while ( again && enc.length > QR_MAX );
 		}
 		return enc;
+	}
+
+	// Display size of a QR code: a whole number of px per module, at least 2
+	// and at least 112 px in all, so a printed code stays scannable.
+	function qrPixels( modules ) {
+		return modules * Math.max( 2, Math.ceil( 112 / modules ) );
 	}
 
 	// ---- Receipt type fields (homepage picker) -----------------------------
 	// The same markup generator-embed.php renders for a template's extra
 	// fields, tip / amount paid and statement, built from its form config.
 	function esc( str ) {
-		return String( str === undefined || str === null ? '' : str )
+		return stripBidi( str )
 			.replace( /&/g, '&amp;' ).replace( /</g, '&lt;' ).replace( />/g, '&gt;' )
 			.replace( /"/g, '&quot;' ).replace( /'/g, '&#039;' );
 	}
@@ -434,8 +599,8 @@
 		}
 		if ( f.tip || f.paid ) {
 			out.tippaid = '<div class="rf-form-row rf-form-row-2col">' +
-				( f.tip ? '<div class="rf-field"><label for="rf-tip">Tip / Gratuity (amount)</label><input type="number" id="rf-tip" min="0" step="0.01" placeholder="0.00"></div>' : '' ) +
-				( f.paid ? '<div class="rf-field"><label for="rf-amount-paid">Amount Paid (leave blank if paid in full)</label><input type="number" id="rf-amount-paid" min="0" step="0.01" placeholder="0.00"></div>' : '' ) +
+				( f.tip ? '<div class="rf-field"><label for="rf-tip">Tip / Gratuity (amount)</label><input type="number" id="rf-tip" min="0" max="' + MAX_AMOUNT + '" step="0.01" placeholder="0.00"></div>' : '' ) +
+				( f.paid ? '<div class="rf-field"><label for="rf-amount-paid">Amount Paid (leave blank if paid in full)</label><input type="number" id="rf-amount-paid" min="0" max="' + MAX_AMOUNT + '" step="0.01" placeholder="0.00"></div>' : '' ) +
 				'</div>';
 		}
 		var st = f.statement;
@@ -459,6 +624,28 @@
 			'<div class="rf-receipt-inner"><p class="rf-copy-label">Customer copy</p>' + body + '</div>';
 	}
 
+	// Splits a canvas `total` px tall into pages of at most `page` px:
+	// [ [ from, to ], … ]. Each page ends at the last row break in its lower
+	// half, or at the page edge when there is none.
+	function pageSlices( total, page, breaks ) {
+		var out = [];
+		var start = 0;
+		while ( total - start > page ) {
+			var end = start + page;
+			var cut = 0;
+			( breaks || [] ).forEach( function ( b ) {
+				if ( b > start + page / 2 && b <= end ) {
+					cut = b;
+				}
+			} );
+			cut = cut || end;
+			out.push( [ start, cut ] );
+			start = cut;
+		}
+		out.push( [ start, total ] );
+		return out;
+	}
+
 	// Lets a Node check exercise the pure helpers without a browser.
 	if ( typeof module !== 'undefined' && module.exports ) {
 		module.exports = {
@@ -467,6 +654,17 @@
 			intToWordsIndian: intToWordsIndian,
 			toCents: toCents,
 			nonNegative: nonNegative,
+			capped: capped,
+			formatRate: formatRate,
+			formatAmount: formatAmount,
+			lineCents: lineCents,
+			stripBidi: stripBidi,
+			monthsBetween: monthsBetween,
+			clip: clip,
+			qrPixels: qrPixels,
+			pageSlices: pageSlices,
+			MAX_AMOUNT: MAX_AMOUNT,
+			QR_MAX: QR_MAX,
 			calcTotals: calcTotals,
 			nextReceiptNumber: nextReceiptNumber,
 			isUsedNumber: isUsedNumber,
@@ -519,21 +717,21 @@
 		// ---- Verification QR code ---------------------------------------------
 		var qrToggle   = document.getElementById( 'rf-qr' );
 		var verifyBase = ( window.rfReceipt && window.rfReceipt.verifyUrl ) || 'https://receiptgenpro.com/verify-receipt/';
-		var qrCache    = { text: '', url: '' };
+		var qrCache    = { text: '', url: '', size: 112 };
 
 		function qrDataUrl( text ) {
 			if ( typeof window.qrcode !== 'function' ) {
 				ensureQrLib();
-				return '';
+				return null;
 			}
 			if ( qrCache.text !== text ) {
 				var qr = window.qrcode( 0, 'L' );
 				qr.addData( text, 'Byte' );
 				qr.make();
-				// 4 px per module, scaled down in CSS with crisp edges.
-				qrCache = { text: text, url: qr.createDataURL( 4, 0 ) };
+				// 4 px per module, shown at a whole number of px per module.
+				qrCache = { text: text, url: qr.createDataURL( 4, 0 ), size: qrPixels( qr.getModuleCount() ) };
 			}
-			return qrCache.url;
+			return qrCache;
 		}
 
 		var qrLoading = false;
@@ -578,7 +776,8 @@
 			missing: 'Fill this in',
 			nofield: 'Not on this template',
 			manual: 'Do this on the printed receipt',
-			na: 'Not needed for this amount'
+			na: 'Not needed for this amount',
+			currency: 'The limit is in %s, so check this yourself'
 		};
 
 		function renderChecker( facts ) {
@@ -591,7 +790,7 @@
 				checkerResult.innerHTML = '';
 				return;
 			}
-			var results = evaluateChecks( p.checks, facts );
+			var results = evaluateChecks( p.checks, facts, p.currency );
 			var needed  = results.filter( function ( r ) {
 				return ! r.optional && ( r.status === 'ok' || r.status === 'missing' || r.status === 'nofield' );
 			} );
@@ -603,8 +802,8 @@
 				( done === needed.length ? 'Everything required is on the receipt.' : done + ' of ' + needed.length + ' required details are on the receipt.' ) + '</p><ul>';
 			results.forEach( function ( r ) {
 				var status = r.status === 'missing' && r.optional ? 'optional' : r.status;
-				var note = r.status === 'missing' && r.optional ? 'Recommended' : STATUS_TEXT[ r.status ];
-				html += '<li class="rf-check-' + status + '"><span class="rf-check-label">' + escapeHtml( r.label ) + '</span>' +
+				var note = r.status === 'missing' && r.optional ? 'Recommended' : STATUS_TEXT[ r.status ].replace( '%s', r.currency || '' );
+				html += '<li class="rf-check-' + ( status === 'currency' ? 'manual' : status ) + '"><span class="rf-check-label">' + escapeHtml( r.label ) + '</span>' +
 					( note ? '<span class="rf-check-note">' + escapeHtml( note ) + '</span>' : '' ) + '</li>';
 			} );
 			html += '</ul>';
@@ -691,11 +890,30 @@
 				typeCurrency = '';
 			}
 
+			// Values typed into fields both types have (Property Address,
+			// Amount Paid, Tip…) carry over to the new type's fields.
+			var carry = {};
+			form.querySelectorAll( '#rf-type-extra [id], #rf-type-tippaid [id]' ).forEach( function ( el ) {
+				if ( el.value ) {
+					carry[ el.id ] = el.value;
+				}
+			} );
 			var parts = typeFieldsHtml( f );
 			[ 'extra', 'tippaid', 'statement' ].forEach( function ( key ) {
 				var box = document.getElementById( 'rf-type-' + key );
 				if ( box ) {
 					box.innerHTML = parts[ key ];
+				}
+			} );
+			Object.keys( carry ).forEach( function ( id ) {
+				var el = document.getElementById( id );
+				if ( ! el ) {
+					return;
+				}
+				var before = el.value;
+				el.value = carry[ id ];
+				if ( el.tagName === 'SELECT' && el.value !== carry[ id ] ) {
+					el.value = before; // not one of this type's options
 				}
 			} );
 			tipInput  = document.getElementById( 'rf-tip' );
@@ -729,6 +947,21 @@
 			return true;
 		}
 
+		// ?type=<slug> in the address bar, so a reload or a shared link opens
+		// the same receipt type.
+		function rememberType( slug ) {
+			if ( ! window.history || ! window.history.replaceState ) {
+				return;
+			}
+			var search = window.location.search.replace( /([?&])type=[^&#]*&?/, '$1' ).replace( /[?&]$/, '' );
+			if ( slug !== 'general' ) {
+				search += ( search ? '&' : '?' ) + 'type=' + encodeURIComponent( slug );
+			}
+			try {
+				window.history.replaceState( window.history.state, '', window.location.pathname + search + window.location.hash );
+			} catch ( e ) {}
+		}
+
 		typeLinks.forEach( function ( a ) {
 			a.addEventListener( 'click', function ( e ) {
 				if ( ! typeData || e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1 ) {
@@ -737,6 +970,7 @@
 				e.preventDefault();
 				if ( applyType( a.dataset.type ) ) {
 					renderReceipt();
+					rememberType( a.dataset.type );
 				}
 			} );
 		} );
@@ -779,6 +1013,27 @@
 			setDesign( 'classic' );
 		}
 
+		// Printing (Ctrl+P): main.css prints only the receipt on A4. The
+		// Thermal Slip prints on an 80 mm page as long as the slip.
+		var printPage = null;
+		window.addEventListener( 'beforeprint', function () {
+			if ( design !== 'thermal' ) {
+				return;
+			}
+			// The slip is 360 px wide on screen and 72 mm (272 px) on paper,
+			// so its text wraps a little more when printed.
+			var mm = Math.ceil( preview.offsetHeight * 25.4 / 96 * 1.15 ) + 10;
+			printPage = document.createElement( 'style' );
+			printPage.textContent = '@page { size: 80mm ' + mm + 'mm; margin: 4mm; }';
+			document.head.appendChild( printPage );
+		} );
+		window.addEventListener( 'afterprint', function () {
+			if ( printPage ) {
+				printPage.remove();
+				printPage = null;
+			}
+		} );
+
 		// ---- Currency dropdown ---------------------------------------------
 		var currencies = ( window.rfReceipt && window.rfReceipt.currencies ) || { USD: '$ — US Dollar' };
 		Object.keys( currencies ).forEach( function ( code ) {
@@ -820,6 +1075,7 @@
 			price.type = 'number';
 			price.className = 'rf-item-price';
 			price.min = '0';
+			price.max = String( MAX_AMOUNT );
 			price.step = '0.01';
 			price.placeholder = '0.00';
 			price.setAttribute( 'aria-label', 'Price' );
@@ -871,11 +1127,43 @@
 				}
 				var reader = new FileReader();
 				reader.onload = function ( ev ) {
-					state.logoDataUrl = ev.target.result;
-					renderReceipt();
+					shrinkLogo( ev.target.result, function ( url ) {
+						state.logoDataUrl = url;
+						renderReceipt();
+					} );
 				};
 				reader.readAsDataURL( file );
 			} );
+		}
+
+		// A phone photo can be 12 MB: keep at most 400 px on the longer side
+		// (the receipt shows it at 48 px), so it fits in sessionStorage and
+		// the export stays light. PNG keeps transparency.
+		var LOGO_MAX = 400;
+		function shrinkLogo( dataUrl, done ) {
+			var img = new Image();
+			img.onload = function () {
+				var w = img.naturalWidth;
+				var h = img.naturalHeight;
+				var k = Math.min( 1, LOGO_MAX / Math.max( w, h, 1 ) );
+				if ( k === 1 || ! w || ! h ) {
+					done( dataUrl );
+					return;
+				}
+				try {
+					var c = document.createElement( 'canvas' );
+					c.width = Math.round( w * k );
+					c.height = Math.round( h * k );
+					c.getContext( '2d' ).drawImage( img, 0, 0, c.width, c.height );
+					done( c.toDataURL( 'image/png' ) );
+				} catch ( e ) {
+					done( dataUrl );
+				}
+			};
+			img.onerror = function () {
+				done( dataUrl );
+			};
+			img.src = dataUrl;
 		}
 
 		if ( logoRemove ) {
@@ -898,7 +1186,21 @@
 			} );
 		}
 
+		// Saved once typing pauses, not on every keystroke.
+		var saveTimer = null;
+		function saveFormSoon() {
+			clearTimeout( saveTimer );
+			saveTimer = setTimeout( saveForm, 400 );
+		}
+		window.addEventListener( 'pagehide', function () {
+			if ( saveTimer ) {
+				clearTimeout( saveTimer );
+				saveForm();
+			}
+		} );
+
 		function saveForm() {
+			saveTimer = null;
 			var data = { type: currentType, fields: {}, items: [], logo: state.logoDataUrl };
 			storeFields().forEach( function ( el ) {
 				data.fields[ el.id ] = el.type === 'checkbox' ? el.checked : el.value;
@@ -982,6 +1284,11 @@
 
 		restoreForm();
 
+		var urlType = ( window.location.search.match( /[?&]type=([a-z0-9-]+)/ ) || [] )[1];
+		if ( urlType && urlType !== currentType ) {
+			applyType( urlType );
+		}
+
 		// A number saved in this tab that was already downloaded moves on too.
 		if ( lastNumber && numberInput && isUsedNumber( numberInput.value, lastNumber ) ) {
 			numberInput.value = nextReceiptNumber( lastNumber );
@@ -1004,7 +1311,7 @@
 
 		function escapeHtml( str ) {
 			var div = document.createElement( 'div' );
-			div.textContent = str || '';
+			div.textContent = stripBidi( str );
 			return div.innerHTML;
 		}
 
@@ -1014,7 +1321,7 @@
 		}
 
 		function money( symbol, n ) {
-			return symbol + ( toCents( n ) / 100 ).toFixed( 2 );
+			return symbol + formatAmount( toCents( n ), currencySel.value );
 		}
 
 		function formatExtra( el ) {
@@ -1036,18 +1343,68 @@
 			return v;
 		}
 
-		function collectItems() {
+		// Notes under the form when an entry was changed: a negative number,
+		// an amount over the maximum, a rate over 100 %, a cut discount.
+		var formNotice = document.getElementById( 'rf-form-notice' );
+		if ( ! formNotice ) {
+			formNotice = document.createElement( 'p' );
+			formNotice.id = 'rf-form-notice';
+			formNotice.className = 'rf-form-notice';
+			formNotice.hidden = true;
+			var moreBox = document.getElementById( 'rf-more-options' );
+			form.insertBefore( formNotice, moreBox || addItemBtn.nextSibling );
+		}
+
+		function isNegative( value ) {
+			return parseFloat( value ) < 0;
+		}
+
+		function isOver( value, max ) {
+			var n = parseFloat( value );
+			return n > max || n === Infinity;
+		}
+
+		function collectItems( notes ) {
 			var rows = itemsList.querySelectorAll( '.rf-item-row' );
 			var items = [];
 			rows.forEach( function ( row ) {
-				var name  = row.querySelector( '.rf-item-name' ).value.trim();
-				var qty   = nonNegative( row.querySelector( '.rf-item-qty' ).value, 1 );
-				var price = nonNegative( row.querySelector( '.rf-item-price' ).value );
+				var name     = row.querySelector( '.rf-item-name' ).value.trim();
+				var qtyRaw   = row.querySelector( '.rf-item-qty' ).value;
+				var priceRaw = row.querySelector( '.rf-item-price' ).value;
+				var qty      = nonNegative( qtyRaw, 1 );
+				var price    = toCents( capped( priceRaw, MAX_AMOUNT ) ) / 100;
+				if ( isNegative( qtyRaw ) || isNegative( priceRaw ) ) {
+					notes.negative = true;
+				}
+				if ( isOver( priceRaw, MAX_AMOUNT ) || toCents( qty * price ) > MAX_CENTS ) {
+					notes.max = true;
+				}
 				if ( name || price ) {
-					items.push( { name: name || 'Item', qty: qty, price: price, lineCents: toCents( qty * price ) } );
+					items.push( { name: name || 'Item', qty: qty, price: price, lineCents: lineCents( qty, price ) } );
 				}
 			} );
 			return items;
+		}
+
+		function showNotices( notes, symbol ) {
+			var text = [];
+			if ( notes.negative ) {
+				text.push( 'Negative numbers count as 0. For a refund or a reduction, use the discount.' );
+			}
+			if ( notes.max ) {
+				text.push( 'Amounts are limited to ' + money( symbol, MAX_AMOUNT ) + '.' );
+			}
+			if ( notes.rate ) {
+				text.push( 'Tax and discount rates are limited to 100%.' );
+			}
+			if ( notes.discount ) {
+				text.push( 'The discount is more than the subtotal, so only ' + money( symbol, notes.discount ) + ' is taken off.' );
+			}
+			var html = text.join( ' ' );
+			if ( formNotice.textContent !== html ) {
+				formNotice.textContent = html;
+			}
+			formNotice.hidden = ! html;
 		}
 
 		function renderReceipt() {
@@ -1057,27 +1414,52 @@
 			var date      = dateInput.value || todayLocal();
 			var currency  = currencySel.value || 'USD';
 			var symbol    = getCurrencySymbol( currency );
-			var taxRate   = nonNegative( document.getElementById( 'rf-tax-rate' ).value );
-			var taxLabel  = fieldValue( 'rf-tax-label' ) || 'Tax';
-			var tax2Rate  = nonNegative( fieldValue( 'rf-tax2-rate' ) );
-			var tax2Label = fieldValue( 'rf-tax2-label' ) || 'Tax 2';
-			var discount  = nonNegative( fieldValue( 'rf-discount' ) );
+			var fix       = {};
+			var taxRaw    = fieldValue( 'rf-tax-rate' );
+			var tax2Raw   = fieldValue( 'rf-tax2-rate' );
+			var discRaw   = fieldValue( 'rf-discount' );
 			var discType  = fieldValue( 'rf-discount-type' ) === 'amount' ? 'amount' : 'percent';
+			var taxRate   = capped( taxRaw, MAX_RATE );
+			var taxLabel  = fieldValue( 'rf-tax-label' ) || 'Tax';
+			var tax2Rate  = capped( tax2Raw, MAX_RATE );
+			var tax2Label = fieldValue( 'rf-tax2-label' ) || 'Tax 2';
+			var discount  = capped( discRaw, discType === 'percent' ? MAX_RATE : MAX_AMOUNT );
 			var payMethod = document.getElementById( 'rf-payment-method' ).value;
 			var notes     = document.getElementById( 'rf-notes' ).value.trim();
-			var items     = collectItems();
-			var tipCents  = tipInput ? toCents( nonNegative( tipInput.value ) ) : 0;
+			var items     = collectItems( fix );
+			var tipRaw    = tipInput ? tipInput.value : '';
+			var tipCents  = toCents( capped( tipRaw, MAX_AMOUNT ) );
 			var paidRaw   = paidInput ? paidInput.value.trim() : '';
+
+			[ taxRaw, tax2Raw, discRaw, tipRaw, paidRaw ].forEach( function ( v ) {
+				if ( isNegative( v ) ) {
+					fix.negative = true;
+				}
+			} );
+			if ( isOver( taxRaw, MAX_RATE ) || isOver( tax2Raw, MAX_RATE ) || ( discType === 'percent' && isOver( discRaw, MAX_RATE ) ) ) {
+				fix.rate = true;
+			}
+			if ( ( discType === 'amount' && isOver( discRaw, MAX_AMOUNT ) ) || isOver( tipRaw, MAX_AMOUNT ) || isOver( paidRaw, MAX_AMOUNT ) ) {
+				fix.max = true;
+			}
 
 			var subtotalCents = items.reduce( function ( sum, it ) {
 				return sum + it.lineCents;
 			}, 0 );
+			if ( subtotalCents > MAX_CENTS ) {
+				subtotalCents = MAX_CENTS;
+				fix.max = true;
+			}
 			var calc       = calcTotals( subtotalCents, discount, discType, [ taxRate, tax2Rate ], tipCents );
 			var totalCents = calc.totalCents;
 			var subtotal   = subtotalCents / 100;
 			var tip        = tipCents / 100;
 			var total      = totalCents / 100;
-			var paid       = paidRaw === '' ? null : toCents( nonNegative( paidRaw ) ) / 100;
+			var paid       = paidRaw === '' ? null : toCents( capped( paidRaw, MAX_AMOUNT ) ) / 100;
+			if ( calc.discountClamped && subtotalCents ) {
+				fix.discount = calc.discountCents / 100;
+			}
+			showNotices( fix, symbol );
 
 			var rowsHtml = items
 				.map( function ( it ) {
@@ -1107,15 +1489,15 @@
 				if ( val ) {
 					var label = ( el.dataset.label || '' ).replace( / \(optional\)$/i, '' );
 					meta.push( '<div><strong>' + escapeHtml( label ) + ':</strong> ' + escapeHtml( val ) + '</div>' );
-					extras.push( [ label, val ] );
+					extras.push( [ label, val, el.id.replace( /^rf-x-/, '' ) ] );
 				}
 			} );
 
 			var totalsHtml =
 				'<div><span>Subtotal</span><span>' + money( symbol, subtotal ) + '</span></div>' +
-				( calc.discountCents ? '<div><span>Discount' + ( discType === 'percent' ? ' (' + Math.min( discount, 100 ) + '%)' : '' ) + '</span><span>-' + money( symbol, calc.discountCents / 100 ) + '</span></div>' : '' ) +
-				( taxRate ? '<div><span>' + escapeHtml( taxLabel ) + ' (' + taxRate + '%)</span><span>' + money( symbol, calc.taxCents[0] / 100 ) + '</span></div>' : '' ) +
-				( tax2Rate ? '<div><span>' + escapeHtml( tax2Label ) + ' (' + tax2Rate + '%)</span><span>' + money( symbol, calc.taxCents[1] / 100 ) + '</span></div>' : '' ) +
+				( calc.discountCents ? '<div><span>Discount' + ( discType === 'percent' ? ' (' + formatRate( Math.min( discount, 100 ) ) + '%)' : '' ) + '</span><span>-' + money( symbol, calc.discountCents / 100 ) + '</span></div>' : '' ) +
+				( taxRate ? '<div><span>' + escapeHtml( taxLabel ) + ' (' + formatRate( taxRate ) + '%)</span><span>' + money( symbol, calc.taxCents[0] / 100 ) + '</span></div>' : '' ) +
+				( tax2Rate ? '<div><span>' + escapeHtml( tax2Label ) + ' (' + formatRate( tax2Rate ) + '%)</span><span>' + money( symbol, calc.taxCents[1] / 100 ) + '</span></div>' : '' ) +
 				( tip ? '<div><span>Tip</span><span>' + money( symbol, tip ) + '</span></div>' : '' ) +
 				'<div class="rf-receipt-total-final"><span>Total</span><span>' + money( symbol, total ) + '</span></div>';
 
@@ -1155,15 +1537,24 @@
 					items: items.map( function ( it ) {
 						return { name: it.name, qty: it.qty, priceCents: toCents( it.price ) };
 					} ),
+					discountCents: calc.discountCents,
+					taxes: [
+						{ label: taxLabel, rate: taxRate, cents: calc.taxCents[0] },
+						{ label: tax2Label, rate: tax2Rate, cents: calc.taxCents[1] }
+					],
+					tipCents: tipCents,
 					totalCents: totalCents,
 					paidCents: paid === null ? null : toCents( paid ),
 					payMethod: payMethod,
 					extras: extras
 				} );
-				var qrImg = qrDataUrl( verifyLink );
-				if ( qrImg ) {
-					qrHtml = '<div class="rf-receipt-qr"><img src="' + qrImg + '" width="112" height="112" alt="Verification QR code"><span>Scan to verify this receipt<br>' + escapeHtml( verifyBase.replace( /^https?:\/\//, '' ) ) + '</span></div>';
-				}
+				var qr = qrDataUrl( verifyLink );
+				var qrText = '<span>Scan to verify this receipt<br>' + escapeHtml( verifyBase.replace( /^https?:\/\//, '' ) ) + '</span>';
+				// While the QR library loads, an empty box holds its place so
+				// the receipt (and an embedding iframe) doesn't jump.
+				qrHtml = qr ?
+					'<div class="rf-receipt-qr"><img src="' + qr.url + '" width="' + qr.size + '" height="' + qr.size + '" style="width:' + qr.size + 'px;height:' + qr.size + 'px" alt="Verification QR code">' + qrText + '</div>' :
+					'<div class="rf-receipt-qr"><span class="rf-qr-pending" aria-hidden="true"></span>' + qrText + '</div>';
 			}
 
 			preview.innerHTML = wrapDesign( design,
@@ -1186,7 +1577,7 @@
 			if ( logoRemove ) {
 				logoRemove.style.display = state.logoDataUrl ? '' : 'none';
 			}
-			saveForm();
+			saveFormSoon();
 
 			renderChecker( {
 				business: !! document.getElementById( 'rf-business-name' ).value.trim(),
@@ -1201,7 +1592,9 @@
 				statement: statement ? statement.checked : null,
 				x: extraFacts(),
 				amount: total,
-				cash: payMethod === 'Cash'
+				cash: payMethod === 'Cash',
+				currency: currency,
+				months: monthsBetween( fieldValue( 'rf-x-period_from' ), fieldValue( 'rf-x-period_to' ) )
 			} );
 
 			// Screen readers hear only the new total, once typing pauses,
@@ -1222,8 +1615,13 @@
 		// ---- Export helpers ----------------------------------------------------
 		var EXPORT_WIDTH = 800; // px; at scale 2 every export is 1600 px wide.
 
+		// iOS Safari draws nothing on a canvas over ~16.7 million pixels.
+		var CANVAS_MAX_PIXELS = 16000000;
+
 		// Renders a copy of the preview at a fixed desktop width, off screen, so a
 		// receipt made on a 375 px phone is as sharp as one made on a laptop.
+		// canvas.rfBreaks lists the y positions (canvas px) between rows, where
+		// a long receipt can be split into PDF pages.
 		function renderCanvas() {
 			var width = DESIGN_WIDTH[ design ] || EXPORT_WIDTH;
 			var clone = preview.cloneNode( true );
@@ -1231,8 +1629,15 @@
 			clone.setAttribute( 'aria-hidden', 'true' );
 			clone.style.cssText = 'position:absolute;left:-10000px;top:0;width:' + width + 'px;max-width:none;box-sizing:border-box;box-shadow:none;margin:0;';
 			document.body.appendChild( clone );
+			var height = clone.offsetHeight;
+			var scale  = Math.min( 2, Math.sqrt( CANVAS_MAX_PIXELS / Math.max( 1, width * height ) ) );
+			var top    = clone.getBoundingClientRect().top;
+			var breaks = [];
+			clone.querySelectorAll( '.rf-receipt-head, .rf-receipt-meta, tr, .rf-receipt-totals > div, .rf-receipt-words, .rf-receipt-statement, .rf-receipt-notes, .rf-receipt-signature, .rf-receipt-qr, .rf-copy-cut, .rf-receipt-inner' ).forEach( function ( el ) {
+				breaks.push( Math.round( ( el.getBoundingClientRect().bottom - top ) * scale ) );
+			} );
 			return window.html2canvas( clone, {
-				scale: 2,
+				scale: scale,
 				backgroundColor: '#ffffff',
 				width: width,
 				windowWidth: Math.max( 1200, document.documentElement.clientWidth ),
@@ -1240,6 +1645,9 @@
 				scrollY: 0
 			} ).then( function ( canvas ) {
 				clone.remove();
+				canvas.rfBreaks = breaks.sort( function ( a, b ) {
+					return a - b;
+				} );
 				return canvas;
 			}, function ( err ) {
 				clone.remove();
@@ -1320,14 +1728,29 @@
 						slip.save( fileName( 'pdf' ) );
 						return;
 					}
-					var pdfWidth  = 190; // A4 width minus 10 mm margins
-					var pdfHeight = ( canvas.height * pdfWidth ) / canvas.width;
-					if ( pdfHeight > 277 ) { // keep aspect ratio on very long receipts
-						pdfHeight = 277;
-						pdfWidth  = ( canvas.width * pdfHeight ) / canvas.height;
-					}
-					var pdf       = new jsPDF( { orientation: 'portrait', unit: 'mm', format: 'a4' } );
-					pdf.addImage( imgData, 'JPEG', ( 210 - pdfWidth ) / 2, 10, pdfWidth, pdfHeight );
+					// A4 at full width (190 mm inside 10 mm margins); a receipt
+					// taller than one page (277 mm) continues on the next
+					// pages, cut between rows, instead of shrinking.
+					var pdf    = new jsPDF( { orientation: 'portrait', unit: 'mm', format: 'a4' } );
+					var pageMm = 277;
+					var pagePx = Math.floor( canvas.width * pageMm / 190 );
+					var slices = pageSlices( canvas.height, pagePx, canvas.rfBreaks || [] );
+					slices.forEach( function ( sl, n ) {
+						var part = canvas;
+						if ( slices.length > 1 ) {
+							part = document.createElement( 'canvas' );
+							part.width = canvas.width;
+							part.height = sl[1] - sl[0];
+							var ctx = part.getContext( '2d' );
+							ctx.fillStyle = '#ffffff';
+							ctx.fillRect( 0, 0, part.width, part.height );
+							ctx.drawImage( canvas, 0, sl[0], canvas.width, part.height, 0, 0, canvas.width, part.height );
+						}
+						if ( n ) {
+							pdf.addPage( 'a4', 'portrait' );
+						}
+						pdf.addImage( slices.length > 1 ? part.toDataURL( 'image/jpeg', 0.92 ) : imgData, 'JPEG', 10, 10, 190, ( part.height * 190 ) / canvas.width );
+					} );
 					pdf.save( fileName( 'pdf' ) );
 				} );
 			} );
