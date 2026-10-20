@@ -162,6 +162,10 @@ check( 'mine' === @file_get_contents( $live . '/hand-made.txt' ), 'a file the he
 check( 'a1' === @file_get_contents( $prev . '/inc/a.php' ), 'the previous version is kept for roll back' );
 check( 1 === $r['removed'], 'one file counted as removed' );
 
+// A run that changes nothing keeps the roll back point.
+RGP_Deploy_Helper::sync( 'webhook' );
+check( array( 'themes/t' ) === get_option( RGP_Deploy_Helper::OPT_STATE )['staged'], 'a no-change run keeps the roll back point' );
+
 // 4. Roll back and forward again.
 check( array( 'themes/t' ) === RGP_Deploy_Helper::rollback(), 'roll back swaps the folder' );
 check( 'a1' === @file_get_contents( $live . '/inc/a.php' ), 'roll back restores the old file' );

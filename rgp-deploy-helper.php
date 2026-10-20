@@ -479,8 +479,9 @@ final class RGP_Deploy_Helper {
 		$new_state = array(
 			'revision'   => empty( $errors ) ? $rev : $state['revision'],
 			'files'      => empty( $errors ) ? array_keys( $files ) : array_values( array_unique( array_merge( $state['files'], array_keys( $files ) ) ) ),
-			'prev_files' => $state['files'],
-			'staged'     => $staged,
+			// A run that changed nothing keeps the last roll back point.
+			'prev_files' => ( $copied || $removed ) ? $state['files'] : $state['prev_files'],
+			'staged'     => ( $copied || $removed ) ? $staged : $state['staged'],
 			'notes'      => $notes,
 			'time'       => time(),
 			'trigger'    => $trigger,
