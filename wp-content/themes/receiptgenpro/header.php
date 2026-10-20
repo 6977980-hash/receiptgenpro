@@ -79,7 +79,7 @@ function rf_default_primary_menu( $args = array() ) {
 	$items = array(
 		home_url( '/' )                 => 'Receipt Generator',
 		home_url( '/receipt-templates/' ) => 'Templates',
-		get_permalink( get_option( 'page_for_posts' ) ) ?: home_url( '/blog/' ) => 'Blog',
+		rf_blog_url() => 'Blog',
 		home_url( '/about-us/' )        => 'About Us',
 		home_url( '/contact-us/' )      => 'Contact',
 	);

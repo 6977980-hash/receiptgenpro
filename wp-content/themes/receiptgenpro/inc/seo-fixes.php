@@ -28,7 +28,11 @@ if ( ! defined( 'ABSPATH' ) ) {
    inc/seo-meta.php already prints a complete robots tag. WordPress core
    printed a second one ("max-image-preview:large") via wp_robots().
    ========================================================================== */
-remove_action( 'wp_head', 'wp_robots', 1 );
+// Only while this theme prints the tags: SEO plugins print robots through
+// wp_robots(). Plugins load before the theme, so the check works here.
+if ( ! rf_seo_plugin_active() ) {
+	remove_action( 'wp_head', 'wp_robots', 1 );
+}
 
 // Same problem for canonical: WordPress core's rel_canonical() printed a
 // second <link rel="canonical"> on every singular page, on top of the one
@@ -70,6 +74,20 @@ function rf_author_link_to_about( $link ) {
 	return home_url( '/about-us/' );
 }
 add_filter( 'author_link', 'rf_author_link_to_about' );
+
+// Audit 20 Oct (#13): date archives (/2026/, /2026/09/) were indexable
+// copies of /blog/ titled just "ReceiptGenPro". Nothing links to them, so
+// send them to the blog.
+function rf_redirect_date_archives() {
+	if ( is_date() && ! rf_seo_plugin_active() ) {
+		wp_safe_redirect( rf_blog_url(), 301 );
+		exit;
+	}
+}
+add_action( 'template_redirect', 'rf_redirect_date_archives', 1 );
+
+// Audit 20 Oct (#21): comments are off, so no comments feed link in <head>.
+add_filter( 'feed_links_show_comments_feed', '__return_false' );
 
 /* ==========================================================================
    3. Security headers (M7)
@@ -288,7 +306,8 @@ function rf_fix_content_links( $html ) {
 function rf_rewrite_internal_links( $html ) {
 	$home = preg_quote( untrailingslashit( home_url() ), '~' );
 	$html = preg_replace(
-		'~href=(["\'])(' . $home . ')?/blog/(?!page/)([a-z0-9\-]+/?)(["\'#?])~i',
+		// Audit 20 Oct (#15): /blog/feed/, /blog/category/… are real URLs.
+		'~href=(["\'])(' . $home . ')?/blog/(?!(?:page|feed|category|tag)(?:/|["\'#?]))([a-z0-9\-]+/?)(["\'#?])~i',
 		'href=$1$2/$3$4',
 		$html
 	);

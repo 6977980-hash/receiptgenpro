@@ -27,7 +27,7 @@ define( 'RF_LOGO_TEXT', 'Receipt<span class="rf-accent">GenPro</span>' );
 define( 'RF_SOCIAL_TWITTER', '' );  // e.g. 'https://x.com/receiptgenpro'
 define( 'RF_SOCIAL_FACEBOOK', '' ); // e.g. 'https://facebook.com/receiptgenpro'
 define( 'RF_SOCIAL_LINKEDIN', '' ); // e.g. 'https://linkedin.com/company/receiptgenpro'
-define( 'RF_THEME_VERSION', '1.3.1' );
+define( 'RF_THEME_VERSION', '1.3.2' );
 
 /* ==========================================================================
    2. THEME SETUP
@@ -272,6 +272,15 @@ add_action( 'personal_options_update', 'rf_save_extra_profile_fields' );
 add_action( 'edit_user_profile_update', 'rf_save_extra_profile_fields' );
 
 /**
+ * The blog's URL. Audit 20 Oct (#18): get_permalink( 0 ) is the current
+ * page's own URL, so an unset "Posts page" setting must fall back to /blog/.
+ */
+function rf_blog_url() {
+	$id = (int) get_option( 'page_for_posts' );
+	return $id ? get_permalink( $id ) : home_url( '/blog/' );
+}
+
+/**
  * Breadcrumb helper used by template-parts/breadcrumbs.php and mirrored
  * into BreadcrumbList schema so the visible trail and the structured data
  * never fall out of sync (a common audit failure on competitor sites).
@@ -282,10 +291,10 @@ function rf_get_breadcrumbs() {
 	);
 
 	if ( is_singular( 'post' ) ) {
-		$trail[] = array( 'title' => 'Blog', 'url' => get_permalink( get_option( 'page_for_posts' ) ) );
+		$trail[] = array( 'title' => 'Blog', 'url' => rf_blog_url() );
 		$trail[] = array( 'title' => get_the_title(), 'url' => get_permalink() );
 	} elseif ( is_home() && ! is_front_page() ) {
-		$trail[] = array( 'title' => 'Blog', 'url' => get_permalink( get_option( 'page_for_posts' ) ) );
+		$trail[] = array( 'title' => 'Blog', 'url' => rf_blog_url() );
 	} elseif ( is_page_template( 'page-receipt-category.php' ) ) {
 		$trail[] = array( 'title' => 'Receipt Templates', 'url' => home_url( '/receipt-templates/' ) );
 		// Oct 2026 audit (SEO-05): same name as the page's H1, not the long SEO title.
@@ -294,7 +303,7 @@ function rf_get_breadcrumbs() {
 	} elseif ( rf_is_templates_hub() ) {
 		$trail[] = array( 'title' => 'Receipt Templates', 'url' => home_url( '/receipt-templates/' ) );
 	} elseif ( is_category() || is_tag() ) {
-		$trail[] = array( 'title' => 'Blog', 'url' => get_permalink( get_option( 'page_for_posts' ) ) );
+		$trail[] = array( 'title' => 'Blog', 'url' => rf_blog_url() );
 		$trail[] = array( 'title' => ucfirst( single_term_title( '', false ) ), 'url' => get_term_link( get_queried_object() ) );
 	} elseif ( is_page() ) {
 		foreach ( array_reverse( get_post_ancestors( get_queried_object_id() ) ) as $ancestor ) {

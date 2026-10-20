@@ -28,7 +28,7 @@ function rf_feature_pages() {
 			'title'       => 'Receipt Requirements Checker',
 			'template'    => 'page-receipt-requirements.php',
 			'seo_title'   => 'Receipt Requirements Checker — HRA, FSA, Donations',
-			'description' => 'Check a receipt before you submit it: what a receipt needs for an HRA claim, a dependent care FSA, a $250+ donation, an expense report or a rent payment, with official sources.',
+			'description' => 'What a receipt needs for an HRA claim, a dependent care FSA, a $250+ donation, an expense report or a rent payment, checked against the official sources.',
 		),
 		'verify-receipt'           => array(
 			'title'       => 'Verify a Receipt',
@@ -46,7 +46,7 @@ function rf_feature_pages() {
 			'title'       => 'Free Receipt Generator Widget',
 			'template'    => 'page-receipt-widget.php',
 			'seo_title'   => 'Free Receipt Generator Widget for Your Website',
-			'description' => 'Add a free receipt generator to your own website: copy one line of embed code for a rent, cash, payment or any other receipt template. No signup, no data collected.',
+			'description' => 'Add a free receipt generator to your website with one line of embed code: rent, cash, payment or any other receipt template. No signup, no data collected.',
 		),
 	);
 
@@ -62,8 +62,9 @@ function rf_feature_pages() {
 				'title'       => $law['state'] . ' Rent Receipt Law',
 				'template'    => 'page-rent-receipt-laws.php',
 				'parent'      => 'rent-receipt-laws',
-				'seo_title'   => $law['state'] . ' Rent Receipt Law — Does a Landlord Have to Give One?',
-				'description' => $law['summary'],
+				// Audit 20 Oct (#12): the old pattern ran to 61–73 characters.
+				'seo_title'   => ( $law['short'] ?? $law['state'] ) . ' Rent Receipt Law: Is a Receipt Required?',
+				'description' => $law['meta'] ?? $law['summary'],
 			);
 		}
 	}
@@ -89,7 +90,9 @@ function rf_ensure_feature_pages() {
 		return;
 	}
 	$pages = rf_feature_pages();
-	$hash  = md5( wp_json_encode( array_map( function ( $p ) { return array( $p['title'], $p['template'], $p['parent'] ?? '' ); }, $pages ) ) );
+	// 'v2' (1.3.2) makes the pass below run once more so it can draft the
+	// pages of states that were removed from the list.
+	$hash  = md5( 'v2' . wp_json_encode( array_map( function ( $p ) { return array( $p['title'], $p['template'], $p['parent'] ?? '' ); }, $pages ) ) );
 	if ( get_option( 'rf_feature_pages_hash' ) === $hash ) {
 		return;
 	}
@@ -147,10 +150,59 @@ function rf_ensure_feature_pages() {
 			update_post_meta( $id, '_wp_page_template', $p['template'] );
 		}
 	}
+	rf_draft_removed_law_pages( $pages );
 	update_option( 'rf_feature_pages_hash', $hash, false );
 	delete_option( 'rf_feature_pages_lock' );
 }
 add_action( 'init', 'rf_ensure_feature_pages', 30 );
+
+/**
+ * Audit 20 Oct (#16): a state page whose state is no longer in
+ * rf_rent_receipt_laws() is set to draft, so it leaves the sitemap and
+ * stops showing the hub under a state's URL. Draft, not trash, so nothing
+ * is lost if the state comes back.
+ */
+function rf_draft_removed_law_pages( $pages ) {
+	if ( ! function_exists( 'rf_rent_receipt_laws' ) ) {
+		return;
+	}
+	$hub = get_page_by_path( 'rent-receipt-laws', OBJECT, 'page' );
+	if ( ! $hub ) {
+		return;
+	}
+	$children = get_pages(
+		array(
+			'parent'      => $hub->ID,
+			'post_status' => 'publish',
+		)
+	);
+	foreach ( $children as $child ) {
+		if ( ! isset( $pages[ 'rent-receipt-laws/' . $child->post_name ] ) ) {
+			wp_update_post(
+				array(
+					'ID'          => $child->ID,
+					'post_status' => 'draft',
+				)
+			);
+		}
+	}
+}
+
+/**
+ * Audit 20 Oct (#16): until it is drafted, a child page of the hub with no
+ * law data would show the hub's content under its own URL. Send it to the
+ * hub instead.
+ */
+function rf_redirect_orphan_law_page() {
+	if ( ! is_page_template( 'page-rent-receipt-laws.php' ) || ! wp_get_post_parent_id( get_queried_object_id() ) ) {
+		return;
+	}
+	if ( ! isset( rf_rent_receipt_laws()[ basename( rf_current_page_path() ) ] ) ) {
+		wp_safe_redirect( home_url( '/rent-receipt-laws/' ), 301 );
+		exit;
+	}
+}
+add_action( 'template_redirect', 'rf_redirect_orphan_law_page' );
 
 /** The first administrator, so new pages aren't authored by "nobody". */
 function rf_feature_pages_author() {
@@ -201,6 +253,60 @@ function rf_feature_pages_schema( $graph ) {
 	return $graph;
 }
 add_filter( 'rf_schema_graph', 'rf_feature_pages_schema' );
+
+/**
+ * Audit 20 Oct (#19): the law pages and the requirements checker state
+ * legal rules, so their WebPage node says when they were last changed and
+ * reviewed, by whom, and which official texts they rely on.
+ */
+function rf_legal_pages_schema( $graph ) {
+	$citations = array();
+	$reviewed  = '';
+	if ( is_page_template( 'page-rent-receipt-laws.php' ) && function_exists( 'rf_rent_receipt_laws' ) ) {
+		$laws = rf_rent_receipt_laws();
+		$slug = wp_get_post_parent_id( get_queried_object_id() ) ? basename( rf_current_page_path() ) : '';
+		foreach ( ( $slug && isset( $laws[ $slug ] ) ) ? array( $laws[ $slug ] ) : $laws as $law ) {
+			$citations[ $law['citation'] ] = $law['url'];
+		}
+		$reviewed = rf_rent_laws_reviewed()['date'];
+	} elseif ( is_page_template( 'page-receipt-requirements.php' ) ) {
+		foreach ( rf_receipt_purposes() as $purpose ) {
+			// A source's url can be '' (no official page to link to).
+			foreach ( (array) ( $purpose['sources'] ?? array() ) as $src ) {
+				$citations[ $src[0] ] = $src[1];
+			}
+		}
+	} else {
+		return $graph;
+	}
+
+	$page = array(
+		'@type'        => 'WebPage',
+		'@id'          => get_permalink() . '#webpage',
+		'name'         => rf_schema_text( get_the_title() ),
+		'url'          => get_permalink(),
+		'isPartOf'     => array( '@id' => home_url( '/#website' ) ),
+		'dateModified' => get_the_modified_date( 'c' ),
+		'reviewedBy'   => array( '@id' => home_url( '/#organization' ) ),
+		'citation'     => array(),
+	);
+	if ( $reviewed ) {
+		$page['lastReviewed'] = $reviewed;
+	}
+	foreach ( $citations as $name => $url ) {
+		$work = array(
+			'@type' => 'CreativeWork',
+			'name'  => $name,
+		);
+		if ( $url ) {
+			$work['url'] = $url;
+		}
+		$page['citation'][] = $work;
+	}
+	$graph[] = $page;
+	return $graph;
+}
+add_filter( 'rf_schema_graph', 'rf_legal_pages_schema' );
 
 function rf_requirements_faqs() {
 	return array(

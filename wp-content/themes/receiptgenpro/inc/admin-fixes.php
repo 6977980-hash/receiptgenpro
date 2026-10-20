@@ -329,7 +329,7 @@ function rf_fixes_page() {
 		<?php $form_open( 'editorial' ); $buttons(); ?>
 
 		<h2>6. Shorter search titles</h2>
-		<p>Sets the SEO title (<code>rf_seo_title</code>) of three guides whose titles are longer than 60 characters, so Google shows them in full. The post headline on the page doesn't change.</p>
+		<p>Sets the SEO title (<code>rf_seo_title</code>) of the guides whose titles are longer than 60 characters, so Google shows them in full. The post headline on the page doesn't change.</p>
 		<?php $form_open( 'titles' ); $buttons(); ?>
 
 		<h2>After applying</h2>

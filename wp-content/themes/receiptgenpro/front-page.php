@@ -223,7 +223,7 @@ get_header();
 					?>
 				</div>
 				<p class="rf-text-center" style="margin-top:1.5rem;">
-					<a href="<?php echo esc_url( get_permalink( get_option( 'page_for_posts' ) ) ?: home_url( '/blog/' ) ); ?>" class="rf-btn rf-btn-secondary">View All Articles</a>
+					<a href="<?php echo esc_url( rf_blog_url() ); ?>" class="rf-btn rf-btn-secondary">View All Articles</a>
 				</p>
 			</div>
 		</section>
