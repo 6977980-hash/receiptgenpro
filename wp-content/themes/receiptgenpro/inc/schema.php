@@ -379,6 +379,11 @@ function rf_schema_article() {
  * cross-referenced via @id.
  */
 function rf_output_schema() {
+	// Audit 20 Oct (#17): an SEO plugin prints its own graph; two graphs
+	// would describe the same page twice.
+	if ( rf_seo_plugin_active() ) {
+		return;
+	}
 	$graph = array( rf_schema_organization(), rf_schema_website() );
 
 	if ( is_front_page() ) {
@@ -456,6 +461,31 @@ function rf_output_schema() {
 		}
 		// HowTo schema intentionally no longer printed (v1.1.0): Google
 		// retired HowTo rich results in Sept 2023, so it only added weight.
+	} elseif ( is_home() && ! is_front_page() ) {
+		// Audit 20 Oct (#19): the blog index is a list of articles.
+		$graph[] = rf_schema_breadcrumbs();
+		$items   = array();
+		$pos     = 1;
+		foreach ( $GLOBALS['wp_query']->posts as $item_post ) {
+			$items[] = array(
+				'@type'    => 'ListItem',
+				'position' => $pos++,
+				'url'      => get_permalink( $item_post ),
+				'name'     => rf_schema_text( get_the_title( $item_post ) ),
+			);
+		}
+		$graph[] = array(
+			'@type'      => 'CollectionPage',
+			'@id'        => rf_blog_url() . '#webpage',
+			'name'       => RF_BRAND_NAME . ' Blog',
+			'url'        => rf_blog_url(),
+			'isPartOf'   => array( '@id' => home_url( '/#website' ) ),
+			'publisher'  => array( '@id' => home_url( '/#organization' ) ),
+			'mainEntity' => array(
+				'@type'           => 'ItemList',
+				'itemListElement' => $items,
+			),
+		);
 	} elseif ( is_page() || is_category() ) {
 		$graph[] = rf_schema_breadcrumbs();
 	}

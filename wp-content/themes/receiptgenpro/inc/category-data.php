@@ -58,7 +58,7 @@ function rf_receipt_categories() {
 		'rent-receipt' => array(
 			'h1'               => 'Free Rent Receipt Generator',
 			'seo_title'        => 'Rent Receipt Generator — Free Template for Landlords',
-			'meta_description' => 'Create a free rent receipt online in seconds. Landlord and tenant names, property address, rent period, amount paid and balance due. Download as PDF, PNG or JPEG.',
+			'meta_description' => 'Make a free rent receipt online: landlord and tenant names, property address, rent period, amount paid and balance due. Download as PDF, PNG or JPEG.',
 			'primary_keyword'  => 'rent receipt generator',
 			'related'          => array( 'cash-receipt', 'construction-receipt', 'cleaning-receipt', 'donation-receipt' ),
 			'icon'             => '🏠',
@@ -279,7 +279,7 @@ function rf_receipt_categories() {
 		'donation-receipt' => array(
 			'h1'               => 'Free Donation Receipt Generator',
 			'seo_title'        => 'Donation Receipt Template — Free 501(c)(3) Receipt',
-			'meta_description' => 'Create a donation receipt for your nonprofit: organization and EIN, donor, cash or in-kind gift, and the goods-or-services statement donors need for $250+ gifts.',
+			'meta_description' => 'Make a donation receipt for your nonprofit: organization and EIN, donor, cash or in-kind gift, and the goods-or-services statement needed for $250+ gifts.',
 			'primary_keyword'  => 'donation receipt generator',
 			'related'          => array( 'cash-receipt', 'childcare-receipt', 'rent-receipt', 'freelance-receipt' ),
 			'icon'             => '❤️',
@@ -475,7 +475,7 @@ function rf_receipt_categories() {
 		'hra-rent-receipt' => array(
 			'h1'               => 'Rent Receipt for HRA (India)',
 			'seo_title'        => 'Rent Receipt for HRA — Free Generator (India, PDF)',
-			'meta_description' => 'Create a monthly rent receipt for your HRA claim: landlord and tenant names, property address, rent month, amount in rupees and words, landlord PAN and signature.',
+			'meta_description' => 'Make a monthly rent receipt for your HRA claim: landlord and tenant names, address, rent month, amount in rupees and words, landlord PAN and signature.',
 			'primary_keyword'  => 'rent receipt for hra',
 			'related'          => array( 'rent-receipt', 'cash-receipt', 'payment-receipt', 'deposit-receipt' ),
 			'icon'             => '🇮🇳',
@@ -510,7 +510,7 @@ function rf_receipt_categories() {
 		'payment-receipt' => array(
 			'h1'               => 'Free Payment Receipt Generator',
 			'seo_title'        => 'Payment Receipt Template — Free Proof of Payment',
-			'meta_description' => 'Make a free payment receipt online: who paid, amount, what it was for, payment method and reference number. Download a proof of payment as PDF, PNG or JPEG.',
+			'meta_description' => 'Make a free payment receipt online: who paid, amount, what it was for, payment method and reference number. Download proof of payment as PDF, PNG or JPEG.',
 			'primary_keyword'  => 'payment receipt template',
 			'related'          => array( 'cash-receipt', 'deposit-receipt', 'freelance-receipt', 'rent-receipt' ),
 			'icon'             => '🧾',
@@ -577,7 +577,7 @@ function rf_receipt_categories() {
 		'missing-receipt-form' => array(
 			'h1'               => 'Free Missing Receipt Form',
 			'seo_title'        => 'Missing Receipt Form — Free Lost Receipt Declaration',
-			'meta_description' => 'Lost a receipt? Fill in a free missing receipt declaration for your expense report: vendor, date, amount, business purpose, why the receipt is missing, and signatures.',
+			'meta_description' => 'Lost a receipt? Fill in a free missing receipt declaration for an expense report: vendor, date, amount, business purpose, why it is missing, signatures.',
 			'primary_keyword'  => 'missing receipt form',
 			'related'          => array( 'payment-receipt', 'cash-receipt', 'taxi-receipt', 'restaurant-receipt' ),
 			'icon'             => '📝',

@@ -27,7 +27,9 @@ function rf_get_seo_data() {
 	$data = array(
 		'title'       => get_bloginfo( 'name' ),
 		'description' => RF_BRAND_DESCRIPTION,
-		'canonical'   => home_url( add_query_arg( array(), $GLOBALS['wp']->request ?? '' ) ),
+		// Audit 20 Oct (#13): WordPress URLs end in a slash; the fallback
+		// canonical didn't (/2026 instead of /2026/).
+		'canonical'   => trailingslashit( home_url( $GLOBALS['wp']->request ?? '' ) ),
 		'robots'      => 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
 		'og_type'     => 'website',
 		'image'       => get_template_directory_uri() . '/assets/img/og-default.png',
@@ -53,6 +55,9 @@ function rf_get_seo_data() {
 	} elseif ( is_singular( 'post' ) ) {
 		global $post;
 		$meta_title = get_post_meta( $post->ID, 'rf_seo_title', true );
+		if ( ! $meta_title ) {
+			$meta_title = rf_seo_title_patches()[ $post->post_name ] ?? '';
+		}
 		$meta_desc  = get_post_meta( $post->ID, 'rf_seo_description', true );
 		// v1.1.0 (audit M2): one consistent format. Custom title if set,
 		// otherwise the post title, with the brand appended only when the
@@ -74,7 +79,7 @@ function rf_get_seo_data() {
 	} elseif ( is_home() && ! is_front_page() ) {
 		$data['title']       = 'Receipt & Invoice Guides | ' . RF_BRAND_NAME . ' Blog';
 		$data['description'] = 'Practical, country-specific guides on making receipts, record-keeping and tax rules for small businesses in the US, UK, Canada, Australia and India.';
-		$data['canonical']   = get_permalink( get_option( 'page_for_posts' ) );
+		$data['canonical']   = rf_blog_url();
 		$data                = rf_seo_paginate( $data );
 	} elseif ( is_page() ) {
 		$data['title']       = get_the_title() . ' | ' . RF_BRAND_NAME;
@@ -117,6 +122,14 @@ function rf_get_seo_data() {
 			$data['robots'] = 'noindex, follow';
 		}
 		$data = rf_seo_paginate( $data );
+	} elseif ( is_date() ) {
+		// Audit 20 Oct (#13): date archives are redirected to /blog/
+		// (rf_redirect_date_archives); this covers anything that slips past.
+		$data['title']  = 'Blog Archive | ' . RF_BRAND_NAME;
+		$data['robots'] = 'noindex, follow';
+	} elseif ( is_attachment() ) {
+		$data['title']  = get_the_title() . ' | ' . RF_BRAND_NAME;
+		$data['robots'] = 'noindex, follow';
 	} elseif ( is_404() ) {
 		$data['title']     = 'Page Not Found | ' . RF_BRAND_NAME;
 		$data['robots']    = 'noindex, follow';
@@ -127,7 +140,14 @@ function rf_get_seo_data() {
 		$data['canonical'] = ''; // noindexed; no canonical to the homepage.
 	}
 
-	return apply_filters( 'rf_seo_data', $data );
+	$data = apply_filters( 'rf_seo_data', $data );
+
+	// Audit 20 Oct (#14): core's wp_robots() is removed (one robots tag
+	// only), so "Discourage search engines" has to be honored here.
+	if ( ! get_option( 'blog_public' ) ) {
+		$data['robots'] = 'noindex, nofollow';
+	}
+	return $data;
 }
 
 /**
@@ -171,7 +191,8 @@ function rf_output_seo_meta_tags() {
 	<meta property="og:image:width" content="1200">
 	<meta property="og:image:height" content="630">
 	<?php endif; ?>
-	<meta property="og:locale" content="en_US">
+	<meta property="og:image:alt" content="<?php echo esc_attr( $seo['title'] ); ?>">
+	<meta property="og:locale" content="<?php echo esc_attr( get_locale() ); ?>">
 
 	<!-- Twitter Card -->
 	<meta name="twitter:card" content="summary_large_image">

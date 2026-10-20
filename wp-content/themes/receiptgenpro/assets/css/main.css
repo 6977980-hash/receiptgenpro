@@ -418,6 +418,7 @@ textarea:focus-visible, .rf-btn:focus-visible { outline: 2px solid var(--rf-prim
 .rf-law-fact { background: var(--rf-bg-soft); border: 1px solid var(--rf-border); border-radius: var(--rf-radius); padding: 1rem; }
 .rf-law-fact strong { display: block; font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; color: var(--rf-ink-soft); margin-bottom: .25rem; }
 .rf-law-disclaimer { font-size: .85rem; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: .75rem 1rem; color: #78350f; }
+.rf-law-reviewed { font-size: .9rem; color: #475569; margin: -1rem auto 1.5rem; }
 
 .rf-widget-builder { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start; }
 @media (max-width: 900px) { .rf-widget-builder { grid-template-columns: 1fr; } }

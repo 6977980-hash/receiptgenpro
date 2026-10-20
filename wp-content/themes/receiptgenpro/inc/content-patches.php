@@ -392,6 +392,10 @@ function rf_seo_title_patches() {
 		'how-long-should-you-keep-business-receipts'                        => 'How Long to Keep Business Receipts: Rules by Country',
 		'digital-receipts-vs-paper-receipts'                                => 'Digital vs Paper Receipts: Pros, Cons & Legal Validity',
 		'receipt-templates-word-vs-excel-vs-google-docs-vs-online-generator' => 'Receipt Templates: Word vs Excel vs Google Docs vs Online',
+		// Audit 20 Oct (#12). seo-meta.php also reads this list when a post
+		// has no rf_seo_title of its own, so these work without a DB write.
+		'receipt-requirements-for-small-businesses-in-the-usa'              => 'Receipt Requirements for US Small Businesses (IRS Rules)',
+		'how-to-create-a-donation-receipt-for-nonprofits'                   => 'How to Create a Nonprofit Donation Receipt (+ Tax Rules)',
 	);
 }
 

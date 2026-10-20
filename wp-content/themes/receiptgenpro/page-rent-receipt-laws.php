@@ -16,6 +16,7 @@ $rf_laws  = rf_rent_receipt_laws();
 $rf_slug  = wp_get_post_parent_id( get_queried_object_id() ) ? basename( rf_current_page_path() ) : '';
 $rf_law   = $rf_slug && isset( $rf_laws[ $rf_slug ] ) ? $rf_laws[ $rf_slug ] : null;
 $rf_hub   = home_url( '/rent-receipt-laws/' );
+$rf_seen  = rf_rent_laws_reviewed();
 ?>
 
 <article id="rf-main-content" class="rf-tool-page">
@@ -27,6 +28,7 @@ $rf_hub   = home_url( '/rent-receipt-laws/' );
 			<span class="rf-category-icon" aria-hidden="true">⚖️</span>
 			<h1><?php echo esc_html( $rf_law['state'] ); ?> Rent Receipt Law</h1>
 			<p class="rf-hero-sub rf-direct-answer"><?php echo esc_html( $rf_law['summary'] ); ?></p>
+			<p class="rf-law-reviewed">Last reviewed: <?php echo esc_html( $rf_seen['label'] ); ?></p>
 			<a href="#rf-generator" class="rf-btn rf-btn-primary">Make a <?php echo esc_html( $rf_law['state'] ); ?> rent receipt ↓</a>
 		</div>
 	</section>
@@ -119,6 +121,7 @@ $rf_hub   = home_url( '/rent-receipt-laws/' );
 				There is no federal rule, but at least <?php echo esc_html( count( $rf_laws ) - ( isset( $rf_laws['district-of-columbia'] ) ? 1 : 0 ) ); ?> states<?php echo isset( $rf_laws['district-of-columbia'] ) ? ' and Washington, D.C.' : ''; ?> have a rule that makes a landlord give a written rent receipt,
 				most often when rent is paid in cash. The table shows when each one applies and links to the statute.
 			</p>
+			<p class="rf-law-reviewed">Last reviewed: <?php echo esc_html( $rf_seen['label'] ); ?></p>
 		</div>
 	</section>
 

@@ -9,8 +9,10 @@
  *
  * Keys: state, citation, url (the text that was read), when_short (hub
  * table), trigger, contents (what the receipt must show, per the text),
- * records, penalty, details (extra paragraphs), summary (meta description
- * and the page's direct answer), checked.
+ * records, penalty, details (extra paragraphs), summary (the page's direct
+ * answer, and the meta description unless 'meta' is set), meta (optional
+ * meta description of 155 characters or less), short (optional short name
+ * for the SEO title, e.g. "DC"), checked.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -22,7 +24,7 @@ function rf_rent_receipt_laws() {
 		'california' => array(
 			'state'      => 'California',
 			'citation'   => 'Cal. Civil Code § 1499',
-			'url'        => 'https://california.public.law/codes/ca_civ_code_section_1499',
+			'url'        => 'https://california.public.law/codes/civil_code_section_1499',
 			'when_short' => 'On request (general rule for paying any debt)',
 			'trigger'    => 'On request (general debtor-creditor rule, not landlord-specific): a debtor may require a written receipt from the creditor.',
 			'contents'   => array(  ),
@@ -32,6 +34,7 @@ function rf_rent_receipt_laws() {
 				'Civ. Code § 1962 requires the lease to disclose who rent is paid to and the accepted payment forms; § 1947.3 requires landlords to accept at least one form of payment that is neither cash nor electronic funds transfer (no receipt duty in either).',
 			),
 			'summary'    => 'California has no landlord-specific rent-receipt statute, but Civil Code § 1499 lets anyone who pays a debt, including a tenant paying rent, demand a written receipt.',
+			'meta'       => 'California has no landlord rent-receipt statute, but Civil Code § 1499 lets anyone paying a debt, including a tenant paying rent, demand a written receipt.',
 			'checked'    => 'October 2026',
 		),
 		'colorado' => array(
@@ -64,6 +67,7 @@ function rf_rent_receipt_laws() {
 				'Public Act 25-146 (in force 1 July 2025) added the ledger-on-request rule.',
 			),
 			'summary'    => 'Connecticut landlords must give a receipt showing date, amount and purpose for every cash payment, and since July 2025 must provide a copy of the tenant\'s ledger on request.',
+			'meta'       => 'Connecticut landlords must give a receipt with date, amount and purpose for cash payments, and since July 2025 a copy of the tenant\'s ledger on request.',
 			'checked'    => 'October 2026',
 		),
 		'delaware' => array(
@@ -84,6 +88,7 @@ function rf_rent_receipt_laws() {
 		),
 		'district-of-columbia' => array(
 			'state'      => 'District of Columbia',
+			'short'      => 'DC',
 			'citation'   => '14 DCMR § 306 (D.C. Housing Regulations)',
 			'url'        => 'https://dcregs.dc.gov/Common/DCMR/SectionList.aspx?SectionNumber=14-306',
 			'when_short' => 'Every payment except a personal check',
@@ -95,6 +100,7 @@ function rf_rent_receipt_laws() {
 				'This is a D.C. housing regulation rather than a statute, but it binds landlords the same way.',
 			),
 			'summary'    => 'D.C. landlords must give a written receipt showing amount, date and purpose for every payment other than a personal check, and must list any outstanding fees.',
+			'meta'       => 'D.C. landlords must give a written receipt showing amount, date and purpose for any payment other than a personal check, and list any outstanding fees.',
 			'checked'    => 'October 2026',
 		),
 		'hawaii' => array(
@@ -127,6 +133,7 @@ function rf_rent_receipt_laws() {
 				'A rent card kept by the tenant with the same information satisfies the section.',
 			),
 			'summary'    => 'Maine landlords must hand over a detailed signed receipt at the time of every cash rent or deposit payment, except in owner-occupied buildings of five or fewer units.',
+			'meta'       => 'Maine landlords must give a detailed signed receipt for every cash rent or deposit payment, except in owner-occupied buildings of five or fewer units.',
 			'checked'    => 'October 2026',
 		),
 		'maryland' => array(
@@ -204,6 +211,7 @@ function rf_rent_receipt_laws() {
 				'If rent has not been received within five days of the due date, the landlord must send the tenant a written notice by certified mail; not sending it can be used as a defense in a nonpayment case.',
 			),
 			'summary'    => 'Yes. New York landlords must give a written receipt for rent paid in cash or by anything other than a personal check, showing the date, amount, premises, rent period and the receiver\'s signature and title.',
+			'meta'       => 'Yes. New York landlords must give a written receipt for rent paid by anything but a personal check, with date, amount, premises, period and signature.',
 			'checked'    => 'October 2026',
 		),
 		'oregon' => array(
@@ -220,6 +228,7 @@ function rf_rent_receipt_laws() {
 				'The writing may be a receipt, a statement of the tenant\'s account or another acknowledgment.',
 			),
 			'summary'    => 'Oregon tenants who ask are entitled to a written receipt, account statement or other acknowledgment showing the amount, date and landlord or property for any payment.',
+			'meta'       => 'Oregon tenants who ask are entitled to a written receipt or account statement showing the amount, date and landlord or property for any payment.',
 			'checked'    => 'October 2026',
 		),
 		'texas' => array(
@@ -234,6 +243,7 @@ function rf_rent_receipt_laws() {
 			'details'    => array(
 			),
 			'summary'    => 'Texas landlords who take cash rent must give a written receipt and log the date and amount in a record book, or face at least one month\'s rent or $500 per violation.',
+			'meta'       => 'Texas landlords who take cash rent must give a written receipt and log it in a record book, or face at least one month\'s rent or $500 per violation.',
 			'checked'    => 'October 2026',
 		),
 		'virginia' => array(
@@ -250,6 +260,7 @@ function rf_rent_receipt_laws() {
 				'The section has been amended several times in 2025 and 2026, and a new version takes effect on 1 July 2027; both keep the receipt and statement rules.',
 			),
 			'summary'    => 'Virginia landlords must give a written receipt whenever rent is paid in cash or by money order, and an account statement within 10 business days of a written request.',
+			'meta'       => 'Virginia landlords must give a written receipt for rent paid in cash or money order, and an account statement within 10 business days of a written request.',
 			'checked'    => 'October 2026',
 		),
 		'washington' => array(
@@ -284,6 +295,18 @@ function rf_rent_receipt_laws() {
 			'summary'    => 'Wisconsin landlords must give a written receipt stating the nature and amount whenever rent is paid in cash.',
 			'checked'    => 'October 2026',
 		),
+	);
+}
+
+/**
+ * When the list was last checked against the statute texts. Shown as
+ * "Last reviewed" on the hub and every state page, and used as
+ * lastReviewed in their WebPage schema.
+ */
+function rf_rent_laws_reviewed() {
+	return array(
+		'label' => 'October 2026',
+		'date'  => '2026-10-15',
 	);
 }
 

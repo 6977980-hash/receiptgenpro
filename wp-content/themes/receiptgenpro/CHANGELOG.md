@@ -1,5 +1,20 @@
 # ReceiptGenPro theme — Changelog
 
+## 1.3.2 — 20 Oct 2026 (audit of 20 Oct, Phase 2: technical SEO)
+
+- **Every meta description is 155 characters or less** (13 were 161–205): the state law pages get a short `meta` next to their `summary` (the page text doesn't change), and the requirements checker, widget, rent, HRA, donation, payment and missing receipt form descriptions are shorter.
+- **Every title is 60 characters or less.** State pages use "{State} Rent Receipt Law: Is a Receipt Required?" ("DC" for the District of Columbia, was 73 characters), and two guides get a shorter SEO title from `rf_seo_title_patches()`, which `seo-meta.php` now reads when a post has no `rf_seo_title` of its own (no database change).
+- **Date archives** (`/2026/`, `/2026/09/`) redirect to `/blog/` (301); date and attachment pages that are still reached are `noindex`. The fallback canonical ends in a slash.
+- **"Discourage search engines" works again:** with it on, every page says `noindex, nofollow`. Core's `wp_robots()` is now removed only while the theme prints the SEO tags, so an SEO plugin keeps its robots tag.
+- **The `/blog/<slug>/` link fix leaves `/blog/feed/`, `/blog/category/…`, `/blog/tag/…` and `/blog/page/…` alone.**
+- **Removed state pages:** a page under `/rent-receipt-laws/` with no law data redirects to the hub, and the page list pass sets such pages to draft.
+- **No theme JSON-LD when Yoast or Rank Math is active** (the plugin prints its own).
+- **`rf_blog_url()`** gives `/blog/` when the Posts page setting is empty (breadcrumbs, canonical, header menu, homepage button); `get_permalink( 0 )` was the current page.
+- **Legal pages:** "Last reviewed: October 2026" on the rent law hub and every state page (`rf_rent_laws_reviewed()`), and a `WebPage` node with `dateModified`, `lastReviewed`, `reviewedBy` and the statutes or official sources as `citation` on those pages and `/receipt-requirements/`. `/blog/` gets BreadcrumbList + CollectionPage.
+- `og:locale` follows the site language, `og:image:alt` added; no comments feed link.
+- California statute link goes straight to `civil_code_section_1499` (the old URL redirected).
+- `tests/php/seo-test.php` (run in CI) checks title and description lengths and the `/blog/` link rewrite.
+
 ## 1.3.1 — 20 Oct 2026 (audit of 20 Oct, Phase 1: trust and safety)
 
 - **Verify page no longer overclaims.** The QR code is not signed, so anyone can make one. The result is now a neutral blue note ("These are the details stored in this QR code. Anyone can create a code, so this does not prove who issued the receipt or that it was paid.") instead of a green "as issued". The page text, the QR hint under the generator, the SEO title/description, the FAQ, the templates hub line and `/llms.txt` drop the "easy to spot a changed receipt" claims. All of this text is in the theme, not in page content, so no content patch is needed.
