@@ -204,7 +204,7 @@ get_header();
 						?>
 						<a href="<?php the_permalink(); ?>" class="rf-blog-card">
 							<?php if ( has_post_thumbnail() ) : ?>
-								<div class="rf-blog-card-thumb"><?php the_post_thumbnail( 'rf-card' ); ?></div>
+								<div class="rf-blog-card-thumb"><?php the_post_thumbnail( 'rf-card', array( 'loading' => 'lazy' ) ); ?></div>
 							<?php endif; ?>
 							<div class="rf-blog-card-body">
 								<?php

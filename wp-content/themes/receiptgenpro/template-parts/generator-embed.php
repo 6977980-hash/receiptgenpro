@@ -271,6 +271,7 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 					<?php endforeach; ?>
 				</select>
 				<div id="rf-checker-result" class="rf-checker-result"></div>
+				<p id="rf-checker-status" class="screen-reader-text" role="status"></p>
 				<p class="rf-checker-more"><a href="<?php echo esc_url( home_url( '/receipt-requirements/' ) ); ?>">What each check is based on</a></p>
 			</div>
 			<p class="rf-usage-note">For receipts you issue for your own business or property. Never create a receipt on behalf of a business you don't own, or for a payment that didn't happen — see our <a href="<?php echo esc_url( home_url( '/terms-and-conditions/' ) ); ?>">Terms</a>.</p>

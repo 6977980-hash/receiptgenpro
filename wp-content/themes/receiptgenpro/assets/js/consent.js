@@ -48,20 +48,31 @@
 			return; // Respect the previous decline — don't nag again.
 		}
 
-		// No stored choice yet — show the banner.
+		// No stored choice yet — show the banner. The page gets room at the
+		// bottom while it shows, so it never covers the footer links.
 		banner.hidden = false;
+		function pad() {
+			document.body.style.paddingBottom = banner.hidden ? '' : banner.offsetHeight + 'px';
+		}
+		function hide() {
+			banner.hidden = true;
+			window.removeEventListener( 'resize', pad );
+			pad();
+		}
+		pad();
+		window.addEventListener( 'resize', pad );
 
 		if ( accept ) {
 			accept.addEventListener( 'click', function () {
 				setStoredConsent( 'granted' );
-				banner.hidden = true;
+				hide();
 				document.dispatchEvent( new Event( 'rfConsentGranted' ) );
 			} );
 		}
 		if ( decline ) {
 			decline.addEventListener( 'click', function () {
 				setStoredConsent( 'declined' );
-				banner.hidden = true;
+				hide();
 			} );
 		}
 	} );

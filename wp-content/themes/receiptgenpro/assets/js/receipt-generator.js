@@ -620,8 +620,9 @@
 			return '<div class="rf-receipt-inner">' + body + '</div>';
 		}
 		return '<div class="rf-receipt-inner"><p class="rf-copy-label">Office copy</p>' + body + '</div>' +
-			'<div class="rf-copy-cut"><span>&#9986; cut here</span></div>' +
-			'<div class="rf-receipt-inner"><p class="rf-copy-label">Customer copy</p>' + body + '</div>';
+			'<div class="rf-copy-cut" aria-hidden="true"><span>&#9986; cut here</span></div>' +
+			// Screen readers read the receipt once; the copy is for paper.
+			'<div class="rf-receipt-inner" aria-hidden="true"><p class="rf-copy-label">Customer copy</p>' + body + '</div>';
 	}
 
 	// Splits a canvas `total` px tall into pages of at most `page` px:
@@ -644,6 +645,13 @@
 		}
 		out.push( [ start, total ] );
 		return out;
+	}
+
+	// Only an image data URL from the logo upload (or its saved copy) is
+	// ever put on the receipt; anything else in sessionStorage is dropped.
+	var LOGO_RE = /^data:image\/(png|jpeg|gif|webp);base64,[A-Za-z0-9+\/=]+$/;
+	function isLogoDataUrl( url ) {
+		return typeof url === 'string' && LOGO_RE.test( url );
 	}
 
 	// Lets a Node check exercise the pure helpers without a browser.
@@ -673,6 +681,7 @@
 			b64urlEncode: b64urlEncode,
 			typeFieldsHtml: typeFieldsHtml,
 			wrapDesign: wrapDesign,
+			isLogoDataUrl: isLogoDataUrl,
 			esc: esc
 		};
 	}
@@ -695,6 +704,16 @@
 		var statement   = document.getElementById( 'rf-statement' );
 		var totalLive   = document.getElementById( 'rf-total-live' );
 		var totalLiveTimer = null;
+
+		// Says a short message once in #rf-total-live (a type switch); the
+		// next total update follows it.
+		function announce( text ) {
+			if ( ! totalLive ) {
+				return;
+			}
+			clearTimeout( totalLiveTimer );
+			totalLive.textContent = text;
+		}
 
 		var cfg = {
 			title: form.dataset.receiptTitle || 'RECEIPT',
@@ -719,12 +738,30 @@
 		var verifyBase = ( window.rfReceipt && window.rfReceipt.verifyUrl ) || 'https://receiptgenpro.com/verify-receipt/';
 		var qrCache    = { text: '', url: '', size: 112 };
 
+		// Re-encoding on every keystroke is slow on phones: while typing,
+		// the code is redrawn at most every QR_WAIT ms (the last one always
+		// lands). An export redraws it first (flushQr).
+		var QR_WAIT  = 300;
+		var qrLastAt = 0;
+		var qrTimer  = null;
+		var qrForce  = false;
+
 		function qrDataUrl( text ) {
 			if ( typeof window.qrcode !== 'function' ) {
 				ensureQrLib();
 				return null;
 			}
+			if ( qrCache.text !== text && qrCache.text && ! qrForce && Date.now() - qrLastAt < QR_WAIT ) {
+				if ( ! qrTimer ) {
+					qrTimer = setTimeout( function () {
+						qrTimer = null;
+						renderReceipt();
+					}, QR_WAIT );
+				}
+				return qrCache;
+			}
 			if ( qrCache.text !== text ) {
+				qrLastAt = Date.now();
 				var qr = window.qrcode( 0, 'L' );
 				qr.addData( text, 'Byte' );
 				qr.make();
@@ -732,6 +769,14 @@
 				qrCache = { text: text, url: qr.createDataURL( 4, 0 ), size: qrPixels( qr.getModuleCount() ) };
 			}
 			return qrCache;
+		}
+
+		function flushQr() {
+			clearTimeout( qrTimer );
+			qrTimer = null;
+			qrForce = true;
+			renderReceipt();
+			qrForce = false;
 		}
 
 		var qrLoading = false;
@@ -750,6 +795,8 @@
 		// ---- Requirement checker ----------------------------------------------
 		var purposeSel    = document.getElementById( 'rf-purpose' );
 		var checkerResult = document.getElementById( 'rf-checker-result' );
+		var checkerStatus = document.getElementById( 'rf-checker-status' );
+		var checkerTimer  = null;
 		var purposes      = ( window.rfReceipt && window.rfReceipt.purposes ) || {};
 		var lastFacts     = null;
 
@@ -788,6 +835,7 @@
 			var p = purposes[ purposeSel.value ];
 			if ( ! p ) {
 				checkerResult.innerHTML = '';
+				setCheckerStatus( '' );
 				return;
 			}
 			var results = evaluateChecks( p.checks, facts, p.currency );
@@ -798,8 +846,8 @@
 				return r.status === 'ok';
 			} ).length;
 			var onOtherTemplate = p.templateUrl && p.templateUrl.replace( /\/$/, '' ) !== ( window.location.origin + window.location.pathname ).replace( /\/$/, '' );
-			var html = '<p class="rf-checker-summary' + ( done === needed.length ? ' rf-checker-all-done' : '' ) + '">' +
-				( done === needed.length ? 'Everything required is on the receipt.' : done + ' of ' + needed.length + ' required details are on the receipt.' ) + '</p><ul>';
+			var summary = done === needed.length ? 'Everything required is on the receipt.' : done + ' of ' + needed.length + ' required details are on the receipt.';
+			var html = '<p class="rf-checker-summary' + ( done === needed.length ? ' rf-checker-all-done' : '' ) + '">' + summary + '</p><ul>';
 			results.forEach( function ( r ) {
 				var status = r.status === 'missing' && r.optional ? 'optional' : r.status;
 				var note = r.status === 'missing' && r.optional ? 'Recommended' : STATUS_TEXT[ r.status ].replace( '%s', r.currency || '' );
@@ -813,6 +861,20 @@
 				html += '<p class="rf-checker-switch">The <a href="' + escapeHtml( p.templateUrl ) + '?purpose=' + encodeURIComponent( purposeSel.value ) + '#rf-generator">' + escapeHtml( p.templateName || 'matching template' ) + '</a> has every field this needs.</p>';
 			}
 			checkerResult.innerHTML = html;
+			setCheckerStatus( summary );
+		}
+
+		// The summary is read out once typing pauses, only when it changes.
+		function setCheckerStatus( text ) {
+			if ( ! checkerStatus ) {
+				return;
+			}
+			clearTimeout( checkerTimer );
+			checkerTimer = setTimeout( function () {
+				if ( checkerStatus.textContent !== text ) {
+					checkerStatus.textContent = text;
+				}
+			}, 800 );
 		}
 
 		// ---- Receipt type picker (homepage) ------------------------------------
@@ -971,6 +1033,7 @@
 				if ( applyType( a.dataset.type ) ) {
 					renderReceipt();
 					rememberType( a.dataset.type );
+					announce( 'Form switched to ' + ( ( typeData[ a.dataset.type ] && typeData[ a.dataset.type ].label ) || 'this receipt type' ) + '.' );
 				}
 			} );
 		} );
@@ -1100,7 +1163,20 @@
 
 			remove.addEventListener( 'click', function () {
 				row.remove();
+				labelRows();
 				renderReceipt();
+			} );
+			labelRows();
+		}
+
+		// "Item 2 price" etc., so a screen reader knows which row a field is in.
+		function labelRows() {
+			itemsList.querySelectorAll( '.rf-item-row' ).forEach( function ( row, i ) {
+				var n = i + 1;
+				row.querySelector( '.rf-item-name' ).setAttribute( 'aria-label', 'Item ' + n + ' description' );
+				row.querySelector( '.rf-item-qty' ).setAttribute( 'aria-label', 'Item ' + n + ' quantity' );
+				row.querySelector( '.rf-item-price' ).setAttribute( 'aria-label', 'Item ' + n + ' price' );
+				row.querySelector( '.rf-item-remove' ).setAttribute( 'aria-label', 'Remove item ' + n );
 			} );
 		}
 
@@ -1128,7 +1204,7 @@
 				var reader = new FileReader();
 				reader.onload = function ( ev ) {
 					shrinkLogo( ev.target.result, function ( url ) {
-						state.logoDataUrl = url;
+						state.logoDataUrl = isLogoDataUrl( url ) ? url : null;
 						renderReceipt();
 					} );
 				};
@@ -1146,7 +1222,8 @@
 				var w = img.naturalWidth;
 				var h = img.naturalHeight;
 				var k = Math.min( 1, LOGO_MAX / Math.max( w, h, 1 ) );
-				if ( k === 1 || ! w || ! h ) {
+				// Other types (an SVG…) are redrawn as PNG, even at full size.
+				if ( ( k === 1 && isLogoDataUrl( dataUrl ) ) || ! w || ! h ) {
 					done( dataUrl );
 					return;
 				}
@@ -1252,7 +1329,7 @@
 					addItemRow( itemPlaceholders[ i ] || itemPlaceholders[0], it );
 				} );
 			}
-			if ( data.logo ) {
+			if ( isLogoDataUrl( data.logo ) ) {
 				state.logoDataUrl = data.logo;
 			}
 		}
@@ -1559,7 +1636,6 @@
 
 			preview.innerHTML = wrapDesign( design,
 				'<div class="rf-receipt-head">' +
-				( state.logoDataUrl ? '<img src="' + state.logoDataUrl + '" class="rf-receipt-logo" alt="">' : '' ) +
 				'<div><h3>' + escapeHtml( business ) + '</h3><p class="rf-receipt-label">' + escapeHtml( cfg.title ) + '</p></div>' +
 				'</div>' +
 				'<div class="rf-receipt-meta">' + meta.join( '' ) + '</div>' +
@@ -1574,6 +1650,16 @@
 				qrHtml +
 				'<p class="rf-receipt-footer">Generated with ' + escapeHtml( ( window.rfReceipt && window.rfReceipt.brand ) || 'ReceiptGenPro' ) + '</p>' );
 
+			// The logo is added as an element, never as HTML text.
+			if ( isLogoDataUrl( state.logoDataUrl ) ) {
+				preview.querySelectorAll( '.rf-receipt-head' ).forEach( function ( head ) {
+					var img = document.createElement( 'img' );
+					img.className = 'rf-receipt-logo';
+					img.alt = '';
+					img.src = state.logoDataUrl;
+					head.insertBefore( img, head.firstChild );
+				} );
+			}
 			if ( logoRemove ) {
 				logoRemove.style.display = state.logoDataUrl ? '' : 'none';
 			}
@@ -1655,10 +1741,17 @@
 			} );
 		}
 
+		// The button stays focusable while busy (disabling it would drop
+		// keyboard focus); a second click is ignored until the export ends.
 		function withCanvas( needPdf, btn, cb ) {
+			if ( btn.getAttribute( 'aria-busy' ) === 'true' ) {
+				return;
+			}
 			var original = btn.textContent;
-			btn.disabled = true;
+			btn.setAttribute( 'aria-busy', 'true' );
+			btn.setAttribute( 'aria-disabled', 'true' );
 			btn.textContent = 'Preparing…';
+			flushQr();
 			ensureLibs( needPdf )
 				.then( function () {
 					return renderCanvas()
@@ -1674,7 +1767,8 @@
 					window.alert( 'The export library could not be loaded. Please check your connection and try again.' );
 				} )
 				.then( function () {
-					btn.disabled = false;
+					btn.removeAttribute( 'aria-busy' );
+					btn.removeAttribute( 'aria-disabled' );
 					btn.textContent = original;
 				} );
 		}

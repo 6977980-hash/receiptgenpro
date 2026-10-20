@@ -15,6 +15,7 @@ $related    = new WP_Query(
 		'post__not_in'        => array( get_the_ID() ),
 		'posts_per_page'      => 3,
 		'ignore_sticky_posts' => true,
+		'no_found_rows'       => true,
 	)
 );
 
@@ -29,7 +30,10 @@ if ( $related->have_posts() ) :
 				?>
 				<a href="<?php the_permalink(); ?>" class="rf-related-card">
 					<?php if ( has_post_thumbnail() ) : ?>
-						<?php the_post_thumbnail( 'rf-card' ); ?>
+						<?php
+						// Three cards of ~235 px in the post column; one full-width card below 800 px.
+						the_post_thumbnail( 'rf-card', array( 'sizes' => '(max-width: 800px) calc(100vw - 2.5rem), 240px' ) );
+						?>
 					<?php endif; ?>
 					<h3><?php the_title(); ?></h3>
 					<p><?php echo esc_html( wp_trim_words( get_the_excerpt(), 16 ) ); ?></p>

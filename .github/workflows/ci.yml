@@ -25,6 +25,8 @@ jobs:
         run: php tests/php/seo-test.php
       - name: Requirement checks have a field on their template
         run: php tests/php/requirements-test.php
+      - name: Deploy helper (staged swap, removals, roll back, webhook signature)
+        run: php tests/php/deploy-test.php
 
   js-tests:
     runs-on: ubuntu-latest

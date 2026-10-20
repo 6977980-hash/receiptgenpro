@@ -110,7 +110,9 @@ function rf_security_headers( $wp = null ) {
 	}
 	header( 'Permissions-Policy: camera=(), microphone=(), geolocation=()' );
 	if ( is_ssl() ) {
-		header( 'Strict-Transport-Security: max-age=31536000' );
+		// includeSubDomains (#61): the only subdomains are www (HTTPS) and ftp
+		// (FTP, which HSTS does not touch).
+		header( 'Strict-Transport-Security: max-age=31536000; includeSubDomains' );
 	}
 }
 add_action( 'send_headers', 'rf_security_headers' );
@@ -216,14 +218,18 @@ function rf_txt_query_vars( $vars ) {
 }
 add_filter( 'query_vars', 'rf_txt_query_vars' );
 
-// Flush rewrite rules once for this version (adds llms.txt + IndexNow key).
+// Flush rewrite rules once for this version (llms.txt, IndexNow key,
+// ads.txt, site.webmanifest, /embed/…). The only flush in the theme: it
+// runs from inc/setup-tasks.php (admin or WP-Cron after a deploy), not in
+// a visitor request (audit 20 Oct, #55).
 function rf_flush_rewrites_v110() {
 	if ( get_option( 'rf_rewrite_version' ) !== RF_THEME_VERSION ) {
 		flush_rewrite_rules( false );
-		update_option( 'rf_rewrite_version', RF_THEME_VERSION );
+		update_option( 'rf_rewrite_version', RF_THEME_VERSION, true );
+		return true;
 	}
+	return false;
 }
-add_action( 'init', 'rf_flush_rewrites_v110', 99 );
 
 // Never add a trailing slash to *.txt / *.webmanifest endpoints (/ads.txt → /ads.txt/ bug).
 function rf_no_slash_for_txt( $redirect_url, $requested_url ) {
@@ -372,13 +378,41 @@ function rf_render_indexnow_key() {
 }
 add_action( 'template_redirect', 'rf_render_indexnow_key', 0 );
 
-function rf_indexnow_ping( $new_status, $old_status, $post ) {
-	if ( 'publish' !== $new_status || wp_is_post_revision( $post ) || wp_is_post_autosave( $post ) ) {
+/**
+ * Audit 20 Oct (#59): a ping only on the first publish (or a re-publish
+ * from draft) or when the title, text, excerpt or slug really changed;
+ * saving a published post unchanged (or the block editor's second save)
+ * no longer pings.
+ */
+function rf_indexnow_on_status( $new_status, $old_status, $post ) {
+	if ( 'publish' === $new_status && 'publish' !== $old_status ) {
+		rf_indexnow_ping( $post );
+	}
+}
+add_action( 'transition_post_status', 'rf_indexnow_on_status', 10, 3 );
+
+function rf_indexnow_on_update( $post_id, $after, $before ) {
+	if ( 'publish' !== $after->post_status || 'publish' !== $before->post_status ) {
+		return; // first publishes are handled above
+	}
+	foreach ( array( 'post_title', 'post_content', 'post_excerpt', 'post_name' ) as $field ) {
+		if ( $after->$field !== $before->$field ) {
+			rf_indexnow_ping( $after );
+			return;
+		}
+	}
+}
+add_action( 'post_updated', 'rf_indexnow_on_update', 10, 3 );
+
+function rf_indexnow_ping( $post ) {
+	static $sent = array();
+	if ( isset( $sent[ $post->ID ] ) || wp_is_post_revision( $post ) || wp_is_post_autosave( $post ) ) {
 		return;
 	}
 	if ( ! in_array( $post->post_type, array( 'post', 'page' ), true ) ) {
 		return;
 	}
+	$sent[ $post->ID ] = true;
 	$host = wp_parse_url( home_url(), PHP_URL_HOST );
 	if ( ! $host || in_array( $host, array( 'localhost', '127.0.0.1' ), true ) ) {
 		return;
@@ -401,4 +435,4 @@ function rf_indexnow_ping( $new_status, $old_status, $post ) {
 		)
 	);
 }
-add_action( 'transition_post_status', 'rf_indexnow_ping', 10, 3 );
+

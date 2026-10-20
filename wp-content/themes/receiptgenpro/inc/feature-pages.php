@@ -84,15 +84,21 @@ function rf_current_page_path() {
 
 /* ==========================================================================
    Create the pages (once per change of the list)
+   Runs from inc/setup-tasks.php (admin_init or WP-Cron), never while a
+   visitor's page is being built (audit 20 Oct, #47).
    ========================================================================== */
+function rf_feature_pages_hash() {
+	// 'v2' (1.3.2) makes the pass below run once more so it can draft the
+	// pages of states that were removed from the list.
+	return md5( 'v2' . wp_json_encode( array_map( function ( $p ) { return array( $p['title'], $p['template'], $p['parent'] ?? '' ); }, rf_feature_pages() ) ) );
+}
+
 function rf_ensure_feature_pages() {
 	if ( wp_installing() ) {
 		return;
 	}
 	$pages = rf_feature_pages();
-	// 'v2' (1.3.2) makes the pass below run once more so it can draft the
-	// pages of states that were removed from the list.
-	$hash  = md5( 'v2' . wp_json_encode( array_map( function ( $p ) { return array( $p['title'], $p['template'], $p['parent'] ?? '' ); }, $pages ) ) );
+	$hash  = rf_feature_pages_hash();
 	if ( get_option( 'rf_feature_pages_hash' ) === $hash ) {
 		return;
 	}
@@ -113,6 +119,9 @@ function rf_ensure_feature_pages() {
 			return substr_count( $a, '/' ) - substr_count( $b, '/' );
 		}
 	);
+	// The hash is saved only when every page exists, so a page that could
+	// not be made (no parent yet, a failed insert) is tried again next time.
+	$complete = true;
 	foreach ( $pages as $path => $p ) {
 		$existing = get_page_by_path( $path, OBJECT, 'page' );
 		if ( $existing ) {
@@ -125,6 +134,7 @@ function rf_ensure_feature_pages() {
 		if ( ! empty( $p['parent'] ) ) {
 			$parent = get_page_by_path( $p['parent'], OBJECT, 'page' );
 			if ( ! $parent ) {
+				$complete = false;
 				continue;
 			}
 			$parent_id = $parent->ID;
@@ -146,15 +156,19 @@ function rf_ensure_feature_pages() {
 			),
 			true
 		);
-		if ( ! is_wp_error( $id ) ) {
+		if ( is_wp_error( $id ) || ! $id ) {
+			$complete = false;
+		} else {
 			update_post_meta( $id, '_wp_page_template', $p['template'] );
 		}
 	}
 	rf_draft_removed_law_pages( $pages );
-	update_option( 'rf_feature_pages_hash', $hash, false );
+	if ( $complete ) {
+		// Autoloaded: rf_setup_needed() reads it on every request.
+		update_option( 'rf_feature_pages_hash', $hash, true );
+	}
 	delete_option( 'rf_feature_pages_lock' );
 }
-add_action( 'init', 'rf_ensure_feature_pages', 30 );
 
 /**
  * Audit 20 Oct (#16): a state page whose state is no longer in
