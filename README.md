@@ -16,8 +16,19 @@ Source for the receiptgenpro WordPress site (theme + deploy helper).
    swapped in with `rename()`; the previous copy stays as `.rgp-prev-<name>`
    for **Tools > Deploy Helper > Roll back the last deploy**.
 
-Deleting the plugin removes this checkout and stops step 3.
-so the site keeps working exactly as it was.
+Deleting the plugin removes this checkout and stops step 3. Files it already
+copied into the live `wp-content/` stay, so the site keeps working exactly as
+it was.
+
+## Checks
+
+CI (`.github/workflows/ci.yml`) runs `php -l` on every PHP file, the PHP tests
+in `tests/php/`, `node --check` on the theme's scripts and the JS tests. Locally:
+
+```
+node --test tests/          # or: node --test tests/*.test.js
+for f in tests/php/*-test.php; do php "$f"; done
+```
 
 ## Layout
 

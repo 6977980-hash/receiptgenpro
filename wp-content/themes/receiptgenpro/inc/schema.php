@@ -8,8 +8,8 @@
  * i.e. structuring direct Q&A pairs so voice assistants and answer boxes
  * can lift a clean answer straight from the page.
  *
- * Design choice: FAQ and HowTo schema are AUTO-EXTRACTED from the visible
- * HTML (elements carrying .rf-faq / .rf-howto-steps) instead of being
+ * Design choice: FAQ schema is AUTO-EXTRACTED from the visible HTML
+ * (elements carrying .rf-faq) instead of being
  * hand-duplicated in a separate field. This guarantees the structured
  * data always matches what the user actually sees — a mismatch between
  * visible content and schema is a Google spam-policy violation and a
@@ -47,10 +47,10 @@ function rf_schema_organization() {
 		),
 		'founder'      => array(
 			'@type'    => 'Person',
-			'name'     => 'Ali Ahmad',
-			'jobTitle' => 'Web developer',
+			'name'     => RF_FOUNDER_NAME,
+			'jobTitle' => RF_FOUNDER_TITLE,
 			'url'      => home_url( '/about-us/' ),
-			'sameAs'   => array( 'https://www.linkedin.com/in/ali-ahmad-chaudhry-12777486/' ),
+			'sameAs'   => array( RF_FOUNDER_LINKEDIN ),
 		),
 		'email'        => RF_SUPPORT_EMAIL,
 		'contactPoint' => array(
@@ -248,61 +248,6 @@ function rf_hub_faqs() {
 		array( 'Can I edit a template after downloading it?', 'The download is a finished PDF or image. To change something, edit the form on the template page and download again — the form keeps your entries until you close the tab.' ),
 		array( 'Which template do I need for a deposit or advance payment?', 'Use the <a href="' . esc_url( home_url( '/deposit-receipt/' ) ) . '">deposit receipt</a> for a deposit or advance payment, or the <a href="' . esc_url( home_url( '/payment-receipt/' ) ) . '">payment receipt</a> for a general payment, and fill in “Amount Paid” so the balance due is calculated for you.' ),
 		array( 'Who should issue a receipt?', 'The business or person who received the money. A receipt should never be created on behalf of another business or for a payment that did not happen.' ),
-	);
-}
-
-/**
- * Extract HowTo steps from an <ol class="rf-howto-steps"> list where each
- * <li> starts with a bolded step name, e.g.
- * <li><strong>Add your business details</strong> — enter your name...</li>
- */
-function rf_extract_howto_from_html( $html ) {
-	if ( empty( $html ) || false === stripos( $html, 'rf-howto-steps' ) ) {
-		return array();
-	}
-	$doc = new DOMDocument();
-	libxml_use_internal_errors( true );
-	$doc->loadHTML( '<?xml encoding="utf-8" ?>' . $html );
-	libxml_clear_errors();
-	$xpath = new DOMXPath( $doc );
-	$items = $xpath->query( "//*[contains(concat(' ', normalize-space(@class), ' '), ' rf-howto-steps ')]/li" );
-
-	$steps = array();
-	foreach ( $items as $li ) {
-		$name = '';
-		$full = trim( $li->textContent );
-		foreach ( $li->childNodes as $node ) {
-			if ( $node instanceof DOMElement && in_array( strtolower( $node->tagName ), array( 'strong', 'b' ), true ) ) {
-				$name = trim( $node->textContent );
-				break;
-			}
-		}
-		if ( '' === $name ) {
-			$name = wp_trim_words( $full, 5 );
-		}
-		$steps[] = array( 'name' => $name, 'text' => $full );
-	}
-	return $steps;
-}
-
-function rf_schema_howto_from_content( $html, $title ) {
-	$steps = rf_extract_howto_from_html( $html );
-	if ( empty( $steps ) ) {
-		return null;
-	}
-	$step_items = array();
-	foreach ( $steps as $i => $step ) {
-		$step_items[] = array(
-			'@type'    => 'HowToStep',
-			'position' => $i + 1,
-			'name'     => $step['name'],
-			'text'     => $step['text'],
-		);
-	}
-	return array(
-		'@type' => 'HowTo',
-		'name'  => $title,
-		'step'  => $step_items,
 	);
 }
 

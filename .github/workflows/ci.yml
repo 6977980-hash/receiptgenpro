@@ -37,5 +37,11 @@ jobs:
           node-version: '20'
       - name: Syntax check
         run: for f in wp-content/themes/receiptgenpro/assets/js/*.js; do node --check "$f"; done
-      - name: Unit tests (generator, verify and widget helpers)
-        run: node --test tests/*.test.js
+      - name: Lint (eslint.config.js)
+        run: npx --yes eslint@9.39.5 wp-content/themes/receiptgenpro/assets/js/
+      - name: Install jsdom for the DOM tests
+        run: npm install --no-save --no-package-lock jsdom@26.1.0
+      - name: Unit and DOM tests (generator, verify and widget)
+        env:
+          RF_REQUIRE_JSDOM: '1'
+        run: node --test tests/

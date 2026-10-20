@@ -52,6 +52,10 @@ function rf_receipt_categories() {
 	if ( null !== $categories ) {
 		return $categories;
 	}
+	// Placeholders follow the calendar instead of a fixed 2026 (audit 20
+	// Oct, #65).
+	$y     = date_i18n( 'Y' );
+	$month = date_i18n( 'F Y' );
 
 	$categories = array(
 
@@ -75,7 +79,7 @@ function rf_receipt_categories() {
 				'business_ph'    => 'e.g. Sarah Collins',
 				'client_label'   => 'Tenant Name',
 				'client_ph'      => 'e.g. John Miller',
-				'item_ph'        => array( 'e.g. Rent for October 2026', 'e.g. Late fee (optional)' ),
+				'item_ph'        => array( 'e.g. Rent for ' . $month, 'e.g. Late fee (optional)' ),
 				'notes_ph'       => 'e.g. Paid in full for the period above.',
 				'payment'        => 'Bank Transfer',
 				'extra'          => array(
@@ -208,7 +212,7 @@ function rf_receipt_categories() {
 				'payment'        => 'Bank Transfer',
 				'extra'          => array(
 					array( 'id' => 'project', 'label' => 'Project Name', 'type' => 'text', 'ph' => 'e.g. Website redesign' ),
-					array( 'id' => 'invoice_ref', 'label' => 'Invoice Reference', 'type' => 'text', 'ph' => 'e.g. INV-2026-014' ),
+					array( 'id' => 'invoice_ref', 'label' => 'Invoice Reference', 'type' => 'text', 'ph' => 'e.g. INV-' . $y . '-014' ),
 					array( 'id' => 'tax_id', 'label' => 'Your Tax ID (optional)', 'type' => 'text', 'ph' => 'e.g. NTN / EIN / VAT number' ),
 				),
 				'paid'           => true,
@@ -466,7 +470,7 @@ function rf_receipt_categories() {
 				'extra'          => array(
 					array( 'id' => 'project_address', 'label' => 'Project Address', 'type' => 'text', 'ph' => 'e.g. Plot 14, Green Avenue' ),
 					array( 'id' => 'phase', 'label' => 'Milestone / Phase', 'type' => 'text', 'ph' => 'e.g. Phase 2 of 4 — Structure' ),
-					array( 'id' => 'contract_ref', 'label' => 'Contract / Invoice Ref.', 'type' => 'text', 'ph' => 'e.g. CT-2026-07' ),
+					array( 'id' => 'contract_ref', 'label' => 'Contract / Invoice Ref.', 'type' => 'text', 'ph' => 'e.g. CT-' . $y . '-07' ),
 				),
 				'paid'           => true,
 				'words'          => true,
@@ -494,7 +498,7 @@ function rf_receipt_categories() {
 				'business_ph'    => 'e.g. Ramesh Kumar',
 				'client_label'   => 'Tenant Name',
 				'client_ph'      => 'e.g. Priya Sharma',
-				'item_ph'        => array( 'e.g. House rent for April 2026', 'e.g. Maintenance charges (if included)' ),
+				'item_ph'        => array( 'e.g. House rent for ' . $month, 'e.g. Maintenance charges (if included)' ),
 				'notes_ph'       => 'e.g. Received with thanks.',
 				'payment'        => 'Bank Transfer',
 				'extra'          => array(
@@ -527,13 +531,13 @@ function rf_receipt_categories() {
 				'business_ph'    => 'e.g. Northstar Supplies',
 				'client_label'   => 'Received From',
 				'client_ph'      => 'e.g. Daniel Evans',
-				'item_ph'        => array( 'e.g. Payment for invoice INV-2026-031', 'e.g. Delivery charge' ),
+				'item_ph'        => array( 'e.g. Payment for invoice INV-' . $y . '-031', 'e.g. Delivery charge' ),
 				'notes_ph'       => 'e.g. Thank you for your payment.',
 				'payment'        => 'Bank Transfer',
 				'extra'          => array(
 					array( 'id' => 'txn_ref', 'label' => 'Transaction / Reference No.', 'type' => 'text', 'ph' => 'e.g. bank ref, cheque no. or payment ID' ),
 					array( 'id' => 'business_address', 'label' => 'Business Address', 'type' => 'text', 'ph' => 'e.g. 40 King Street, Manchester' ),
-					array( 'id' => 'invoice_ref', 'label' => 'Invoice Reference (optional)', 'type' => 'text', 'ph' => 'e.g. INV-2026-031' ),
+					array( 'id' => 'invoice_ref', 'label' => 'Invoice Reference (optional)', 'type' => 'text', 'ph' => 'e.g. INV-' . $y . '-031' ),
 				),
 				'paid'           => true,
 				'words'          => true,
@@ -724,4 +728,40 @@ function rf_receipt_designs() {
 		'stripe'    => 'Green Stripe',
 		'copies'    => 'Office + Customer Copy',
 	);
+}
+
+/**
+ * The one list of currencies (audit 20 Oct, #70): code => array( symbol,
+ * name ). Add a currency here and every form, receipt and the verify page
+ * have it. The generator's menu, receipt-generator.js (which reads the
+ * symbol from the menu label) and verify-receipt.js (rfVerify.symbols,
+ * functions.php) all come from here.
+ */
+function rf_currencies() {
+	return array(
+		'USD' => array( '$', 'US Dollar' ),
+		'EUR' => array( '€', 'Euro' ),
+		'GBP' => array( '£', 'British Pound' ),
+		'PKR' => array( '₨', 'Pakistani Rupee' ),
+		'INR' => array( '₹', 'Indian Rupee' ),
+		'CAD' => array( 'CA$', 'Canadian Dollar' ),
+		'AUD' => array( 'AU$', 'Australian Dollar' ),
+		'AED' => array( 'د.إ', 'UAE Dirham' ),
+		'SAR' => array( '﷼', 'Saudi Riyal' ),
+	);
+}
+
+/** code => "symbol — name", the generator's currency menu. */
+function rf_supported_currencies() {
+	return array_map(
+		function ( $c ) {
+			return $c[0] . ' — ' . $c[1];
+		},
+		rf_currencies()
+	);
+}
+
+/** code => symbol. */
+function rf_currency_symbols() {
+	return wp_list_pluck( rf_currencies(), 0 );
 }

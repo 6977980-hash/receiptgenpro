@@ -67,8 +67,8 @@
 			integrity: 'sha512-BNaRQnYJYiPSqHHDb58B0yaPfCu+Wgds8Gp/gU33kqBtgNS4tSPHuGibyoeqMV/TJlSKda6FXzoEyYGjTe+vXA=='
 		},
 		jspdf: {
-			url: 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
-			integrity: 'sha512-qZvrmS2ekKPF2mSznTQsxqPgnpkI4DNTlrdUmTzrDgektczlKNRRhy5X5AAOnx5S09ydFYWWNSfcEqDTTHgtNA=='
+			url: 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js',
+			integrity: 'sha512-plOdviVmws4Y3JAvbnpfKb2hVxKM1lCwsi3vmElYRj+tiDLffZ4FVUj5a8vyKJ9pIgl8JCAHEJ4D1iUKBecswg=='
 		},
 		qrcode: {
 			url: 'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js',
@@ -113,6 +113,11 @@
 	}
 
 	// ---- Money helpers -----------------------------------------------------
+	// "€ — Euro" → "€" (the currency menu label, from rf_currencies()).
+	function currencySymbol( label ) {
+		return String( label ).split( ' — ' )[0];
+	}
+
 	// All totals are built from amounts rounded to whole cents, so the figures
 	// printed on the receipt always add up (subtotal + tax + tip = total).
 	function toCents( n ) {
@@ -657,6 +662,7 @@
 	// Lets a Node check exercise the pure helpers without a browser.
 	if ( typeof module !== 'undefined' && module.exports ) {
 		module.exports = {
+			currencySymbol: currencySymbol,
 			amountInWords: amountInWords,
 			intToWords: intToWords,
 			intToWordsIndian: intToWordsIndian,
@@ -1381,9 +1387,9 @@
 		form.addEventListener( 'input', renderReceipt );
 		form.addEventListener( 'change', renderReceipt );
 
+		// The menu labels ("€ — Euro", from rf_currencies()) carry the symbol.
 		function getCurrencySymbol( code ) {
-			var map = { USD: '$', EUR: '€', GBP: '£', PKR: '₨', INR: '₹', CAD: 'CA$', AUD: 'AU$', AED: 'د.إ', SAR: '﷼' };
-			return map[ code ] || code + ' ';
+			return currencies[ code ] ? currencySymbol( currencies[ code ] ) : code + ' ';
 		}
 
 		function escapeHtml( str ) {

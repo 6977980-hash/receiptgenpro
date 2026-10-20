@@ -13,6 +13,9 @@ define( 'RF_BRAND_NAME', 'ReceiptGenPro' );
 function add_action() {}
 function add_filter() {}
 function remove_action() {}
+function date_i18n( $format ) {
+	return gmdate( $format );
+}
 function home_url( $path = '' ) {
 	return 'https://example.com' . $path;
 }
@@ -102,6 +105,18 @@ $js = shell_exec( 'node -e ' . escapeshellarg( 'process.stdout.write(require(' .
 if ( null !== $js && '' !== $js ) {
 	check( rf_widget_height_script( 'https://example.com/' ) === $js, "widget height script differs from widget-builder.js:\n" . rf_widget_height_script( 'https://example.com/' ) . "\n$js" );
 }
+
+// Audit 20 Oct (#63): HRA cites the Income-tax Act, 2025 (in force from
+// 1 April 2026), not the repealed 1961 Act.
+$hra_sources = implode( ' ', array_column( rf_receipt_purposes()['hra']['sources'], 0 ) );
+check( false !== strpos( $hra_sources, 'Income-tax Act, 2025, Schedule III (Table: Sl. No. 11)' ), 'HRA cites Schedule III of the 2025 Act' );
+check( false === strpos( $hra_sources, 'Act, 1961, section' ), 'HRA no longer cites the 1961 Act as the rule' );
+
+// #65: only landlord-specific rules are counted on the hub.
+require $theme . '/inc/rent-laws.php';
+$laws = rf_rent_receipt_laws();
+check( ! empty( $laws['california']['general'] ), 'California is marked as a general (debtor) rule' );
+check( empty( $laws['virginia']['contents'] ), 'Virginia lists no receipt contents (the statement on request is a separate note)' );
 
 if ( $failures ) {
 	echo "$failures check(s) failed.\n";

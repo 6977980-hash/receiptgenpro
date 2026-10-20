@@ -12,7 +12,9 @@
  * records, penalty, details (extra paragraphs), summary (the page's direct
  * answer, and the meta description unless 'meta' is set), meta (optional
  * meta description of 155 characters or less), short (optional short name
- * for the SEO title, e.g. "DC"), checked.
+ * for the SEO title, e.g. "DC"), checked, general (optional: true when
+ * the only rule is a general one, not landlord-specific; such a state is
+ * listed but not counted as having a landlord rule).
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -36,6 +38,8 @@ function rf_rent_receipt_laws() {
 			'summary'    => 'California has no landlord-specific rent-receipt statute, but Civil Code § 1499 lets anyone who pays a debt, including a tenant paying rent, demand a written receipt.',
 			'meta'       => 'California has no landlord rent-receipt statute, but Civil Code § 1499 lets anyone paying a debt, including a tenant paying rent, demand a written receipt.',
 			'checked'    => 'October 2026',
+			// Not counted on the hub as a landlord rule (audit 20 Oct, #65).
+			'general'    => true,
 		),
 		'colorado' => array(
 			'state'      => 'Colorado',
@@ -252,11 +256,11 @@ function rf_rent_receipt_laws() {
 			'url'        => 'https://law.lis.virginia.gov/vacode/title55.1/chapter12/section55.1-1204/',
 			'when_short' => 'Cash or money order',
 			'trigger'    => 'Automatic whenever rent is paid in cash or by money order. Separately, on written request the landlord must give a written statement of all charges and payments.',
-			'contents'   => array( 'Statement on request: all debits and credits over the tenancy or the past 12 months, whichever is shorter' ),
+			'contents'   => array(  ),
 			'records'    => '',
 			'penalty'    => '',
 			'details'    => array(
-				'Timing: Statement of charges and payments: within 10 business days of the written request. Receipt timing not stated.',
+				'On request (separate from the receipt, § 55.1-1204(D)): after a written request, the landlord must give a written statement of all charges and payments over the tenancy or the past 12 months, whichever is shorter, within 10 business days. The statute does not say when the receipt itself is due.',
 				'The section has been amended several times in 2025 and 2026, and a new version takes effect on 1 July 2027; both keep the receipt and statement rules.',
 			),
 			'summary'    => 'Virginia landlords must give a written receipt whenever rent is paid in cash or by money order, and an account statement within 10 business days of a written request.',

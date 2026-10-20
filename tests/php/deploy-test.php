@@ -205,6 +205,46 @@ check( ! RGP_Deploy_Helper::valid_signature( 'k3y', $body, hash_hmac( 'sha256', 
 $sum = RGP_Deploy_Helper::summary( get_option( RGP_Deploy_Helper::OPT_STATE ) );
 check( ! isset( $sum['files'] ), 'the webhook summary has no file list' );
 
+// 7. The Phase 1 guards (audit 20 Oct, #69): a checkout that is still
+// being written, or that would delete too much, is not deployed.
+check( '' === RGP_Deploy_Helper::removal_problem( array(), array( 'themes/t/a.php' ) ), 'nothing deployed before: no removal problem' );
+check( false !== strpos( RGP_Deploy_Helper::removal_problem( array( 'themes/t/a.php', 'plugins/p/p.php' ), array( 'themes/t/a.php' ) ), 'plugins/p' ), 'a whole missing folder is a problem' );
+$old = array();
+for ( $i = 0; $i < 10; $i++ ) {
+	$old[] = "themes/t/f$i.php";
+}
+check( '' !== RGP_Deploy_Helper::removal_problem( $old, array_slice( $old, 0, 2 ) ), 'removing 8 of 10 files is a problem' );
+check( '' === RGP_Deploy_Helper::removal_problem( $old, array_slice( $old, 1 ) ), 'removing 1 of 10 files is fine' );
+
+// Still being written: a file changed seconds ago, or git's index.lock.
+file_put_contents( $repo . '/inc/a.php', 'a4' ); // dated now
+$r = RGP_Deploy_Helper::sync( 'manual' );
+check( is_wp_error( $r ) && false !== strpos( $r->get_error_message(), 'waiting' ), 'a file changed seconds ago waits for the settle time' );
+check( 'a3' === @file_get_contents( $live . '/inc/a.php' ), 'nothing is copied while the repo settles' );
+touch( $repo . '/inc/a.php', time() - 120 );
+mkdir( RGP_DEPLOY_REPO_DIR . '/.git' );
+touch( RGP_DEPLOY_REPO_DIR . '/.git/index.lock' );
+$r = RGP_Deploy_Helper::sync( 'manual' );
+check( is_wp_error( $r ) && false !== strpos( $r->get_error_message(), 'index.lock' ), 'a running git (index.lock) is waited for' );
+rm_rf( RGP_DEPLOY_REPO_DIR . '/.git' );
+$r = RGP_Deploy_Helper::sync( 'manual' );
+check( is_array( $r ) && 'a4' === @file_get_contents( $live . '/inc/a.php' ), 'once settled the change deploys' );
+
+// A mass delete is refused unless the admin allows it.
+for ( $i = 0; $i < 6; $i++ ) {
+	put( $repo . "/extra/e$i.php", "e$i" );
+}
+RGP_Deploy_Helper::sync( 'manual' );
+for ( $i = 0; $i < 6; $i++ ) {
+	unlink( $repo . "/extra/e$i.php" );
+}
+rmdir( $repo . '/extra' );
+$r = RGP_Deploy_Helper::sync( 'manual' );
+check( is_wp_error( $r ) && false !== strpos( $r->get_error_message(), 'would be deleted' ), 'deleting most deployed files is refused: ' . ( is_wp_error( $r ) ? $r->get_error_message() : json_encode( $r ) ) );
+check( file_exists( $live . '/extra/e0.php' ), 'the refused run deletes nothing' );
+$r = RGP_Deploy_Helper::sync( 'manual', true );
+check( is_array( $r ) && ! file_exists( $live . '/extra/e0.php' ), '"Allow removing many files" deletes them' );
+
 rm_rf( $tmp );
 
 if ( $failures ) {

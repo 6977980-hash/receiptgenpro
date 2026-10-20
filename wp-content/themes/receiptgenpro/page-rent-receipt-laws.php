@@ -118,8 +118,21 @@ $rf_seen  = rf_rent_laws_reviewed();
 			<span class="rf-category-icon" aria-hidden="true">⚖️</span>
 			<h1>Rent Receipt Laws by State</h1>
 			<p class="rf-hero-sub rf-direct-answer">
-				There is no federal rule, but at least <?php echo esc_html( count( $rf_laws ) - ( isset( $rf_laws['district-of-columbia'] ) ? 1 : 0 ) ); ?> states<?php echo isset( $rf_laws['district-of-columbia'] ) ? ' and Washington, D.C.' : ''; ?> have a rule that makes a landlord give a written rent receipt,
-				most often when rent is paid in cash. The table shows when each one applies and links to the statute.
+				<?php
+				// Audit 20 Oct (#65): a state whose only rule is a general one
+				// ('general', e.g. California's debtor rule) is listed but not
+				// counted as a landlord rule.
+				$rf_landlord = array_filter(
+					$rf_laws,
+					function ( $l ) {
+						return empty( $l['general'] );
+					}
+				);
+				$rf_general  = array_diff_key( $rf_laws, $rf_landlord );
+				$rf_has_dc   = isset( $rf_landlord['district-of-columbia'] );
+				?>
+				There is no federal rule, but at least <?php echo esc_html( count( $rf_landlord ) - ( $rf_has_dc ? 1 : 0 ) ); ?> states<?php echo $rf_has_dc ? ' and Washington, D.C.' : ''; ?> have a rule that makes a landlord give a written rent receipt,
+				most often when rent is paid in cash<?php echo $rf_general ? esc_html( '; in ' . implode( ' and ', wp_list_pluck( $rf_general, 'state' ) ) . ' a general rule lets anyone who pays a debt, rent included, ask for one' ) : ''; ?>. The table shows when each one applies and links to the statute.
 			</p>
 			<p class="rf-law-reviewed">Last reviewed: <?php echo esc_html( $rf_seen['label'] ); ?></p>
 		</div>
