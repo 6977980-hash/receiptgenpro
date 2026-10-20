@@ -1,5 +1,9 @@
 # ReceiptGenPro theme — Changelog
 
+## 1.3.2.1 — 20 Oct 2026
+
+- The two shortened guide titles now show live: those posts store their full headline in `rf_seo_title`, so a stored title over 60 characters gives way to the one in `rf_seo_title_patches()`.
+
 ## 1.3.2 — 20 Oct 2026 (audit of 20 Oct, Phase 2: technical SEO)
 
 - **Every meta description is 155 characters or less** (13 were 161–205): the state law pages get a short `meta` next to their `summary` (the page text doesn't change), and the requirements checker, widget, rent, HRA, donation, payment and missing receipt form descriptions are shorter.

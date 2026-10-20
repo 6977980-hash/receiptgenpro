@@ -55,8 +55,11 @@ function rf_get_seo_data() {
 	} elseif ( is_singular( 'post' ) ) {
 		global $post;
 		$meta_title = get_post_meta( $post->ID, 'rf_seo_title', true );
-		if ( ! $meta_title ) {
-			$meta_title = rf_seo_title_patches()[ $post->post_name ] ?? '';
+		// A stored title that is too long gives way to the short one in
+		// rf_seo_title_patches() (some posts store their full headline).
+		$short_title = rf_seo_title_patches()[ $post->post_name ] ?? '';
+		if ( $short_title && ( ! $meta_title || mb_strlen( $meta_title ) > 60 ) ) {
+			$meta_title = $short_title;
 		}
 		$meta_desc  = get_post_meta( $post->ID, 'rf_seo_description', true );
 		// v1.1.0 (audit M2): one consistent format. Custom title if set,
