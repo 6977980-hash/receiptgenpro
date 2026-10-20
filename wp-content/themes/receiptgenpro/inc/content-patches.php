@@ -320,17 +320,43 @@ function rf_fixes_apply_patch( $content, $patch ) {
  * DB changes going live with the deploy instead of being clicked in
  * Tools → ReceiptGenPro Fixes. It applies only the patches marked
  * 'since' => '1.1.5' plus the shorter SEO titles, through wp_update_post()
- * (so each page keeps a revision), and runs once: the option is added
- * before any change, so parallel requests can't repeat it.
+ * (so each page keeps a revision), and runs once.
+ *
+ * Audit 20 Oct (#47): it runs from inc/setup-tasks.php (admin or WP-Cron),
+ * not in a visitor request. Each finished slug is recorded, so a run that
+ * died part-way (a 'started' older than 10 minutes) resumes where it
+ * stopped instead of blocking for good or patching a page twice.
  */
+function rf_migration_done() {
+	$state = get_option( 'rf_migration_phase5' );
+	return is_array( $state ) && ! empty( $state['done'] );
+}
+
 function rf_migrate_phase5_content() {
-	if ( get_option( 'rf_migration_phase5' ) || wp_installing() ) {
+	if ( rf_migration_done() || wp_installing() ) {
 		return;
 	}
-	if ( ! add_option( 'rf_migration_phase5', array( 'started' => gmdate( 'c' ) ), '', false ) ) {
-		return;
+	$state = get_option( 'rf_migration_phase5' );
+	if ( is_array( $state ) ) {
+		$started = isset( $state['started'] ) ? strtotime( $state['started'] ) : 0;
+		if ( $started && time() - $started < 10 * MINUTE_IN_SECONDS ) {
+			return; // another run is still going
+		}
+		$state['started'] = gmdate( 'c' );
+		update_option( 'rf_migration_phase5', $state, true );
+	} else {
+		$state = array( 'started' => gmdate( 'c' ), 'slugs' => array(), 'log' => array() );
+		if ( ! add_option( 'rf_migration_phase5', $state, '', true ) ) {
+			return;
+		}
 	}
-	$log = array();
+	$state += array( 'slugs' => array(), 'log' => array() );
+	$log    = $state['log'];
+	$record = function ( $slug ) use ( &$state, &$log ) {
+		$state['slugs'][] = $slug;
+		$state['log']     = $log;
+		update_option( 'rf_migration_phase5', $state, true );
+	};
 
 	// The visitor who triggers this may not have unfiltered_html; the HTML
 	// below is the theme's own, so kses must not rewrite it.
@@ -344,12 +370,13 @@ function rf_migrate_phase5_content() {
 				return isset( $patch['since'] ) && '1.1.5' === $patch['since'];
 			}
 		);
-		if ( ! $list ) {
+		if ( ! $list || in_array( $slug, $state['slugs'], true ) ) {
 			continue;
 		}
 		$found = get_posts( array( 'name' => $slug, 'post_type' => 'page', 'post_status' => 'publish', 'numberposts' => 1 ) );
 		if ( ! $found ) {
 			$log[] = "/$slug/: page not found";
+			$record( $slug );
 			continue;
 		}
 		$content = $found[0]->post_content;
@@ -360,8 +387,10 @@ function rf_migrate_phase5_content() {
 		if ( $content !== $found[0]->post_content ) {
 			wp_update_post( array( 'ID' => $found[0]->ID, 'post_content' => wp_slash( $content ) ) );
 		}
+		$record( $slug );
 	}
 
+	// Setting a meta value twice is harmless, so the titles need no record.
 	foreach ( rf_seo_title_patches() as $slug => $title ) {
 		$found = get_posts( array( 'name' => $slug, 'post_type' => 'post', 'post_status' => 'publish', 'numberposts' => 1 ) );
 		if ( $found ) {
@@ -375,10 +404,9 @@ function rf_migrate_phase5_content() {
 	if ( $kses ) {
 		kses_init_filters();
 	}
-	update_option( 'rf_migration_phase5', array( 'done' => gmdate( 'c' ), 'log' => $log ), false );
+	update_option( 'rf_migration_phase5', array( 'done' => gmdate( 'c' ), 'log' => $log ), true );
 	do_action( 'litespeed_purge_all' );
 }
-add_action( 'init', 'rf_migrate_phase5_content', 20 );
 
 /**
  * Shorter SEO titles (Oct 2026 audit, SEO-07): each is 60 characters or

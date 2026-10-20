@@ -94,18 +94,8 @@ function rf_ads_txt_404( $wp ) {
 }
 add_action( 'parse_request', 'rf_ads_txt_404' );
 
-/**
- * Flush rewrite rules once after this file is first loaded, so /ads.txt
- * works immediately without requiring a manual visit to Settings →
- * Permalinks → Save.
- */
-function rf_maybe_flush_rewrites() {
-	if ( ! get_option( 'rf_ads_txt_flushed' ) ) {
-		flush_rewrite_rules();
-		update_option( 'rf_ads_txt_flushed', 1 );
-	}
-}
-add_action( 'init', 'rf_maybe_flush_rewrites', 20 );
+// The rewrite rule above is flushed by rf_flush_rewrites_v110() (inc/seo-fixes.php)
+// once per theme version, from admin or WP-Cron.
 
 /* ==========================================================================
    2. Cookie consent banner (gates ad/analytics scripts)
@@ -124,7 +114,7 @@ function rf_render_consent_banner() {
 		return;
 	}
 	?>
-	<div id="rf-consent-banner" class="rf-consent-banner" hidden>
+	<div id="rf-consent-banner" class="rf-consent-banner" role="region" aria-label="Cookie consent" hidden>
 		<div class="rf-consent-inner">
 			<p>We use cookies for analytics and, where enabled, personalized advertising. See our <a href="<?php echo esc_url( home_url( '/cookie-policy/' ) ); ?>">Cookie Policy</a>.</p>
 			<div class="rf-consent-actions">

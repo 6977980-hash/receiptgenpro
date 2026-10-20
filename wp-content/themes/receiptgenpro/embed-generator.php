@@ -31,6 +31,8 @@ $rf_theme = get_template_directory_uri();
 <link rel="stylesheet" href="<?php echo esc_url( $rf_theme . '/assets/css/main.css?ver=' . rf_asset_ver( 'assets/css/main.css' ) ); ?>">
 </head>
 <body class="rf-embed-body">
+<main>
+<h1 class="screen-reader-text"><?php echo esc_html( $rf_label ); ?></h1>
 <?php
 get_template_part(
 	'template-parts/generator-embed',
@@ -43,6 +45,7 @@ get_template_part(
 	)
 );
 ?>
+</main>
 <p class="rf-embed-credit">Free <a href="<?php echo esc_url( $rf_page ); ?>"><?php echo esc_html( strtolower( $rf_label ) ); ?></a> by <a href="<?php echo esc_url( home_url( '/' ) ); ?>"><?php echo esc_html( RF_BRAND_NAME ); ?></a></p>
 <script>window.rfReceipt = <?php echo wp_json_encode( rf_receipt_script_data(), JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_UNESCAPED_UNICODE ); ?>;</script>
 <script src="<?php echo esc_url( $rf_theme . '/assets/js/receipt-generator.js?ver=' . rf_asset_ver( 'assets/js/receipt-generator.js' ) ); ?>"></script>

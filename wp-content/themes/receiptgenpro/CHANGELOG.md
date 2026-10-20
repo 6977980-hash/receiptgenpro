@@ -1,5 +1,29 @@
 # ReceiptGenPro theme — Changelog
 
+## 1.3.4 — 20 Oct 2026 (audit of 20 Oct, Phase 4: accessibility, performance, deploy)
+
+- **Contrast** (#45): green text (`--rf-success`: requirement checker "done", author reviewer) is #15803d (5.0:1, was 3.15:1); the Modern Blue receipt label is white on blue (was #dbeafe, 4.24:1).
+- **Links in text are underlined** (#46): `p a`, `li a`, field hints, sources notes, law disclaimers and the QR hint, not only post and page content. Menus, breadcrumbs and link lists keep their look.
+- **Scrolling** (#50): no smooth scrolling with "reduce motion" on; `scroll-padding-top: 80px` so a jump link doesn't land under the header.
+- **Screen readers** (#51): item fields are named per row ("Item 2 price", "Remove item 2"); the requirement checker has a `role="status"` summary read once typing pauses; switching receipt type is announced; the second copy of "Office + Customer Copy" is hidden from screen readers; on the verify page only the status line is live; footer headings are h2 (no h3 without an h2); the mobile menu is a `<nav>`; the `/embed/` page has `<main>` and a hidden h1; Download buttons say `aria-busy` while preparing instead of being disabled, so keyboard focus stays on them.
+- **Cookie banner** (#52): `role="region"` named "Cookie consent", and the page gets bottom padding while it shows, so it never covers the footer.
+- **QR code** (#53): redrawn at most every 300 ms while typing (the last change always lands; a download redraws it first).
+- **Logo** (#60): only a `data:image/(png|jpeg|gif|webp);base64` URL is used, also from the tab's saved form, and the `<img>` is built with the DOM, not HTML text. Other image types (SVG) are redrawn as PNG on upload.
+- **Setup work leaves visitor requests** (#47, #55, new `inc/setup-tasks.php`): creating the tool pages, the one-time content migration and the rewrite flush run on `admin_init` or in a WP-Cron event scheduled when one is out of date. `rf_feature_pages_hash` is saved only when every page exists; the migration records each finished page and resumes a run older than 10 minutes. The only rewrite flush left is the per-version one; the favicon and ads.txt one-shot flushes are gone.
+- **Fewer queries** (#54): the three flags read on every request are autoloaded; related posts use `no_found_rows`.
+- **Script loading** (#49): only the theme's own scripts are deferred, through WordPress 6.3+'s loading strategy (a filter on the same handles for older versions). Other plugins' scripts are no longer given `defer`.
+- **Images** (#58): homepage blog cards load lazily; related-post images have a `sizes` that matches their ~240 px.
+- **IndexNow** (#59): pings only on a first publish (or a re-publish) or when the title, text, excerpt or slug changed.
+- **HSTS** (#61): `includeSubDomains` (the only subdomains are www, on HTTPS, and ftp).
+- Tests: `tests/v134-a11y.test.js` (logo check, hidden copy, contrast, reduced motion) and `tests/php/deploy-test.php` (in CI).
+
+### Deploy helper (`rgp-deploy-helper.php` 1.2.0)
+- **No deploy in visitor requests** (#48): a WP-Cron event checks once a minute (in its own background request), wp-admin checks once a minute for admins, and the webhook deploys at once.
+- **Staged swap** (#48): each theme/plugin folder is built in `.rgp-stage-<name>` (repo files plus live files the helper never deployed) and swapped in with two `rename()` calls; the old folder stays as `.rgp-prev-<name>`, and **Tools → Deploy Helper → Roll back the last deploy** swaps it back (and forward again). If staging is not possible, files are copied in place in the order sub-folders → `functions.php` → templates.
+- **Safer removal** (#56): an empty repo is never deployed; folders emptied by a removal are deleted; symlinks, `..` paths and anything resolving outside the repo are skipped, and a delete must stay inside the live `wp-content`; changing the repo folder resets the stored file list.
+- **Webhook** (#57): POST only; a GitHub webhook whose Secret is the deploy key is checked with `X-Hub-Signature-256`; `X-RGP-Key` still works; `?key=` still works for now but shows a warning on the admin page, which no longer shows a URL with the key. GitHub's ping is answered; a delivery while Git is still writing gets 202 and the minute check deploys it. The answer is a short summary, not the file list.
+- Phase 1 guards stay: the 60 s settle wait, the mass-delete check, the atomic lock.
+
 ## 1.3.3 — 20 Oct 2026 (audit of 20 Oct, Phase 3: generator and UX)
 
 - **Huge, exponent and Infinity inputs** (#23): amounts are capped at 999,999,999,999.99 and tax / discount rates at 100 %, in the inputs' `max` and in the script; `1e400` counts as 0. A note under the form says when an entry was capped, a negative number was counted as 0, or a discount larger than the subtotal was cut (#31). Rates print trimmed (8.875 %, not 8.875000000001 %).

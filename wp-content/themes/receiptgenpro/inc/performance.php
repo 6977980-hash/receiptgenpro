@@ -76,36 +76,42 @@ function rf_resource_hints( $urls, $relation_type ) {
 }
 add_filter( 'wp_resource_hints', 'rf_resource_hints', 10, 2 );
 
-// Defer/async every enqueued script by default except the two CDN libs
-// that html2canvas/jsPDF need loaded in order (handled via dependency
-// array, not async) — everything else can safely defer.
+// Defer the theme's own scripts only (audit 20 Oct, #49). The old filter
+// added `defer` to every front-end <script src>, including other plugins'
+// scripts with inline "after" code (jQuery + its inline callers), which
+// then ran before their library. WordPress 6.3+ does this safely with a
+// loading strategy: it drops `defer` itself when an inline "after" script
+// or a non-deferred dependant needs the file earlier.
 //
-// FRONT-END ONLY — this must never run in wp-admin. WordPress's block
-// editor (Gutenberg) enqueues its own core scripts (wp-i18n, wp-api-fetch,
-// wp-data, wp-blocks, …) together with small inline "-after" bootstrap
-// scripts that call them synchronously right after each library loads
-// (e.g. wp.apiFetch.use(...), wp.i18n.setLocaleData(...)). Those inline
-// bootstrap scripts are never deferred, so if this filter also adds
-// `defer` to the *library* scripts on admin pages, the inline scripts run
-// before their dependencies exist — every wp.* global comes back
-// `undefined`, which crashes the editor and silently breaks the REST API
-// client (apiFetch never gets its /wp-json/ root-URL middleware attached).
-// Keeping this strictly to the front end is what fixes that.
-function rf_defer_scripts( $tag, $handle, $src ) {
-	if ( is_admin() ) {
-		return $tag;
-	}
+// rf-receipt-generator stays a normal footer script: the embed page and
+// inline code expect it to have run before DOMContentLoaded handlers.
+function rf_deferred_handles() {
+	return array( 'rf-main', 'rf-consent', 'rf-verify-receipt', 'rf-widget-builder' );
+}
 
-	$no_defer = array( 'jspdf', 'html2canvas', 'rf-receipt-generator' );
-	if ( in_array( $handle, $no_defer, true ) ) {
+function rf_defer_theme_scripts() {
+	if ( ! version_compare( get_bloginfo( 'version' ), '6.3', '>=' ) ) {
+		return; // older WordPress: rf_defer_scripts_legacy() below.
+	}
+	foreach ( rf_deferred_handles() as $handle ) {
+		if ( wp_script_is( $handle, 'registered' ) ) {
+			wp_script_add_data( $handle, 'strategy', 'defer' );
+		}
+	}
+}
+add_action( 'wp_enqueue_scripts', 'rf_defer_theme_scripts', 99 );
+
+// Before 6.3 there is no strategy: add the attribute to the same handles.
+function rf_defer_scripts_legacy( $tag, $handle ) {
+	if ( is_admin() || version_compare( get_bloginfo( 'version' ), '6.3', '>=' ) || ! in_array( $handle, rf_deferred_handles(), true ) ) {
 		return $tag;
 	}
-	if ( strpos( $tag, 'defer' ) === false ) {
-		$tag = str_replace( ' src', ' defer src', $tag );
+	if ( false === strpos( $tag, ' defer' ) ) {
+		$tag = str_replace( ' src=', ' defer src=', $tag );
 	}
 	return $tag;
 }
-add_filter( 'script_loader_tag', 'rf_defer_scripts', 10, 3 );
+add_filter( 'script_loader_tag', 'rf_defer_scripts_legacy', 10, 2 );
 
 // Post revisions: WordPress core defines WP_POST_REVISIONS before themes
 // load, so a theme cannot change it. To limit revisions, add

@@ -27,7 +27,7 @@ define( 'RF_LOGO_TEXT', 'Receipt<span class="rf-accent">GenPro</span>' );
 define( 'RF_SOCIAL_TWITTER', '' );  // e.g. 'https://x.com/receiptgenpro'
 define( 'RF_SOCIAL_FACEBOOK', '' ); // e.g. 'https://facebook.com/receiptgenpro'
 define( 'RF_SOCIAL_LINKEDIN', '' ); // e.g. 'https://linkedin.com/company/receiptgenpro'
-define( 'RF_THEME_VERSION', '1.3.3' );
+define( 'RF_THEME_VERSION', '1.3.4' );
 
 /* ==========================================================================
    2. THEME SETUP
@@ -181,6 +181,7 @@ require get_template_directory() . '/inc/feature-pages.php';
 require get_template_directory() . '/inc/seo-fixes.php';
 require get_template_directory() . '/inc/post-sources.php';
 require get_template_directory() . '/inc/content-patches.php';
+require get_template_directory() . '/inc/setup-tasks.php';
 if ( is_admin() ) {
 	require get_template_directory() . '/inc/admin-fixes.php';
 }

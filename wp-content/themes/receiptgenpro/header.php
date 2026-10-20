@@ -43,7 +43,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 		</button>
 	</div>
 
-	<div class="rf-nav-mobile" id="rf-primary-nav-mobile">
+	<nav class="rf-nav-mobile" id="rf-primary-nav-mobile" aria-label="<?php esc_attr_e( 'Primary (mobile)', 'receiptgenpro' ); ?>">
 		<?php
 		wp_nav_menu(
 			array(
@@ -54,7 +54,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 			)
 		);
 		?>
-	</div>
+	</nav>
 </header>
 
 <?php if ( ! is_front_page() ) : ?>

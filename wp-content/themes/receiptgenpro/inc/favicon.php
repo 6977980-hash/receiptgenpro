@@ -87,15 +87,5 @@ function rf_manifest_render() {
 }
 add_action( 'template_redirect', 'rf_manifest_render' );
 
-/**
- * Flush rewrite rules once after this file is first loaded, so
- * /site.webmanifest works immediately without a manual visit to
- * Settings → Permalinks → Save.
- */
-function rf_maybe_flush_favicon_rewrites() {
-	if ( ! get_option( 'rf_webmanifest_flushed' ) ) {
-		flush_rewrite_rules();
-		update_option( 'rf_webmanifest_flushed', 1 );
-	}
-}
-add_action( 'init', 'rf_maybe_flush_favicon_rewrites', 20 );
+// The rewrite rule above is flushed by rf_flush_rewrites_v110() (inc/seo-fixes.php)
+// once per theme version, from admin or WP-Cron.

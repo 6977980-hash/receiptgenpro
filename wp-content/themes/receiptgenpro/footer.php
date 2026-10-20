@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 		</div>
 
 		<div class="rf-footer-col">
-			<h3><?php esc_html_e( 'Receipt Tools', 'receiptgenpro' ); ?></h3>
+			<h2 class="rf-footer-heading"><?php esc_html_e( 'Receipt Tools', 'receiptgenpro' ); ?></h2>
 			<?php
 			wp_nav_menu(
 				array(
@@ -38,7 +38,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 		</div>
 
 		<div class="rf-footer-col">
-			<h3><?php esc_html_e( 'More Receipts', 'receiptgenpro' ); ?></h3>
+			<h2 class="rf-footer-heading"><?php esc_html_e( 'More Receipts', 'receiptgenpro' ); ?></h2>
 			<?php
 			wp_nav_menu(
 				array(
@@ -54,7 +54,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 		</div>
 
 		<div class="rf-footer-col">
-			<h3><?php esc_html_e( 'Support', 'receiptgenpro' ); ?></h3>
+			<h2 class="rf-footer-heading"><?php esc_html_e( 'Support', 'receiptgenpro' ); ?></h2>
 			<?php
 			wp_nav_menu(
 				array(

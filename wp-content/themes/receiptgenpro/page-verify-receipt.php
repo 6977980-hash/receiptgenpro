@@ -28,8 +28,8 @@ get_header();
 
 	<div class="rf-container rf-narrow">
 		<section class="rf-section">
-			<div class="rf-verify-box" id="rf-verify" aria-live="polite">
-				<p class="rf-verify-status rf-verify-status-none" id="rf-verify-status">No receipt loaded yet. Scan the QR code on the receipt with your phone camera, or paste the link below.</p>
+			<div class="rf-verify-box" id="rf-verify">
+				<p class="rf-verify-status rf-verify-status-none" id="rf-verify-status" role="status">No receipt loaded yet. Scan the QR code on the receipt with your phone camera, or paste the link below.</p>
 				<div class="rf-verify-details" id="rf-verify-details" hidden></div>
 				<form class="rf-verify-paste" id="rf-verify-form">
 					<label for="rf-verify-input" class="screen-reader-text">Verification link</label>
