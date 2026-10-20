@@ -23,6 +23,8 @@ jobs:
           exit $status
       - name: SEO checks (title/description lengths, link rewrite)
         run: php tests/php/seo-test.php
+      - name: Requirement checks have a field on their template
+        run: php tests/php/requirements-test.php
 
   js-tests:
     runs-on: ubuntu-latest

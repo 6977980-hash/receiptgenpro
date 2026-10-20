@@ -398,6 +398,18 @@ function rf_embed_templates() {
 	return $list;
 }
 
+/**
+ * The auto-height listener of the widget embed code, the same script
+ * assets/js/widget-builder.js builds (v1.3.3): it resizes the iframe whose
+ * window sent the message, for messages from the site's own origin.
+ */
+function rf_widget_height_script( $site ) {
+	$parts  = wp_parse_url( $site );
+	$origin = ( $parts['scheme'] ?? 'https' ) . '://' . ( $parts['host'] ?? '' ) . ( isset( $parts['port'] ) ? ':' . $parts['port'] : '' );
+	return '<script>addEventListener("message",function(e){if(e.origin!==' . wp_json_encode( $origin, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG ) . '||!e.data||!e.data.rgpHeight)return;'
+		. 'document.querySelectorAll("iframe").forEach(function(f){if(f.contentWindow===e.source)f.style.height=e.data.rgpHeight+"px"})})</script>';
+}
+
 /** True when the request path is /embed/…, the only place rf_embed counts. */
 function rf_is_embed_path() {
 	$uri  = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '';

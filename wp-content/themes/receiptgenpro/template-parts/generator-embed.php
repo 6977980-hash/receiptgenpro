@@ -26,6 +26,10 @@
  * the homepage, a receipt type picker that swaps the form in place. The
  * parts that differ by type sit in #rf-type-* wrappers so the JS can
  * rebuild them from the same config this file renders.
+ *
+ * v1.3.3: amount inputs have max="999999999999.99" and rate inputs
+ * max="100" (the script applies the same limits), and #rf-form-notice
+ * says when an entry was capped or counted as 0.
  */
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -145,7 +149,7 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 			<div class="rf-form-row rf-form-row-2col">
 				<div class="rf-field">
 					<label for="rf-tax-rate">Tax Rate (%)</label>
-					<input type="number" id="rf-tax-rate" value="0" min="0" step="0.01">
+					<input type="number" id="rf-tax-rate" value="0" min="0" max="100" step="0.01">
 				</div>
 				<div class="rf-field">
 					<label for="rf-payment-method">Payment Method</label>
@@ -157,12 +161,14 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 				</div>
 			</div>
 
+			<p class="rf-form-notice" id="rf-form-notice" role="status" hidden></p>
+
 			<details class="rf-more-options" id="rf-more-options">
 				<summary>Discount and a second tax (e.g. CGST + SGST)</summary>
 				<div class="rf-form-row rf-form-row-2col">
 					<div class="rf-field">
 						<label for="rf-discount">Discount</label>
-						<input type="number" id="rf-discount" min="0" step="0.01" placeholder="0">
+						<input type="number" id="rf-discount" min="0" max="999999999999.99" step="0.01" placeholder="0">
 					</div>
 					<div class="rf-field">
 						<label for="rf-discount-type">Discount type</label>
@@ -185,7 +191,7 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 					</div>
 					<div class="rf-field">
 						<label for="rf-tax2-rate">Second tax rate (%)</label>
-						<input type="number" id="rf-tax2-rate" value="0" min="0" step="0.01">
+						<input type="number" id="rf-tax2-rate" value="0" min="0" max="100" step="0.01">
 					</div>
 				</div>
 				<p class="rf-field-hint">The discount comes off the subtotal before tax, and both taxes are charged on the discounted amount.</p>
@@ -197,13 +203,13 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 					<?php if ( $form['tip'] ) : ?>
 						<div class="rf-field">
 							<label for="rf-tip">Tip / Gratuity (amount)</label>
-							<input type="number" id="rf-tip" min="0" step="0.01" placeholder="0.00">
+							<input type="number" id="rf-tip" min="0" max="999999999999.99" step="0.01" placeholder="0.00">
 						</div>
 					<?php endif; ?>
 					<?php if ( $form['paid'] ) : ?>
 						<div class="rf-field">
 							<label for="rf-amount-paid">Amount Paid (leave blank if paid in full)</label>
-							<input type="number" id="rf-amount-paid" min="0" step="0.01" placeholder="0.00">
+							<input type="number" id="rf-amount-paid" min="0" max="999999999999.99" step="0.01" placeholder="0.00">
 						</div>
 					<?php endif; ?>
 				</div>

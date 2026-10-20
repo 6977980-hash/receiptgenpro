@@ -1,5 +1,19 @@
 # ReceiptGenPro theme — Changelog
 
+## 1.3.3 — 20 Oct 2026 (audit of 20 Oct, Phase 3: generator and UX)
+
+- **Huge, exponent and Infinity inputs** (#23): amounts are capped at 999,999,999,999.99 and tax / discount rates at 100 %, in the inputs' `max` and in the script; `1e400` counts as 0. A note under the form says when an entry was capped, a negative number was counted as 0, or a discount larger than the subtotal was cut (#31). Rates print trimmed (8.875 %, not 8.875000000001 %).
+- **Receipt layout:** the Qty / Price / Total headers are right-aligned over their numbers in all nine designs (#24); long business names and big amounts wrap inside the receipt at 375 px (fixed table columns, smaller numbers on phones) (#26).
+- **Printing** (Ctrl+P) prints only the receipt, without header, form, buttons, checker, footer or cookie banner, with colours kept; the Thermal Slip prints on an 80 mm page as long as the slip (#25).
+- **Verification QR:** the payload stays under ~500 characters (texts, then extra fields, then item names, then items are shortened or dropped; text is cut by code point), and the code is drawn at a whole number of px per module, so it scans when printed (#27). It now carries the discount, tax lines and tip, which the verify page shows (#37), and never the PAN, EIN or other tax IDs (#38).
+- **Maths and words:** unit prices are rounded to cents before × quantity (#28); "One US dollar", "one cent", "one penny", no "Zero … and" (#29); thousands separators everywhere, lakh / crore grouping for INR and PKR (#30).
+- **Requirement checker:** the restaurant and payment receipts get an address field, so "Place of the expense" can pass (#32); amount limits apply only to a receipt in their own currency (the HRA limits are in rupees), and the HRA PAN limit is compared per month for a From–To rent period (#33). `tests/php/requirements-test.php` (in CI) checks that every required check has a field on its template.
+- **A4 PDF:** a receipt taller than a page continues on the next pages, cut between rows, instead of shrinking to 40 % width; the canvas scale drops below 2 when the image would pass iOS's ~16.7 MP limit (#34).
+- **Picker and form:** values typed into fields both receipt types have (property, Amount Paid, tip…) carry over when switching type (#35); the address bar keeps `?type=<slug>`, so a reload or a shared link opens the same type (#36). Logos are shrunk to 400 px on upload and the form is saved once typing pauses (#40). Bidi control characters are stripped from the receipt and the verify page (#39).
+- **Widget:** the auto-height script checks `new URL(site).origin` as a JSON string and finds the iframe by its window, not by a URL selector, and the code shown before the script runs includes it too (#41). The `/embed/` page has favicon links, and the QR code's space is held while its library loads (#44).
+- **Profile:** Job Title and Expertise appear once on the profile screen and are saved with `sanitize_text_field( wp_unslash() )` (#42).
+- **Small fixes:** tap targets of 44 px for template hub links, the QR checkbox and byline links (#43); wide tables in posts scroll sideways on phones, the header menu wraps, hub cards show focus only for keyboard focus (#44).
+
 ## 1.3.2.1 — 20 Oct 2026
 
 - The two shortened guide titles now show live: those posts store their full headline in `rf_seo_title`, so a stored title over 60 characters gives way to the one in `rf_seo_title_patches()`.

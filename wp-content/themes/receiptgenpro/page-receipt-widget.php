@@ -51,7 +51,8 @@ $rf_default   = 'rent-receipt';
 						<?php
 						$rf_page_url = home_url( '/' . $rf_default . '/' );
 						$rf_code     = '<iframe src="' . esc_url( home_url( '/embed/' . $rf_default . '/' ) ) . '" title="' . esc_attr( $rf_templates[ $rf_default ] ) . '" width="100%" height="1600" style="border:0;width:100%;max-width:1180px" loading="lazy"></iframe>' . "\n"
-							. '<p style="font-size:13px">Free <a href="' . esc_url( $rf_page_url ) . '">' . esc_html( strtolower( $rf_templates[ $rf_default ] ) ) . '</a> by ' . esc_html( RF_BRAND_NAME ) . '</p>';
+							. '<p style="font-size:13px">Free <a href="' . esc_url( $rf_page_url ) . '">' . esc_html( strtolower( $rf_templates[ $rf_default ] ) ) . '</a> by ' . esc_html( RF_BRAND_NAME ) . '</p>' . "\n"
+							. rf_widget_height_script( home_url( '/' ) );
 						?>
 						<textarea id="rf-widget-code" readonly><?php echo esc_textarea( $rf_code ); ?></textarea>
 					</div>

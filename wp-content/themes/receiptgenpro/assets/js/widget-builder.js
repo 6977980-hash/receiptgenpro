@@ -8,19 +8,32 @@
 		return String( str ).replace( /&/g, '&amp;' ).replace( /"/g, '&quot;' ).replace( /</g, '&lt;' ).replace( />/g, '&gt;' );
 	}
 
+	// A value inside a <script>: a JSON string with < escaped, so no text
+	// can close the script element.
+	function jsString( str ) {
+		return JSON.stringify( String( str ) ).replace( /</g, '\\u003c' );
+	}
+
+	// The auto-height listener: resizes the iframe whose window sent the
+	// message, only for messages from the site's own origin. Matching the
+	// sender's window needs no selector, so nothing from the URL is put
+	// into one. page-receipt-widget.php prints the same script.
+	function heightScript( site ) {
+		return '<script>addEventListener("message",function(e){if(e.origin!==' + jsString( new URL( site ).origin ) + '||!e.data||!e.data.rgpHeight)return;' +
+			'document.querySelectorAll("iframe").forEach(function(f){if(f.contentWindow===e.source)f.style.height=e.data.rgpHeight+"px"})})</script>';
+	}
+
 	// The embed code: iframe + credit link + an optional auto-height listener
 	// (sites that strip scripts keep the fixed height).
 	function buildCode( o ) {
 		var src = o.embedBase + o.slug + '/';
-		var origin = o.site.replace( /\/$/, '' );
 		return '<iframe src="' + esc( src ) + '" title="' + esc( o.label ) + '" width="100%" height="' + o.height + '" style="border:0;width:100%;max-width:1180px" loading="lazy"></iframe>\n' +
 			'<p style="font-size:13px">Free <a href="' + esc( o.page ) + '">' + esc( o.label.toLowerCase() ) + '</a> by ' + esc( o.brand ) + '</p>\n' +
-			'<script>addEventListener("message",function(e){if(e.origin!=="' + origin + '"||!e.data||!e.data.rgpHeight)return;' +
-			'document.querySelectorAll(\'iframe[src^="' + esc( o.embedBase ) + '"]\').forEach(function(f){if(f.contentWindow===e.source)f.style.height=e.data.rgpHeight+"px"})})</script>';
+			heightScript( o.site );
 	}
 
 	if ( typeof module !== 'undefined' && module.exports ) {
-		module.exports = { buildCode: buildCode };
+		module.exports = { buildCode: buildCode, heightScript: heightScript };
 	}
 	if ( typeof document === 'undefined' ) {
 		return;

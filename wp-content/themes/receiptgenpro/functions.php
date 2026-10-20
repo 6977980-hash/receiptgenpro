@@ -27,7 +27,7 @@ define( 'RF_LOGO_TEXT', 'Receipt<span class="rf-accent">GenPro</span>' );
 define( 'RF_SOCIAL_TWITTER', '' );  // e.g. 'https://x.com/receiptgenpro'
 define( 'RF_SOCIAL_FACEBOOK', '' ); // e.g. 'https://facebook.com/receiptgenpro'
 define( 'RF_SOCIAL_LINKEDIN', '' ); // e.g. 'https://linkedin.com/company/receiptgenpro'
-define( 'RF_THEME_VERSION', '1.3.2.1' );
+define( 'RF_THEME_VERSION', '1.3.3' );
 
 /* ==========================================================================
    2. THEME SETUP
@@ -203,8 +203,8 @@ add_filter( 'excerpt_more', fn() => '&hellip;' );
  * template-parts/author-box.php and inc/schema.php Person markup).
  */
 function rf_user_contact_fields( $fields ) {
-	$fields['rf_job_title']  = __( 'Job Title / Credentials (e.g. "Certified Public Accountant, 12 yrs experience")', 'receiptgenpro' );
-	$fields['rf_expertise']  = __( 'One-line expertise statement (shown in author box + Person schema)', 'receiptgenpro' );
+	// rf_job_title and rf_expertise are in rf_extra_profile_fields() below
+	// (they were listed in both places, so the form had each field twice).
 	$fields['linkedin']      = __( 'LinkedIn URL', 'receiptgenpro' );
 	$fields['rf_avatar_url'] = __( 'Author photo URL (upload to Media Library, paste its URL; square, 96 px or larger)', 'receiptgenpro' );
 	return $fields;
@@ -242,13 +242,14 @@ function rf_author_avatar( $author_id, $size = 96 ) {
 function rf_extra_profile_fields( $user ) {
 	?>
 	<h2><?php esc_html_e( 'ReceiptGenPro Author / E-E-A-T Details', 'receiptgenpro' ); ?></h2>
+	<p><?php esc_html_e( 'Shown in the author box and the Person schema on your posts.', 'receiptgenpro' ); ?></p>
 	<table class="form-table">
 		<tr>
-			<th><label for="rf_job_title"><?php esc_html_e( 'Job Title / Credentials', 'receiptgenpro' ); ?></label></th>
+			<th><label for="rf_job_title"><?php esc_html_e( 'Job Title / Credentials (e.g. "Certified Public Accountant, 12 yrs experience")', 'receiptgenpro' ); ?></label></th>
 			<td><input type="text" name="rf_job_title" id="rf_job_title" value="<?php echo esc_attr( get_the_author_meta( 'rf_job_title', $user->ID ) ); ?>" class="regular-text" /></td>
 		</tr>
 		<tr>
-			<th><label for="rf_expertise"><?php esc_html_e( 'Expertise statement', 'receiptgenpro' ); ?></label></th>
+			<th><label for="rf_expertise"><?php esc_html_e( 'One-line expertise statement', 'receiptgenpro' ); ?></label></th>
 			<td><input type="text" name="rf_expertise" id="rf_expertise" value="<?php echo esc_attr( get_the_author_meta( 'rf_expertise', $user->ID ) ); ?>" class="regular-text" /></td>
 		</tr>
 	</table>
@@ -262,10 +263,10 @@ function rf_save_extra_profile_fields( $user_id ) {
 		return false;
 	}
 	if ( isset( $_POST['rf_job_title'] ) ) {
-		update_user_meta( $user_id, 'rf_job_title', sanitize_text_field( $_POST['rf_job_title'] ) );
+		update_user_meta( $user_id, 'rf_job_title', sanitize_text_field( wp_unslash( $_POST['rf_job_title'] ) ) );
 	}
 	if ( isset( $_POST['rf_expertise'] ) ) {
-		update_user_meta( $user_id, 'rf_expertise', sanitize_text_field( $_POST['rf_expertise'] ) );
+		update_user_meta( $user_id, 'rf_expertise', sanitize_text_field( wp_unslash( $_POST['rf_expertise'] ) ) );
 	}
 }
 add_action( 'personal_options_update', 'rf_save_extra_profile_fields' );
