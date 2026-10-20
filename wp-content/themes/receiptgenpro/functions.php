@@ -27,7 +27,11 @@ define( 'RF_LOGO_TEXT', 'Receipt<span class="rf-accent">GenPro</span>' );
 define( 'RF_SOCIAL_TWITTER', '' );  // e.g. 'https://x.com/receiptgenpro'
 define( 'RF_SOCIAL_FACEBOOK', '' ); // e.g. 'https://facebook.com/receiptgenpro'
 define( 'RF_SOCIAL_LINKEDIN', '' ); // e.g. 'https://linkedin.com/company/receiptgenpro'
-define( 'RF_THEME_VERSION', '1.3.4' );
+// Founder in the Organization schema (inc/schema.php), audit 20 Oct (#70).
+define( 'RF_FOUNDER_NAME', 'Ali Ahmad' );
+define( 'RF_FOUNDER_TITLE', 'Web developer' );
+define( 'RF_FOUNDER_LINKEDIN', 'https://www.linkedin.com/in/ali-ahmad-chaudhry-12777486/' );
+define( 'RF_THEME_VERSION', '1.3.5' );
 
 /* ==========================================================================
    2. THEME SETUP
@@ -88,7 +92,7 @@ function rf_enqueue_assets() {
 	wp_enqueue_script( 'rf-main', get_template_directory_uri() . '/assets/js/main.js', array(), rf_asset_ver( 'assets/js/main.js' ), true );
 
 	// The receipt generator tool loads ONLY on the pages that contain it.
-	// v1.1.0 (audit M5): jsPDF (~350 KB) and html2canvas (~200 KB) are no
+	// v1.1.0 (audit M5): jsPDF (~420 KB) and html2canvas (~200 KB) are no
 	// longer enqueued up front — receipt-generator.js lazy-loads them from
 	// cdnjs the first time a visitor clicks a Download button.
 	// v1.2.0: also on each /rent-receipt-laws/<state>/ page.
@@ -101,6 +105,7 @@ function rf_enqueue_assets() {
 	// v1.2.0 tool pages.
 	if ( is_page_template( 'page-verify-receipt.php' ) ) {
 		wp_enqueue_script( 'rf-verify-receipt', get_template_directory_uri() . '/assets/js/verify-receipt.js', array(), rf_asset_ver( 'assets/js/verify-receipt.js' ), true );
+		wp_localize_script( 'rf-verify-receipt', 'rfVerify', array( 'symbols' => rf_currency_symbols() ) );
 	}
 	if ( is_page_template( 'page-receipt-widget.php' ) ) {
 		wp_enqueue_script( 'rf-widget-builder', get_template_directory_uri() . '/assets/js/widget-builder.js', array(), rf_asset_ver( 'assets/js/widget-builder.js' ), true );
@@ -108,24 +113,7 @@ function rf_enqueue_assets() {
 }
 add_action( 'wp_enqueue_scripts', 'rf_enqueue_assets' );
 
-/**
- * A trimmed but genuinely useful currency list for the MVP tool.
- * Extend this array as the product grows — it is the single source of
- * truth for the currency <select> on every receipt form.
- */
-function rf_supported_currencies() {
-	return array(
-		'USD' => '$ — US Dollar',
-		'EUR' => '€ — Euro',
-		'GBP' => '£ — British Pound',
-		'PKR' => '₨ — Pakistani Rupee',
-		'INR' => '₹ — Indian Rupee',
-		'CAD' => 'CA$ — Canadian Dollar',
-		'AUD' => 'AU$ — Australian Dollar',
-		'AED' => 'د.إ — UAE Dirham',
-		'SAR' => '﷼ — Saudi Riyal',
-	);
-}
+// The currency list is rf_currencies() in inc/category-data.php.
 
 /* ==========================================================================
    4. PERFORMANCE — undo the things that hurt Core Web Vitals by default
@@ -340,3 +328,48 @@ function rf_remove_users_sitemap( $provider, $name ) {
 }
 add_filter( 'wp_sitemaps_add_provider', 'rf_remove_users_sitemap', 10, 2 );
 
+/* Template helpers, moved out of header.php and single.php (audit 20 Oct,
+   #70) so a template is never the place a function is declared. */
+
+/**
+ * Fallback menu so the theme looks correct even before the site owner
+ * has built a Primary Menu in wp-admin.
+ *
+ * wp_nav_menu() passes its own $args, so the desktop call gets the
+ * horizontal `rf-nav-menu` list and the mobile call gets the vertical
+ * `rf-nav-menu-mobile` list (it used to print `rf-nav-menu` for both,
+ * which made the open mobile menu one wide row off the side of a phone).
+ */
+function rf_default_primary_menu( $args = array() ) {
+	$args       = (array) $args;
+	$menu_class = ! empty( $args['menu_class'] ) ? $args['menu_class'] : 'rf-nav-menu';
+
+	$items = array(
+		home_url( '/' )                 => 'Receipt Generator',
+		home_url( '/receipt-templates/' ) => 'Templates',
+		rf_blog_url() => 'Blog',
+		home_url( '/about-us/' )        => 'About Us',
+		home_url( '/contact-us/' )      => 'Contact',
+	);
+	$html = '<ul class="' . esc_attr( $menu_class ) . '">';
+	foreach ( $items as $url => $label ) {
+		$html .= sprintf( '<li><a href="%s">%s</a></li>', esc_url( $url ), esc_html( $label ) );
+	}
+	$html .= '</ul>';
+
+	if ( isset( $args['echo'] ) && ! $args['echo'] ) {
+		return $html;
+	}
+	echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped above.
+}
+
+/**
+ * Simple word-count-based reading time estimate — a small but genuine
+ * UX/AEO signal (answer engines favor pages that are transparent about
+ * content depth and freshness).
+ */
+function rf_reading_time() {
+	$content = get_post_field( 'post_content', get_the_ID() );
+	$words   = str_word_count( wp_strip_all_tags( $content ) );
+	return max( 1, (int) ceil( $words / 200 ) );
+}

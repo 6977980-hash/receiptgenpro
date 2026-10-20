@@ -50,10 +50,18 @@ function rf_receipt_purposes() {
 			'template' => 'hra-rent-receipt',
 			'symbol'   => '₹',
 			'currency' => 'INR',
-			'intro'    => 'Employers ask salaried tenants for monthly rent receipts before they allow the House Rent Allowance exemption. The landlord PAN is mandatory once the rent paid in the year is more than ₹1,00,000.',
+			'intro'    => 'Employers ask salaried tenants for monthly rent receipts before they allow the House Rent Allowance exemption, which is available only under the old tax regime. The landlord PAN is mandatory once the rent paid in the year is more than ₹1,00,000.',
+			// Audit 20 Oct (#63): from 1 April 2026 the Income-tax Act, 2025
+			// (No. 30 of 2025, s. 1(3)) replaces the 1961 Act. HRA is Schedule
+			// III, Table Sl. No. 11 (was s. 10(13A)); s. 202(2)(a)(i) leaves it
+			// out of the new (default) regime; the employee's claims go to the
+			// employer on Form No. 124 under s. 392(5)(b) (was Form 12BB). The
+			// ₹1 lakh PAN rule is the Department's Form No. 124 FAQ (was
+			// CBDT Circular 8/2013). Act text read in the Gazette of India copy (as enacted),
+			// 20 Oct 2026.
 			'sources'  => array(
-				array( 'CBDT Circular No. 8/2013 of 10 October 2013 (landlord PAN when rent is above ₹1 lakh a year)', '' ),
-				array( 'Income-tax Act, 1961, section 10(13A) (HRA exemption)', '' ),
+				array( 'Income-tax Act, 2025, Schedule III (Table: Sl. No. 11) (HRA exemption, from tax year 2026-27; was section 10(13A) of the 1961 Act)', 'https://egazette.gov.in/WriteReadData/2025/265620.pdf' ),
+				array( 'Income Tax Department, Form No. 124 FAQs (landlord PAN when the year\'s rent is above ₹1,00,000; Form 124 replaces Form 12BB)', 'https://www.incometaxindia.gov.in/documents/d/guest/form-124-faqs' ),
 			),
 			'checks'   => array(
 				array( 'label' => 'Tenant name (the employee)', 'field' => 'client' ),

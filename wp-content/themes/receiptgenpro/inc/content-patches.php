@@ -440,9 +440,77 @@ function rf_about_never_store_content() {
 <li><strong>Your receipt details</strong> (names, items, prices, notes) are used only to draw the preview in your browser. They are never sent to our server.</li>
 <li><strong>Your logo</strong> is read by your browser and shown in the preview. It is not uploaded.</li>
 <li><strong>A reload doesn't lose your work:</strong> the form, and your logo, are kept in your browser tab's session storage, which is cleared when you close the tab.</li>
-<li><strong>Your downloads</strong> (PDF, PNG or JPEG) are created on your own device. When you click a download button, your browser fetches two open-source libraries, html2canvas and jsPDF, from the cdnjs CDN and builds the file locally. We never see or keep a copy.</li>
-</ul>
-HTML;
+HTML
+	. "\n" . rf_about_downloads_item() . "\n</ul>\n";
+}
+
+/**
+ * The "Your downloads" line of "What We Never Store" (audit 20 Oct, #62).
+ * The 1.1.5 text said two libraries load only on download, but the QR
+ * library loads as soon as the preview draws its verification QR code,
+ * which is on by default. Pages that already have the old line get this
+ * one through rf_migrate_v135_content().
+ */
+function rf_about_downloads_item() {
+	return '<li><strong>Your downloads</strong> (PDF, PNG or JPEG) and the receipt\'s QR code are created on your own device, with three open-source libraries from the cdnjs CDN. qrcode-generator loads with the generator while "Add a verification QR code" is ticked (it is by default) and draws the code in your browser. html2canvas and jsPDF load only when you click a download button, and build the file locally. We never see or keep a copy.</li>';
+}
+
+/** The 1.1.5 line that rf_about_downloads_item() replaces. */
+function rf_about_downloads_item_v115() {
+	return '<li><strong>Your downloads</strong> (PDF, PNG or JPEG) are created on your own device. When you click a download button, your browser fetches two open-source libraries, html2canvas and jsPDF, from the cdnjs CDN and builds the file locally. We never see or keep a copy.</li>';
+}
+
+/**
+ * One-time patch of theme 1.3.5 (audit 20 Oct, #62): replaces the old
+ * "Your downloads" line on About Us. Same rules as the Phase 5 migration
+ * above: runs from inc/setup-tasks.php (admin or WP-Cron), through
+ * wp_update_post() so the page keeps a revision, and records itself in its
+ * own option, rf_migration_v135, so it never runs twice.
+ */
+function rf_migration_v135_done() {
+	$state = get_option( 'rf_migration_v135' );
+	return is_array( $state ) && ! empty( $state['done'] );
+}
+
+function rf_migrate_v135_content() {
+	if ( rf_migration_v135_done() || wp_installing() ) {
+		return;
+	}
+	$state = get_option( 'rf_migration_v135' );
+	if ( is_array( $state ) && isset( $state['started'] ) && time() - strtotime( $state['started'] ) < 10 * MINUTE_IN_SECONDS ) {
+		return; // another run is still going
+	}
+	if ( is_array( $state ) ) {
+		update_option( 'rf_migration_v135', array( 'started' => gmdate( 'c' ) ), true );
+	} elseif ( ! add_option( 'rf_migration_v135', array( 'started' => gmdate( 'c' ) ), '', true ) ) {
+		return;
+	}
+
+	$log   = array();
+	$found = get_posts( array( 'name' => 'about-us', 'post_type' => 'page', 'post_status' => 'publish', 'numberposts' => 1 ) );
+	if ( ! $found ) {
+		$log[] = '/about-us/: page not found';
+	} else {
+		list( $content, $status ) = rf_fixes_apply_patch(
+			$found[0]->post_content,
+			array(
+				'find'    => rf_about_downloads_item_v115(),
+				'unless'  => 'three open-source libraries',
+				'replace' => rf_about_downloads_item(),
+			)
+		);
+		$log[] = "/about-us/: name the three libraries: $status";
+		if ( $content !== $found[0]->post_content ) {
+			$kses = (bool) has_filter( 'content_save_pre', 'wp_filter_post_kses' );
+			kses_remove_filters();
+			wp_update_post( array( 'ID' => $found[0]->ID, 'post_content' => wp_slash( $content ) ) );
+			if ( $kses ) {
+				kses_init_filters();
+			}
+		}
+	}
+	update_option( 'rf_migration_v135', array( 'done' => gmdate( 'c' ), 'log' => $log ), true );
+	do_action( 'litespeed_purge_all' );
 }
 
 /**

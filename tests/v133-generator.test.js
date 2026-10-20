@@ -48,7 +48,14 @@ test( '#30 thousands separators, lakh grouping for INR / PKR', () => {
 	assert.equal( rg.formatAmount( 123456789, 'USD' ), '1,234,567.89' );
 	assert.equal( rg.formatAmount( 123456789, 'INR' ), '12,34,567.89' );
 	assert.equal( rg.formatAmount( 5, 'PKR' ), '0.05' );
-	assert.equal( vr.money( { cu: 'USD' }, 123456789 ), '$1,234,567.89' );
+	// The symbols come from the page (rfVerify, printed by functions.php).
+	globalThis.window = { rfVerify: { symbols: { USD: '$' } } };
+	try {
+		assert.equal( vr.money( { cu: 'USD' }, 123456789 ), '$1,234,567.89' );
+	} finally {
+		delete globalThis.window;
+	}
+	assert.equal( vr.money( { cu: 'USD' }, 123456789 ), 'USD 1,234,567.89' );
 } );
 
 test( '#31 a discount larger than the subtotal is flagged', () => {

@@ -65,9 +65,10 @@ function rf_add_decoding_async( $attr, $attachment = null ) {
 }
 add_filter( 'wp_get_attachment_image_attributes', 'rf_add_decoding_async', 10, 2 );
 
-// DNS-prefetch the CDN that serves the export libraries (only on pages
-// with the tool). v1.1.0: the libraries themselves are lazy-loaded on the
-// first Download click, so a cheap dns-prefetch replaces the preconnect.
+// DNS-prefetch the CDN that serves the generator's three libraries (only
+// on pages with the tool). receipt-generator.js loads them itself:
+// qrcode-generator as soon as the preview draws its QR code (on by
+// default), html2canvas and jsPDF on the first Download click.
 function rf_resource_hints( $urls, $relation_type ) {
 	if ( 'dns-prefetch' === $relation_type && wp_script_is( 'rf-receipt-generator', 'enqueued' ) ) {
 		$urls[] = 'https://cdnjs.cloudflare.com';

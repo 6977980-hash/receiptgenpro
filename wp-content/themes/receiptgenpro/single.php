@@ -65,14 +65,3 @@ while ( have_posts() ) :
 endwhile;
 
 get_footer();
-
-/**
- * Simple word-count-based reading time estimate — a small but genuine
- * UX/AEO signal (answer engines favor pages that are transparent about
- * content depth and freshness).
- */
-function rf_reading_time() {
-	$content = get_post_field( 'post_content', get_the_ID() );
-	$words   = str_word_count( wp_strip_all_tags( $content ) );
-	return max( 1, (int) ceil( $words / 200 ) );
-}

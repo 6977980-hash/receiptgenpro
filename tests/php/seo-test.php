@@ -12,6 +12,9 @@ define( 'RF_BRAND_NAME', 'ReceiptGenPro' );
 function add_action() {}
 function add_filter() {}
 function remove_action() {}
+function date_i18n( $format ) {
+	return gmdate( $format );
+}
 function home_url( $path = '' ) {
 	return 'https://example.com' . $path;
 }

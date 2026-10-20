@@ -53,6 +53,34 @@ function rf_needs_consent() {
 	return (bool) ( RF_ADSENSE_CLIENT_ID || RF_GA4_ID );
 }
 
+/**
+ * Audit 20 Oct (#66): no ads or analytics on /verify-receipt/. Its URL
+ * carries the whole receipt after #r=, and while a fragment is not sent
+ * in requests, ad and analytics scripts can read location.href.
+ */
+function rf_tracking_allowed_here() {
+	return ! is_page_template( 'page-verify-receipt.php' );
+}
+
+/**
+ * Google Consent Mode v2 (#66): everything is denied until the visitor
+ * accepts; assets/js/consent.js sends the update. Printed first in <head>,
+ * before any Google tag, and only when there is a tag to gate.
+ */
+function rf_output_consent_mode_default() {
+	if ( ! rf_needs_consent() || ! rf_tracking_allowed_here() ) {
+		return;
+	}
+	?>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	window.gtag = window.gtag || function () { dataLayer.push(arguments); };
+	gtag('consent', 'default', { ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied', analytics_storage: 'denied', wait_for_update: 500 });
+	</script>
+	<?php
+}
+add_action( 'wp_head', 'rf_output_consent_mode_default', 1 );
+
 /* ==========================================================================
    1. Virtual /ads.txt
    ========================================================================== */
@@ -133,7 +161,7 @@ add_action( 'wp_footer', 'rf_render_consent_banner', 5 );
    ========================================================================== */
 
 function rf_output_adsense_script() {
-	if ( ! RF_ADSENSE_CLIENT_ID ) {
+	if ( ! RF_ADSENSE_CLIENT_ID || ! rf_tracking_allowed_here() ) {
 		return;
 	}
 	?>
@@ -153,7 +181,7 @@ function rf_output_adsense_script() {
 add_action( 'wp_head', 'rf_output_adsense_script', 20 );
 
 function rf_output_ga4_script() {
-	if ( ! RF_GA4_ID ) {
+	if ( ! RF_GA4_ID || ! rf_tracking_allowed_here() ) {
 		return;
 	}
 	?>
@@ -166,7 +194,7 @@ function rf_output_ga4_script() {
 		s.src = 'https://www.googletagmanager.com/gtag/js?id=<?php echo esc_js( RF_GA4_ID ); ?>';
 		document.head.appendChild(s);
 		window.dataLayer = window.dataLayer || [];
-		window.gtag = function () { dataLayer.push(arguments); };
+		window.gtag = window.gtag || function () { dataLayer.push(arguments); };
 		gtag('js', new Date());
 		gtag('config', '<?php echo esc_js( RF_GA4_ID ); ?>');
 	});

@@ -1,5 +1,16 @@
 # ReceiptGenPro theme — Changelog
 
+## 1.3.5 — 20 Oct 2026 (audit of 20 Oct, Phase 5: content and optional fixes)
+
+- **About Us** (#62): "What We Never Store" names all three libraries: qrcode-generator loads with the generator while the QR code option is on (the default), html2canvas and jsPDF only on a download. The live page gets the new line from a one-time patch (`rf_migrate_v135_content()`, option `rf_migration_v135`, run from admin or WP-Cron with a revision); the stale comment in `inc/performance.php` is fixed.
+- **HRA sources** (#63): from 1 April 2026 the Income-tax Act, 2025 applies. The HRA check now cites Schedule III (Table: Sl. No. 11) of that Act (was s. 10(13A) of the 1961 Act) and the Income Tax Department's Form No. 124 FAQ for the ₹1 lakh landlord-PAN rule (Form 124 replaced Form 12BB); the intro says the exemption is only in the old regime (s. 202(2)). Read in the Gazette of India copy of the Act.
+- **Rent laws** (#65): the hub counts only landlord-specific rules; California (Civ. Code § 1499, a general debtor rule) is listed and named separately (`'general' => true`). Virginia's statement of charges on written request (§ 55.1-1204(D)) is a separate "on request" note, not a receipt content. Both re-read on the official text.
+- **Placeholders** (#65): "Rent for October 2026", "INV-2026-…" and the other dated examples follow the current month and year.
+- **Before ads / analytics go live** (#66; nothing changes while both IDs are empty): Google Consent Mode v2 default-denied stub before any Google tag; the stored cookie choice is versioned (`granted@2`); a footer "Cookie settings" button reopens the banner, and withdrawing reloads the page; no AdSense or GA4 on `/verify-receipt/` (its URL carries the receipt). The theme has no fixed ad slots (Auto ads), so there is no slot to reserve.
+- **jsPDF 4.2.1** (#68, was 2.5.1) from cdnjs with its SRI; A4 and thermal PDF and PNG exports tested in Chromium.
+- **Hygiene** (#70): founder name, title and LinkedIn are `RF_FOUNDER_*` constants in `functions.php`; the unused HowTo extraction code is gone; one currency list, `rf_currencies()` (`inc/category-data.php`), feeds the menu, the receipt (symbol read from the menu label) and the verify page (`rfVerify.symbols`); `rf_default_primary_menu()` and `rf_reading_time()` moved from `header.php` / `single.php` to `functions.php`; README sentence fixed.
+- **Tests** (#69): `tests/v135-dom.test.js` runs the real markup (`tests/php/render-generator.php`) and scripts in jsdom: render, type switch (HRA → INR → USD), save and restore, receipt number, verify page. `tests/v135-content.test.js`; deploy guard checks (settle wait, `index.lock`, mass delete) in `tests/php/deploy-test.php`; HRA and rent-law checks in `tests/php/requirements-test.php`. CI runs ESLint (`eslint.config.js`, bug rules only) and `node --test tests/` (directory form; on Node 21+ use `node --test`).
+
 ## 1.3.4 — 20 Oct 2026 (audit of 20 Oct, Phase 4: accessibility, performance, deploy)
 
 - **Contrast** (#45): green text (`--rf-success`: requirement checker "done", author reviewer) is #15803d (5.0:1, was 3.15:1); the Modern Blue receipt label is white on blue (was #dbeafe, 4.24:1).

@@ -11,7 +11,12 @@
 ( function () {
 	'use strict';
 
-	var SYMBOLS = { USD: '$', EUR: '€', GBP: '£', PKR: '₨', INR: '₹', CAD: 'CA$', AUD: 'AU$', AED: 'د.إ', SAR: '﷼' };
+	// From rf_currencies() (functions.php, printed as rfVerify.symbols); a
+	// code it doesn't know prints as "EUR 12.00".
+	function symbol( code ) {
+		var map = ( typeof window !== 'undefined' && window.rfVerify && window.rfVerify.symbols ) || {};
+		return Object.prototype.hasOwnProperty.call( map, code ) ? map[ code ] : '';
+	}
 
 	function b64urlDecode( str ) {
 		str = String( str ).replace( /-/g, '+' ).replace( /_/g, '/' );
@@ -80,7 +85,7 @@
 	function money( p, cents ) {
 		var locale = p.cu === 'INR' || p.cu === 'PKR' ? 'en-IN' : 'en-US';
 		var num = new Intl.NumberFormat( locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 } ).format( cents / 100 );
-		return ( SYMBOLS[ p.cu ] || ( p.cu ? stripBidi( p.cu ) + ' ' : '' ) ) + num;
+		return ( symbol( p.cu ) || ( p.cu ? stripBidi( p.cu ) + ' ' : '' ) ) + num;
 	}
 
 	if ( typeof module !== 'undefined' && module.exports ) {

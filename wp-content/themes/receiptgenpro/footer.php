@@ -93,6 +93,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 	<div class="rf-container rf-footer-bottom">
 		<p>&copy; <?php echo esc_html( gmdate( 'Y' ) ); ?> <?php echo esc_html( RF_BRAND_NAME ); ?>. <?php esc_html_e( 'All rights reserved.', 'receiptgenpro' ); ?></p>
+		<?php if ( rf_needs_consent() ) : ?>
+			<?php // Audit 20 Oct (#66): reopens the cookie banner; consent.js shows it. ?>
+			<p><button type="button" class="rf-footer-consent" data-rf-consent-open hidden><?php esc_html_e( 'Cookie settings', 'receiptgenpro' ); ?></button></p>
+		<?php endif; ?>
 		<p class="rf-footer-disclaimer"><?php esc_html_e( 'Receipts generated with this tool are intended for legitimate record-keeping, invoicing and reimbursement purposes only.', 'receiptgenpro' ); ?></p>
 	</div>
 </footer>
