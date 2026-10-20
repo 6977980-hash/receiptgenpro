@@ -33,8 +33,8 @@ function rf_feature_pages() {
 		'verify-receipt'           => array(
 			'title'       => 'Verify a Receipt',
 			'template'    => 'page-verify-receipt.php',
-			'seo_title'   => 'Verify a Receipt — Check If a Receipt Was Changed',
-			'description' => 'Scan the QR code on a ReceiptGenPro receipt to see the details exactly as they were issued, and spot a receipt whose amount, date or names were changed later.',
+			'seo_title'   => 'Verify a Receipt — Read a Receipt QR Code',
+			'description' => 'Scan the QR code on a ReceiptGenPro receipt to read the details stored in it, and learn what a receipt QR code can and cannot prove.',
 		),
 		'missing-receipt-form'     => array(
 			'title'    => 'Missing Receipt Form',
@@ -212,8 +212,8 @@ function rf_requirements_faqs() {
 
 function rf_verify_faqs() {
 	return array(
-		array( 'How do I check if a receipt is real?', 'If the receipt has a ReceiptGenPro verification QR code, scan it. This page then shows the details exactly as the issuer created them. If the amount, date or names on the paper differ from what you see here, the receipt was changed after it was made. For any other receipt, ask the business that issued it to confirm the payment.' ),
-		array( 'Does a matching QR code prove the payment happened?', 'No. It proves the printed receipt matches what its creator entered. Only the business or person who received the money, or a bank statement, can confirm the payment itself.' ),
+		array( 'Does the QR code prove a receipt is real?', 'No. Scanning a ReceiptGenPro QR code shows the details stored in it, which helps you read and compare them. The code is not signed, so anyone can make one with any details. To confirm a receipt or a payment, ask the business or person named on it, or check a bank statement.' ),
+		array( 'Does a matching QR code prove the payment happened?', 'No. A matching code only shows that the printed receipt and the code hold the same details. Only the business or person who received the money, or a bank statement, can confirm the payment itself.' ),
 		array( 'Is my receipt uploaded when I scan the code?', 'No. The details are stored in the part of the link after the # sign, which browsers never send to a server. This page decodes them in your browser.' ),
 	);
 }
@@ -292,12 +292,41 @@ function rf_embed_templates() {
 	return $list;
 }
 
+/** True when the request path is /embed/…, the only place rf_embed counts. */
+function rf_is_embed_path() {
+	$uri  = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
+	$path = (string) wp_parse_url( $uri, PHP_URL_PATH );
+	$home = rtrim( (string) wp_parse_url( home_url( '/' ), PHP_URL_PATH ), '/' );
+	return 0 === strpos( $path, $home . '/embed/' );
+}
+
+/**
+ * The embed template asked for, or '' when there is none or it is not valid.
+ * Pass the raw query var; it can be an array (?rf_embed[]=x), so it is
+ * checked before being used as an array key.
+ */
+function rf_embed_slug( $raw ) {
+	if ( ! is_string( $raw ) || '' === $raw || ! rf_is_embed_path() ) {
+		return '';
+	}
+	return isset( rf_embed_templates()[ $raw ] ) ? $raw : '';
+}
+
+/** Drop rf_embed from any request that is not a plain /embed/<slug>/ string. */
+function rf_embed_clean_request( $vars ) {
+	if ( isset( $vars['rf_embed'] ) && ( ! is_string( $vars['rf_embed'] ) || '' === $vars['rf_embed'] || ! rf_is_embed_path() ) ) {
+		unset( $vars['rf_embed'] );
+	}
+	return $vars;
+}
+add_filter( 'request', 'rf_embed_clean_request' );
+
 function rf_render_embed() {
 	$slug = get_query_var( 'rf_embed' );
-	if ( ! $slug ) {
+	if ( ! is_string( $slug ) || '' === $slug || ! rf_is_embed_path() ) {
 		return;
 	}
-	if ( ! isset( rf_embed_templates()[ $slug ] ) ) {
+	if ( '' === rf_embed_slug( $slug ) ) {
 		global $wp_query;
 		$wp_query->set_404();
 		status_header( 404 );

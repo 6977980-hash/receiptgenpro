@@ -67,3 +67,17 @@ test( 'widget code has the iframe, the credit link and an origin-checked listene
 	assert.match( code, /<a href="https:\/\/receiptgenpro\.com\/rent-receipt\/">rent receipt generator<\/a> by ReceiptGenPro/ );
 	assert.match( code, /e\.origin!=="https:\/\/receiptgenpro\.com"/ );
 } );
+
+test( 'decodePayload rejects malformed lines, extras and amounts', () => {
+	const enc = ( o ) => '#r=' + rg.b64urlEncode( JSON.stringify( o ) );
+	assert.equal( vr.decodePayload( enc( { v: 1, tot: 1, i: [ null ], x: 'ab' } ) ), null );
+	assert.equal( vr.decodePayload( enc( { v: 1, tot: 1, i: [ [ 'a', 1, 100 ] ], x: 'ab' } ) ), null );
+	assert.equal( vr.decodePayload( enc( { v: 1, tot: 1, i: [ [ 'a', 1, 100 ] ], x: [ 'ab' ] } ) ), null );
+	assert.equal( vr.decodePayload( enc( { v: 1, tot: 1.5, i: [] } ) ), null );
+	assert.equal( vr.decodePayload( enc( { v: 1, tot: 1, i: [ [ 'a', 1, '100' ] ] } ) ), null );
+	assert.equal( vr.decodePayload( enc( { v: 1, tot: 1, i: [], pd: 'x' } ) ), null );
+	assert.equal( vr.decodePayload( enc( { v: 1, tot: 1e400, i: [] } ) ), null );
+	assert.equal( vr.decodePayload( enc( null ) ), null );
+	const ok = vr.decodePayload( enc( { v: 1, tot: 100, i: [ [ 'a', 1, 100 ] ], x: [ [ 'Rent Month', 'April' ] ], pd: 100 } ) );
+	assert.equal( ok.tot, 100 );
+} );

@@ -23,6 +23,15 @@
 		return new TextDecoder().decode( bytes );
 	}
 
+	function isCents( n ) {
+		return typeof n === 'number' && isFinite( n ) && Math.floor( n ) === n;
+	}
+
+	// An array whose every entry is itself an array (item lines, extra fields).
+	function isRows( a ) {
+		return Array.isArray( a ) && a.every( Array.isArray );
+	}
+
 	// Returns the receipt object, or null if the link holds no valid receipt.
 	function decodePayload( hashOrUrl ) {
 		var m = String( hashOrUrl || '' ).match( /[#&]r=([A-Za-z0-9_-]+)/ );
@@ -31,8 +40,19 @@
 		}
 		try {
 			var p = JSON.parse( b64urlDecode( m[1] ) );
-			if ( ! p || p.v !== 1 || typeof p.tot !== 'number' || ! Array.isArray( p.i ) ) {
+			if ( ! p || typeof p !== 'object' || p.v !== 1 || ! isCents( p.tot ) || ! isRows( p.i ) ) {
 				return null;
+			}
+			if ( p.x !== undefined && ! isRows( p.x ) ) {
+				return null;
+			}
+			if ( p.pd !== undefined && p.pd !== null && ! isCents( p.pd ) ) {
+				return null;
+			}
+			for ( var k = 0; k < p.i.length; k++ ) {
+				if ( ! isCents( p.i[ k ][2] ) ) {
+					return null;
+				}
 			}
 			return p;
 		} catch ( e ) {
@@ -66,6 +86,14 @@
 		}
 		var hasLink = /[#&]r=/.test( String( hashOrUrl || '' ) );
 		var p = decodePayload( hashOrUrl );
+		var html = '';
+		if ( p ) {
+			try {
+				html = detailsHtml( p );
+			} catch ( e ) {
+				p = null;
+			}
+		}
 		if ( ! p ) {
 			details.hidden = true;
 			details.innerHTML = '';
@@ -76,9 +104,15 @@
 			return;
 		}
 
-		status.className = 'rf-verify-status rf-verify-status-ok';
-		status.textContent = 'Receipt details as issued. Compare each line with the receipt you were given.';
+		details.innerHTML = html;
+		details.hidden = false;
+		// Set only after the details rendered, so a bad link never shows a result.
+		// Neutral, not green: the code is not signed, so anyone can make one.
+		status.className = 'rf-verify-status rf-verify-status-info';
+		status.textContent = 'These are the details stored in this QR code. Anyone can create a code, so this does not prove who issued the receipt or that it was paid.';
+	}
 
+	function detailsHtml( p ) {
 		var rows = [
 			[ 'Document', p.t ],
 			[ 'Issued by', p.b ],
@@ -111,10 +145,8 @@
 		if ( p.more ) {
 			html += '<p class="rf-muted">The receipt has more lines than fit in the QR code; the first ones are shown.</p>';
 		}
-		html += '<p class="rf-muted">This shows what the issuer entered. It does not confirm the payment itself; only the issuer or a bank statement can.</p>';
-
-		details.innerHTML = html;
-		details.hidden = false;
+		html += '<p class="rf-muted">This shows what was typed when the code was made. It does not confirm who issued the receipt or that it was paid; only the person who received the money, or a bank statement, can.</p>';
+		return html;
 	}
 
 	document.addEventListener( 'DOMContentLoaded', function () {

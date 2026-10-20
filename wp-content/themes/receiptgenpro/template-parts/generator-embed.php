@@ -231,7 +231,7 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 					<input type="checkbox" id="rf-qr" checked aria-describedby="rf-qr-hint">
 					Add a verification QR code
 				</label>
-				<p class="rf-field-hint" id="rf-qr-hint">Scanning it shows the details as you issued them, so anyone can spot a receipt that was changed later. <a href="<?php echo esc_url( home_url( '/verify-receipt/' ) ); ?>">How it works</a></p>
+				<p class="rf-field-hint" id="rf-qr-hint">Scanning it shows the receipt's details on a phone. It is a convenience, not proof the receipt is genuine. <a href="<?php echo esc_url( home_url( '/verify-receipt/' ) ); ?>">How it works</a></p>
 			</div>
 		</form>
 

@@ -20,8 +20,8 @@ get_header();
 			<span class="rf-category-icon" aria-hidden="true">🔍</span>
 			<h1>Verify a Receipt</h1>
 			<p class="rf-hero-sub rf-direct-answer">
-				Receipts made with <?php echo esc_html( RF_BRAND_NAME ); ?> can carry a QR code. Scan it and this page shows the receipt's
-				details exactly as they were issued. If the paper in your hand shows a different amount, date or name, it was changed after it was made.
+				Receipts made with <?php echo esc_html( RF_BRAND_NAME ); ?> can carry a QR code. Scan it and this page shows the details
+				stored in the code. Anyone can make a code, so it is a quick reference, not proof of who issued the receipt or that it was paid.
 			</p>
 		</div>
 	</section>
@@ -45,15 +45,15 @@ get_header();
 			<ol>
 				<li>Point your phone camera at the QR code printed on the receipt and open the link.</li>
 				<li>Compare every line on this page with the receipt: the amount, the date, the receipt number and both names.</li>
-				<li>If anything differs, the receipt was edited after it was created. Ask the person who issued it for the original.</li>
+				<li>If anything differs, or if you need to be sure, ask the person or business named on the receipt to confirm it.</li>
 			</ol>
 			<h2>What This Proves, and What It Doesn't</h2>
-			<p>The QR code holds a copy of the details the issuer typed when they made the receipt. That makes later edits easy to spot: someone who changes the total in a PDF editor or on paper cannot change what the code says without making a new code.</p>
-			<p>It does not prove that the money was paid, or that the issuer is who they say they are. Only the person or business that received the payment, or a bank statement, can confirm that.</p>
+			<p>The QR code holds a copy of the details that were typed when the receipt was made. It is not signed or registered anywhere, so anyone can make a new code with any details, including a code that matches an edited receipt.</p>
+			<p>So a matching code does not prove who issued the receipt, that it was not changed, or that the money was paid. Only the person or business that received the payment, or a bank statement, can confirm that.</p>
 			<h2>Your Privacy</h2>
 			<p>The details travel in the part of the link after the # sign. Browsers never send that part to a website, so the receipt is never uploaded to us; this page reads it inside your own browser.</p>
 			<h2>Add a QR Code to Your Own Receipts</h2>
-			<p>Every <a href="<?php echo esc_url( home_url( '/receipt-templates/' ) ); ?>">receipt template</a> on this site adds a verification QR code by default. Your customers, tenants or employer can scan it to confirm the receipt is the one you issued. You can switch it off with the "Add a verification QR code" box.</p>
+			<p>Every <a href="<?php echo esc_url( home_url( '/receipt-templates/' ) ); ?>">receipt template</a> on this site adds a verification QR code by default. Your customers, tenants or employer can scan it to read the details on their phone. You can switch it off with the "Add a verification QR code" box.</p>
 		</section>
 
 		<section class="rf-section rf-faq-section">

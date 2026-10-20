@@ -2,7 +2,7 @@
 /**
  * Plugin Name: RGP Deploy Helper
  * Description: Copies the theme and plugin folders from this Git checkout (deployed by Hostinger) into the live wp-content folder whenever a new commit arrives. Deleting this plugin only stops deployment; everything already deployed stays as it is.
- * Version:     1.1.1
+ * Version:     1.1.2
  * Author:      receiptgenpro
  * License:     GPL-2.0-or-later
  * Requires PHP: 7.4
@@ -18,6 +18,15 @@ final class RGP_Deploy_Helper {
 	const LOCK         = 'rgp_deploy_lock';
 	const THROTTLE     = 'rgp_deploy_checked';
 	const SELF_SLUG    = 'rgp-deploy-helper';
+
+	/** A lock older than this belongs to a run that died; it is cleared. */
+	const LOCK_TTL = 600;
+
+	/** Wait this long after the checkout last changed before copying it. */
+	const SETTLE_SECONDS = 60;
+
+	/** Refuse a run that would delete more than this share of managed files. */
+	const MAX_REMOVE_SHARE = 0.2;
 
 	/** Top-level folders inside the repo's wp-content that get copied. */
 	const SECTIONS = array( 'themes', 'plugins', 'mu-plugins' );
@@ -44,7 +53,8 @@ final class RGP_Deploy_Helper {
 		delete_option( self::OPT_STATE );
 		delete_option( self::OPT_SECRET );
 		delete_option( self::OPT_REPO_DIR );
-		delete_transient( self::LOCK );
+		delete_option( self::LOCK );
+		delete_transient( self::LOCK ); // lock used by 1.1.1 and older
 		delete_transient( self::THROTTLE );
 	}
 
@@ -187,24 +197,147 @@ final class RGP_Deploy_Helper {
 		return $files + $last;
 	}
 
-	public static function sync( $trigger ) {
-		if ( get_transient( self::LOCK ) ) {
+	/**
+	 * Atomic lock: INSERT IGNORE succeeds for exactly one request, unlike a
+	 * transient get/set, where two requests can both see "no lock".
+	 */
+	private static function acquire_lock() {
+		global $wpdb;
+		// A run that crashed never released its lock; clear it after LOCK_TTL.
+		$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name = %s AND CAST(option_value AS UNSIGNED) < %d", self::LOCK, time() - self::LOCK_TTL ) );
+		$got = $wpdb->query( $wpdb->prepare( "INSERT IGNORE INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %s, 'no')", self::LOCK, (string) time() ) );
+		wp_cache_delete( self::LOCK, 'options' );
+		wp_cache_delete( 'notoptions', 'options' );
+		return 1 === (int) $got;
+	}
+
+	private static function release_lock() {
+		global $wpdb;
+		$wpdb->delete( $wpdb->options, array( 'option_name' => self::LOCK ) );
+		wp_cache_delete( self::LOCK, 'options' );
+	}
+
+	/**
+	 * Why the checkout must not be copied yet, or '' when it is safe.
+	 * Hostinger's git pull writes files one by one; while it runs (index.lock)
+	 * or just after it changed HEAD, the folder can be half old, half new.
+	 *
+	 * @param array<string,string> $files Source files, for checkouts without .git.
+	 */
+	private static function checkout_busy( array $files ) {
+		$git = self::repo_dir() . '/.git';
+		if ( file_exists( $git . '/index.lock' ) ) {
+			return 'Git is still updating the repo folder (.git/index.lock exists).';
+		}
+		$newest = 0;
+		if ( is_dir( $git ) ) {
+			$paths = array( $git . '/HEAD', $git . '/index', $git . '/packed-refs' );
+			$head  = is_readable( $git . '/HEAD' ) ? trim( (string) file_get_contents( $git . '/HEAD' ) ) : '';
+			if ( 0 === strpos( $head, 'ref:' ) ) {
+				$paths[] = $git . '/' . trim( substr( $head, 4 ) );
+			}
+		} else {
+			$paths = array_values( $files );
+		}
+		foreach ( $paths as $path ) {
+			$mtime = @filemtime( $path );
+			if ( $mtime && $mtime > $newest ) {
+				$newest = $mtime;
+			}
+		}
+		$age = time() - $newest;
+		if ( $newest && $age < self::SETTLE_SECONDS ) {
+			return sprintf( 'The repo folder changed %d seconds ago; waiting until it is %d seconds old.', max( 0, $age ), self::SETTLE_SECONDS );
+		}
+		return '';
+	}
+
+	/**
+	 * Why this run would delete too much, or '' when it is fine. A checkout
+	 * that is missing a whole theme/plugin folder, or a big share of its
+	 * files, is far more likely broken than a real change.
+	 *
+	 * @param string[] $old Files deployed last time.
+	 * @param string[] $new Files in the repo now.
+	 */
+	public static function removal_problem( array $old, array $new ) {
+		if ( empty( $old ) ) {
+			return '';
+		}
+		$folder = function ( $rel ) {
+			$parts = explode( '/', $rel );
+			return count( $parts ) > 2 ? $parts[0] . '/' . $parts[1] : '';
+		};
+		$now = array_flip( array_filter( array_map( $folder, $new ) ) );
+		foreach ( array_unique( array_filter( array_map( $folder, $old ) ) ) as $dir ) {
+			if ( ! isset( $now[ $dir ] ) ) {
+				return 'The whole folder ' . $dir . ' is missing from the repo.';
+			}
+		}
+		$remove = count( array_diff( $old, $new ) );
+		if ( $remove > count( $old ) * self::MAX_REMOVE_SHARE ) {
+			return sprintf( '%d of %d deployed files would be deleted.', $remove, count( $old ) );
+		}
+		return '';
+	}
+
+	/** Records why a run did not happen; the revision stays, so it is retried. */
+	private static function refuse( array $state, $trigger, $reason ) {
+		$state['time']    = time();
+		$state['trigger'] = $trigger;
+		$state['copied']  = 0;
+		$state['removed'] = 0;
+		$state['errors']  = array( 'Not deployed: ' . $reason );
+		update_option( self::OPT_STATE, $state, false );
+		return new WP_Error( 'rgp_refused', $reason );
+	}
+
+	/**
+	 * @param string $trigger       auto, webhook or manual.
+	 * @param bool   $allow_removal Skip the mass-delete check (admin's choice).
+	 */
+	public static function sync( $trigger, $allow_removal = false ) {
+		if ( ! self::acquire_lock() ) {
 			return new WP_Error( 'rgp_locked', 'A deployment is already running.' );
 		}
-		set_transient( self::LOCK, 1, 5 * MINUTE_IN_SECONDS );
+		try {
+			return self::run_sync( $trigger, $allow_removal );
+		} finally {
+			self::release_lock();
+		}
+	}
 
+	private static function run_sync( $trigger, $allow_removal ) {
 		$source = self::source_root();
 		$target = self::target_root();
 		$state  = self::state();
-		$rev    = self::current_revision();
-		$files  = self::list_source_files();
+
+		if ( ! is_dir( $source ) ) {
+			return self::refuse( $state, $trigger, 'Repo folder not found: ' . $source );
+		}
+		$src_real = wp_normalize_path( (string) realpath( $source ) );
+		$dst_real = wp_normalize_path( (string) realpath( $target ) );
+		// The repo normally lives inside wp-content/plugins/; only the same
+		// folder (copying files onto themselves) is refused.
+		if ( '' === $dst_real || $src_real === $dst_real ) {
+			return self::refuse( $state, $trigger, 'The repo folder is the same as the live wp-content folder.' );
+		}
+
+		$rev   = self::current_revision();
+		$files = self::list_source_files();
+		$busy  = self::checkout_busy( $files );
+		if ( '' !== $busy ) {
+			return self::refuse( $state, $trigger, $busy );
+		}
+		if ( ! $allow_removal ) {
+			$problem = self::removal_problem( $state['files'], array_keys( $files ) );
+			if ( '' !== $problem ) {
+				return self::refuse( $state, $trigger, $problem . ' Check the repo folder, then use "Deploy now" with "Allow removing many files" if this is intended.' );
+			}
+		}
 
 		$copied = 0;
 		$errors = array();
-
-		if ( ! is_dir( $source ) ) {
-			$errors[] = 'Repo folder not found: ' . $source;
-		}
 
 		foreach ( $files as $rel => $abs ) {
 			$dest = $target . '/' . $rel;
@@ -215,13 +348,18 @@ final class RGP_Deploy_Helper {
 				$errors[] = 'Cannot create folder for ' . $rel;
 				continue;
 			}
-			$tmp = $dest . '.rgp-tmp';
+			$tmp = $dest . '.rgp-tmp-' . wp_generate_password( 8, false );
 			if ( @copy( $abs, $tmp ) && @rename( $tmp, $dest ) ) {
 				$copied++;
 			} else {
 				@unlink( $tmp );
 				$errors[] = 'Cannot write ' . $rel;
 			}
+		}
+
+		// The checkout changed while copying: copy again on the next run.
+		if ( self::current_revision() !== $rev || '' !== self::checkout_busy( $files ) ) {
+			$errors[] = 'The repo folder changed during the deployment; it will run again.';
 		}
 
 		// Remove files this plugin deployed earlier that are gone from the repo.
@@ -236,6 +374,8 @@ final class RGP_Deploy_Helper {
 			}
 		}
 
+		// The revision only counts as deployed when everything went through;
+		// otherwise it stays, and the next check runs the deployment again.
 		$new_state = array(
 			'revision' => empty( $errors ) ? $rev : $state['revision'],
 			'files'    => empty( $errors ) ? array_keys( $files ) : array_values( array_unique( array_merge( $state['files'], array_keys( $files ) ) ) ),
@@ -258,7 +398,6 @@ final class RGP_Deploy_Helper {
 			do_action( 'litespeed_purge_all' );
 		}
 
-		delete_transient( self::LOCK );
 		return $new_state;
 	}
 
@@ -325,7 +464,7 @@ final class RGP_Deploy_Helper {
 			wp_die( 'Not allowed.' );
 		}
 		check_admin_referer( 'rgp_deploy_sync' );
-		self::sync( 'manual' );
+		self::sync( 'manual', ! empty( $_POST['allow_removal'] ) );
 		wp_safe_redirect( admin_url( 'tools.php?page=rgp-deploy&synced=1' ) );
 		exit;
 	}
@@ -377,6 +516,7 @@ final class RGP_Deploy_Helper {
 				<input type="hidden" name="action" value="rgp_deploy_sync">
 				<?php wp_nonce_field( 'rgp_deploy_sync' ); ?>
 				<?php submit_button( 'Deploy now', 'primary', 'submit', false ); ?>
+				<label style="margin-left:12px"><input type="checkbox" name="allow_removal" value="1"> Allow removing many files (only when you deleted a theme/plugin folder or many files on purpose)</label>
 			</form>
 
 			<h2>Instant deploy webhook (optional)</h2>
