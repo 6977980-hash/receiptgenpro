@@ -1,5 +1,22 @@
 # ReceiptGenPro theme — Changelog
 
+## 1.3.1 — 20 Oct 2026 (audit of 20 Oct, Phase 1: trust and safety)
+
+- **Verify page no longer overclaims.** The QR code is not signed, so anyone can make one. The result is now a neutral blue note ("These are the details stored in this QR code. Anyone can create a code, so this does not prove who issued the receipt or that it was paid.") instead of a green "as issued". The page text, the QR hint under the generator, the SEO title/description, the FAQ, the templates hub line and `/llms.txt` drop the "easy to spot a changed receipt" claims. All of this text is in the theme, not in page content, so no content patch is needed.
+- **Verify page checks the link fully** before showing anything: item lines and extra fields must be lists, amounts whole numbers. The status is set only after the details render, so a damaged link never shows a result and then breaks.
+- **`?rf_embed[]=x` no longer gives HTTP 500** on any URL. `rf_embed` only counts on `/embed/<template>/` paths and must be a known template (`rf_embed_slug()`); `/?rf_embed=cash-receipt` is a normal page again, and `frame-ancestors *` is sent only for a valid embed.
+- **Receipt numbers no longer repeat.** After a download the field moves on to the next number, and a number saved in the tab that was already downloaded moves on after a reload. A year at the end stays (`A-1/2026` → `A-2/2026`), and long numbers are counted as text, so nothing past 2^53 loses digits.
+- **Currency follows the receipt type.** Switching from HRA (INR) to a type without its own currency goes back to the page default (USD) unless you picked another currency yourself; the payment method follows the type only until you choose one.
+- **Footer text contrast** fixed (`.rf-site-footer p` was 2.35:1, now #cbd5e1 on the dark footer).
+- **Admin "links" fix** keeps backslashes in content (`wp_slash()` in both `wp_update_post()` calls).
+- Unit tests for the receipt number rules and the verify link checks.
+
+### Deploy helper (`rgp-deploy-helper.php` 1.1.2)
+- Waits while Git is still writing: no copy while `.git/index.lock` exists or until HEAD / the branch ref / the index are 60 seconds old.
+- Refuses a run that would delete a whole theme/plugin folder or more than 20% of the files it manages, logs why on Tools → Deploy Helper and retries on the next check. "Deploy now" has an "Allow removing many files" box for intended removals.
+- A revision counts as deployed only when every file went through and the checkout did not change during the copy; otherwise it runs again.
+- Atomic lock (`INSERT IGNORE` on the `rgp_deploy_lock` option, cleared after 10 minutes if a run died) instead of a transient, unique temp file names, and source = target is refused.
+
 ## 1.3.0 — 16 Oct 2026 (receipt type picker and designs)
 
 - **Receipt type picker on the homepage.** "1. Choose your receipt type" lists the general receipt and every template in `rf_receipt_categories()`. Picking one swaps the form in place (labels, placeholders, extra fields, tip / amount paid, statement, signature lines, default payment method, currency and requirement check) and keeps what the types share. No new URLs: each option is a link to that template's own page, so crawlers and visitors without JavaScript land there, and a "guide" link under the picker points to it. The type is kept with the rest of the form for the tab session.

@@ -84,7 +84,8 @@ function rf_security_headers( $wp = null ) {
 	header( 'X-Content-Type-Options: nosniff' );
 	header( 'Referrer-Policy: strict-origin-when-cross-origin' );
 	// v1.2.0: /embed/<template>/ is made to be shown in other sites' iframes.
-	if ( $wp instanceof WP && ! empty( $wp->query_vars['rf_embed'] ) ) {
+	// Only a valid template on an /embed/ path gets frame-ancestors *.
+	if ( $wp instanceof WP && isset( $wp->query_vars['rf_embed'] ) && function_exists( 'rf_embed_slug' ) && '' !== rf_embed_slug( $wp->query_vars['rf_embed'] ) ) {
 		header( "Content-Security-Policy: frame-ancestors *" );
 	} else {
 		header( 'X-Frame-Options: SAMEORIGIN' );
@@ -237,7 +238,7 @@ function rf_render_llms_txt() {
 		$lines[] = '- [' . rf_category_label( $cat ) . '](' . home_url( '/' . $slug . '/' ) . '): ' . $cat['meta_description'];
 	}
 	$lines[] = '- [Receipt Requirements Checker](' . home_url( '/receipt-requirements/' ) . '): what a receipt must show for an HRA claim, a dependent care FSA, a $250+ donation, an expense report or a US rent payment, with official sources';
-	$lines[] = '- [Verify a Receipt](' . home_url( '/verify-receipt/' ) . '): reads the verification QR code printed on ' . RF_BRAND_NAME . ' receipts to show the details as issued';
+	$lines[] = '- [Verify a Receipt](' . home_url( '/verify-receipt/' ) . '): reads the verification QR code printed on ' . RF_BRAND_NAME . ' receipts to show the details stored in it (not proof of authenticity)';
 	$lines[] = '- [Rent Receipt Laws by State](' . home_url( '/rent-receipt-laws/' ) . '): US states that require landlords to give rent receipts, with statute citations';
 	$lines[] = '- [Receipt Generator Widget](' . home_url( '/receipt-generator-widget/' ) . '): free embed code to put any template on another website';
 	$lines[] = '';

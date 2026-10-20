@@ -136,19 +136,72 @@
 		return { discountCents: discountCents, taxCents: taxCents, totalCents: totalCents };
 	}
 
+	// Splits a receipt number into { pre, digits, post } around its counter:
+	// the last run of digits, unless that run is a year (19xx/20xx) at the
+	// very end after a separator and another run comes before it, as in
+	// A-1/2026 or 0042-2026. null when there is no digit at all.
+	function numberParts( str ) {
+		var runs = [];
+		var re = /\d+/g;
+		var m;
+		while ( ( m = re.exec( str ) ) ) {
+			runs.push( { start: m.index, digits: m[0] } );
+		}
+		if ( ! runs.length ) {
+			return null;
+		}
+		var run = runs[ runs.length - 1 ];
+		if ( runs.length > 1 && run.start + 4 === str.length && /^(19|20)\d\d$/.test( run.digits ) && /[\/\-.\s_]$/.test( str.slice( 0, run.start ) ) ) {
+			run = runs[ runs.length - 2 ];
+		}
+		return { pre: str.slice( 0, run.start ), digits: run.digits, post: str.slice( run.start + run.digits.length ) };
+	}
+
+	// Adds 1 to a string of digits, keeping zero padding and any length
+	// (no parseInt, so 20-digit numbers don't lose precision).
+	function incrementDigits( digits ) {
+		var out = digits.split( '' );
+		for ( var i = out.length - 1; i >= 0; i-- ) {
+			if ( out[ i ] !== '9' ) {
+				out[ i ] = String( +out[ i ] + 1 );
+				return out.join( '' );
+			}
+			out[ i ] = '0';
+		}
+		return '1' + out.join( '' );
+	}
+
 	// The receipt number after this one: 1001 → 1002, INV-0099 → INV-0100,
-	// 2026-009 → 2026-010. A number without trailing digits gets "-2".
+	// 2026-009 → 2026-010, A-1/2026 → A-2/2026 (a year at the end is kept).
+	// A number without digits gets "-2".
 	function nextReceiptNumber( current ) {
 		var str = String( current || '' ).trim();
-		var m = str.match( /^(.*?)(\d+)$/ );
-		if ( ! m ) {
+		var p = numberParts( str );
+		if ( ! p ) {
 			return str ? str + '-2' : '1001';
 		}
-		var next = String( parseInt( m[2], 10 ) + 1 );
-		while ( next.length < m[2].length ) {
-			next = '0' + next;
+		return p.pre + incrementDigits( p.digits ) + p.post;
+	}
+
+	// True when `num` was already used: it equals the last downloaded number,
+	// or has the same prefix and suffix and a counter that is not higher.
+	function isUsedNumber( num, last ) {
+		num  = String( num || '' ).trim();
+		last = String( last || '' ).trim();
+		if ( ! num || ! last ) {
+			return false;
 		}
-		return m[1] + next;
+		if ( num === last ) {
+			return true;
+		}
+		var a = numberParts( num );
+		var b = numberParts( last );
+		if ( ! a || ! b || a.pre !== b.pre || a.post !== b.post ) {
+			return false;
+		}
+		var x = a.digits.replace( /^0+(?=\d)/, '' );
+		var y = b.digits.replace( /^0+(?=\d)/, '' );
+		return x.length < y.length || ( x.length === y.length && x <= y );
 	}
 
 	// Today's date in the visitor's own time zone (toISOString() is UTC).
@@ -416,6 +469,7 @@
 			nonNegative: nonNegative,
 			calcTotals: calcTotals,
 			nextReceiptNumber: nextReceiptNumber,
+			isUsedNumber: isUsedNumber,
 			evaluateChecks: evaluateChecks,
 			buildPayload: buildPayload,
 			b64urlEncode: b64urlEncode,
@@ -587,6 +641,15 @@
 			}
 		}
 
+		var paySel = document.getElementById( 'rf-payment-method' );
+		var paymentTouched = false;
+		var typeCurrency = '';
+		if ( paySel ) {
+			paySel.addEventListener( 'change', function () {
+				paymentTouched = true;
+			} );
+		}
+
 		// Swap the form to another receipt type, keeping everything the
 		// types share (business, customer, number, date, items, taxes, notes).
 		function applyType( slug ) {
@@ -612,12 +675,20 @@
 			if ( notesEl ) {
 				notesEl.placeholder = f.notes_ph || '';
 			}
-			var paySel = document.getElementById( 'rf-payment-method' );
-			if ( paySel && f.payment ) {
+			// The payment method follows the type until the visitor picks one.
+			if ( paySel && f.payment && ! paymentTouched ) {
 				paySel.value = f.payment;
 			}
+			// A type's own currency (INR for HRA) is undone when switching to
+			// a type without one, unless the visitor chose another currency.
 			if ( f.currency && currencies[ f.currency ] ) {
 				currencySel.value = f.currency;
+				typeCurrency = f.currency;
+			} else if ( typeCurrency ) {
+				if ( currencySel.value === typeCurrency ) {
+					currencySel.value = defaultCurrency;
+				}
+				typeCurrency = '';
 			}
 
 			var parts = typeFieldsHtml( f );
@@ -717,9 +788,9 @@
 			currencySel.appendChild( opt );
 		} );
 
-		if ( form.dataset.currency && currencies[ form.dataset.currency ] ) {
-			currencySel.value = form.dataset.currency; // template default (e.g. INR for HRA)
-		}
+		// The page's own currency: the template default (e.g. INR for HRA) or USD.
+		var defaultCurrency = form.dataset.currency && currencies[ form.dataset.currency ] ? form.dataset.currency : ( currencies.USD ? 'USD' : currencySel.value );
+		currencySel.value = defaultCurrency;
 
 		// ---- Default date = today ------------------------------------------
 		if ( dateInput && ! dateInput.value ) {
@@ -895,13 +966,26 @@
 			}
 		} catch ( e ) {}
 
+		// After a download: remember the number used and move the field on to
+		// the next one, so the next receipt never repeats it.
 		function rememberNumber() {
+			if ( ! numberInput ) {
+				return;
+			}
+			var used = numberInput.value.trim() || '1001';
 			try {
-				window.localStorage.setItem( LAST_NUMBER_KEY, numberInput.value.trim() || '1001' );
+				window.localStorage.setItem( LAST_NUMBER_KEY, used );
 			} catch ( e ) {}
+			numberInput.value = nextReceiptNumber( used );
+			numberInput.dispatchEvent( new Event( 'input', { bubbles: true } ) );
 		}
 
 		restoreForm();
+
+		// A number saved in this tab that was already downloaded moves on too.
+		if ( lastNumber && numberInput && isUsedNumber( numberInput.value, lastNumber ) ) {
+			numberInput.value = nextReceiptNumber( lastNumber );
+		}
 
 		// Show the extra options when a restored form uses them.
 		var moreOptions = document.getElementById( 'rf-more-options' );

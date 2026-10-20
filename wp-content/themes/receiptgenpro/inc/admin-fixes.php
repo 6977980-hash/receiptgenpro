@@ -115,7 +115,7 @@ function rf_fixes_handle() {
 					$log[] = array( $icon, "/$slug/ — {$patch['label']}: $text" );
 				}
 				if ( $apply && $content !== $page->post_content ) {
-					wp_update_post( array( 'ID' => $page->ID, 'post_content' => $content ) );
+					wp_update_post( array( 'ID' => $page->ID, 'post_content' => wp_slash( $content ) ) );
 				}
 			}
 			if ( '' === $owner['owner'] ) {
@@ -132,7 +132,7 @@ function rf_fixes_handle() {
 					$log[]  = array( $apply ? 'ok' : 'todo', sprintf( '%s — %d link(s)', get_permalink( $p ), $before ) );
 					$changed++;
 					if ( $apply ) {
-						wp_update_post( array( 'ID' => $p->ID, 'post_content' => $new ) );
+						wp_update_post( array( 'ID' => $p->ID, 'post_content' => wp_slash( $new ) ) );
 					}
 				}
 			}

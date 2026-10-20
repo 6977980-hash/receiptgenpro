@@ -11,7 +11,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-$rf_slug  = get_query_var( 'rf_embed' );
+$rf_slug  = rf_embed_slug( get_query_var( 'rf_embed' ) );
+if ( '' === $rf_slug ) {
+	return;
+}
 $rf_cat   = 'receipt' === $rf_slug ? null : rf_get_category_data( $rf_slug );
 $rf_label = $rf_cat ? rf_category_label( $rf_cat ) : 'Receipt Generator';
 $rf_page  = $rf_cat ? home_url( '/' . $rf_slug . '/' ) : home_url( '/' );

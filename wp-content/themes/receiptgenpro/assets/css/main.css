@@ -258,6 +258,7 @@ textarea:focus-visible, .rf-btn:focus-visible { outline: 2px solid var(--rf-prim
 .rf-footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 2rem; }
 @media (max-width: 800px) { .rf-footer-grid { grid-template-columns: 1fr 1fr; } }
 .rf-site-footer h3 { color: #fff; font-size: .95rem; }
+.rf-site-footer p { color: #cbd5e1; } /* global p colour is too dark on the footer (2.35:1) */
 .rf-site-footer a { color: #cbd5e1; }
 .rf-site-footer .rf-logo { color: #fff; }
 .rf-footer-menu { list-style: none; padding: 0; margin: 0; }
@@ -404,6 +405,7 @@ textarea:focus-visible, .rf-btn:focus-visible { outline: 2px solid var(--rf-prim
 .rf-verify-status { font-weight: 700; padding: .65rem .85rem; border-radius: 8px; margin-bottom: 1rem; }
 .rf-verify-status-ok { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
 .rf-verify-status-bad { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+.rf-verify-status-info { background: #eff6ff; color: #1e3a8a; border: 1px solid #bfdbfe; }
 .rf-verify-status-none { background: var(--rf-bg-soft); color: var(--rf-ink-soft); border: 1px solid var(--rf-border); }
 .rf-verify-paste { display: flex; gap: .5rem; margin-top: 1rem; }
 .rf-verify-paste input { flex: 1; min-width: 0; padding: .6rem .7rem; border: 1px solid var(--rf-input-border); border-radius: 8px; font: inherit; }

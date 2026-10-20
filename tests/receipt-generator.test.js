@@ -104,3 +104,31 @@ test( 'wrapDesign prints two copies only for the copies design', () => {
 	assert.equal( two.split( 'rf-receipt-inner' ).length - 1, 2 );
 	assert.match( two, /Office copy[\s\S]*cut here[\s\S]*Customer copy/ );
 } );
+
+test( 'nextReceiptNumber keeps a year at the end and the number after a year at the start', () => {
+	assert.equal( rg.nextReceiptNumber( 'A-1/2026' ), 'A-2/2026' );
+	assert.equal( rg.nextReceiptNumber( '0042-2026' ), '0043-2026' );
+	assert.equal( rg.nextReceiptNumber( 'INV-2026-0007' ), 'INV-2026-0008' );
+	// A lone 4-digit number is the counter itself.
+	assert.equal( rg.nextReceiptNumber( '2026' ), '2027' );
+	assert.equal( rg.nextReceiptNumber( 'R2026' ), 'R2027' );
+} );
+
+test( 'nextReceiptNumber works past 2^53 without losing digits', () => {
+	assert.equal( rg.nextReceiptNumber( '9007199254740993' ), '9007199254740994' );
+	assert.equal( rg.nextReceiptNumber( 'X-99999999999999999999' ), 'X-100000000000000000000' );
+	assert.equal( rg.nextReceiptNumber( '0009' ), '0010' );
+} );
+
+test( 'isUsedNumber: same or lower counter with the same prefix was already used', () => {
+	assert.equal( rg.isUsedNumber( 'INV-0007', 'INV-0007' ), true );
+	assert.equal( rg.isUsedNumber( 'INV-0005', 'INV-0007' ), true );
+	assert.equal( rg.isUsedNumber( 'INV-0008', 'INV-0007' ), false );
+	assert.equal( rg.isUsedNumber( '999', '1000' ), true );
+	assert.equal( rg.isUsedNumber( '1001', '999' ), false );
+	assert.equal( rg.isUsedNumber( 'A-1/2026', 'A-3/2026' ), true );
+	// A different series is the visitor's own choice and is kept.
+	assert.equal( rg.isUsedNumber( 'B-1', 'A-3' ), false );
+	assert.equal( rg.isUsedNumber( '', '1001' ), false );
+	assert.equal( rg.isUsedNumber( '1001', null ), false );
+} );

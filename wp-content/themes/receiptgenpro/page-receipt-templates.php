@@ -102,7 +102,7 @@ $rf_groups = array(
 			<h2>Free Receipt Tools</h2>
 			<ul>
 				<li><a href="<?php echo esc_url( home_url( '/receipt-requirements/' ) ); ?>">Receipt requirements checker</a>: what a receipt needs for HRA, FSA, $250+ donations and expense reports.</li>
-				<li><a href="<?php echo esc_url( home_url( '/verify-receipt/' ) ); ?>">Verify a receipt</a>: scan the QR code on a receipt to see whether it was changed.</li>
+				<li><a href="<?php echo esc_url( home_url( '/verify-receipt/' ) ); ?>">Verify a receipt</a>: scan the QR code on a receipt to read the details stored in it.</li>
 				<li><a href="<?php echo esc_url( home_url( '/rent-receipt-laws/' ) ); ?>">Rent receipt laws by state</a>: when a US landlord must give a receipt.</li>
 				<li><a href="<?php echo esc_url( home_url( '/receipt-generator-widget/' ) ); ?>">Receipt generator widget</a>: put any template on your own website.</li>
 			</ul>
