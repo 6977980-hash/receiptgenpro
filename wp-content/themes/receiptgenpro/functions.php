@@ -31,7 +31,7 @@ define( 'RF_SOCIAL_LINKEDIN', '' ); // e.g. 'https://linkedin.com/company/receip
 define( 'RF_FOUNDER_NAME', 'Ali Ahmad' );
 define( 'RF_FOUNDER_TITLE', 'Web developer' );
 define( 'RF_FOUNDER_LINKEDIN', 'https://www.linkedin.com/in/ali-ahmad-chaudhry-12777486/' );
-define( 'RF_THEME_VERSION', '1.3.9' );
+define( 'RF_THEME_VERSION', '1.4.0' );
 
 /* ==========================================================================
    2. THEME SETUP
@@ -105,7 +105,14 @@ function rf_enqueue_assets() {
 	// v1.2.0 tool pages.
 	if ( is_page_template( 'page-verify-receipt.php' ) ) {
 		wp_enqueue_script( 'rf-verify-receipt', get_template_directory_uri() . '/assets/js/verify-receipt.js', array(), rf_asset_ver( 'assets/js/verify-receipt.js' ), true );
-		wp_localize_script( 'rf-verify-receipt', 'rfVerify', array( 'symbols' => rf_currency_symbols() ) );
+		wp_localize_script(
+			'rf-verify-receipt',
+			'rfVerify',
+			array(
+				'symbols'  => rf_currency_symbols(),
+				'decimals' => rf_currency_decimals(),
+			)
+		);
 	}
 	if ( is_page_template( 'page-receipt-widget.php' ) ) {
 		wp_enqueue_script( 'rf-widget-builder', get_template_directory_uri() . '/assets/js/widget-builder.js', array(), rf_asset_ver( 'assets/js/widget-builder.js' ), true );

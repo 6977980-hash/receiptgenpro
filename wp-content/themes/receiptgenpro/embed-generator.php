@@ -42,6 +42,7 @@ get_template_part(
 		'form'         => $rf_cat['form'] ?? array(),
 		'purpose'      => $rf_cat['purpose'] ?? '',
 		'item_default' => 'e.g. Service or product name',
+		'embed'        => true,
 	)
 );
 ?>

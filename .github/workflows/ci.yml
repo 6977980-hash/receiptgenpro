@@ -29,6 +29,10 @@ jobs:
         run: php tests/php/deploy-test.php
       - name: 1.3.7 content patches apply to the live page text
         run: php tests/php/v137-test.php
+      - name: 1.3.9 CSP report-only header
+        run: php tests/php/v139-test.php
+      - name: 1.4.0 privacy patches and currency list
+        run: php tests/php/v140-test.php
 
   js-tests:
     runs-on: ubuntu-latest

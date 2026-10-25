@@ -378,6 +378,10 @@ p a:not(.rf-btn), li a:not(.rf-btn), .rf-field-hint a, .rf-sources-note a, .rf-l
 
 /* v1.1.3 (audit Phase 3): "Remove logo" under the logo upload */
 .rf-logo-remove { margin-top: .35rem; background: none; border: 0; padding: 2px 0; color: #b91c1c; font: inherit; font-size: .85rem; text-decoration: underline; cursor: pointer; }
+/* v1.4.0: "Remember my business details" and its "Forget saved details" button. */
+.rf-remember { margin-top: .25rem; }
+.rf-forget { min-height: 32px; background: none; border: 0; padding: 2px 0; color: #b91c1c; font: inherit; font-size: .85rem; text-decoration: underline; cursor: pointer; }
+.rf-forget[hidden], #rf-currency-other[hidden] { display: none; }
 
 /* ==========================================================================
    v1.2.0 — requirement checker, verification QR, second signature

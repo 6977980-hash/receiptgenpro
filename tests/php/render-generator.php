@@ -2,8 +2,9 @@
 /**
  * Prints the generator markup and its window.rfReceipt data as JSON, for
  * the jsdom tests (tests/v135-dom.test.js). Runs without WordPress.
- * Run: php tests/php/render-generator.php [template-slug]
- * No slug: the homepage form with the receipt type picker.
+ * Run: php tests/php/render-generator.php [template-slug] [embed]
+ * No slug: the homepage form with the receipt type picker. "embed": the
+ * form as /embed/<slug>/ shows it.
  */
 
 define( 'ABSPATH', __DIR__ . '/' );
@@ -78,6 +79,9 @@ $cat  = $slug ? rf_get_category_data( $slug ) : null;
 $args = $cat
 	? array( 'form' => $cat['form'], 'purpose' => $cat['purpose'] ?? '' )
 	: array( 'picker' => true );
+if ( 'embed' === ( $argv[2] ?? '' ) ) {
+	$args = array( 'form' => $cat['form'] ?? array(), 'purpose' => $cat['purpose'] ?? '', 'embed' => true );
+}
 
 ob_start();
 include $theme . '/template-parts/generator-embed.php';

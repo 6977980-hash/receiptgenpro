@@ -741,7 +741,7 @@ function rf_receipt_designs() {
 
 /**
  * The one list of currencies (audit 20 Oct, #70): code => array( symbol,
- * name ). Add a currency here and every form, receipt and the verify page
+ * name [, decimals] ). Add a currency here and every form, receipt and the verify page
  * have it. The generator's menu, receipt-generator.js (which reads the
  * symbol from the menu label) and verify-receipt.js (rfVerify.symbols,
  * functions.php) all come from here.
@@ -761,6 +761,17 @@ function rf_currencies() {
 		// page add a space after them ("SAR 1,000.00").
 		'AED' => array( 'AED', 'UAE Dirham' ),
 		'SAR' => array( 'SAR', 'Saudi Riyal' ),
+		// v1.4.0 (audit 25 Oct, G-5). A third entry is the number of
+		// decimals when it isn't 2: yen have none, Kuwaiti dinars have 3
+		// (1,000 fils). "RM" and "KWD" are letters, so they get the space.
+		'NZD' => array( 'NZ$', 'New Zealand Dollar' ),
+		'SGD' => array( 'S$', 'Singapore Dollar' ),
+		'ZAR' => array( 'R', 'South African Rand' ),
+		'NGN' => array( '₦', 'Nigerian Naira' ),
+		'PHP' => array( '₱', 'Philippine Peso' ),
+		'MYR' => array( 'RM', 'Malaysian Ringgit' ),
+		'JPY' => array( '¥', 'Japanese Yen', 0 ),
+		'KWD' => array( 'KWD', 'Kuwaiti Dinar', 3 ),
 	);
 }
 
@@ -777,4 +788,14 @@ function rf_supported_currencies() {
 /** code => symbol. */
 function rf_currency_symbols() {
 	return wp_list_pluck( rf_currencies(), 0 );
+}
+
+/** code => number of decimals (0, 2 or 3), for the generator and the verify page. */
+function rf_currency_decimals() {
+	return array_map(
+		function ( $c ) {
+			return isset( $c[2] ) ? (int) $c[2] : 2;
+		},
+		rf_currencies()
+	);
 }

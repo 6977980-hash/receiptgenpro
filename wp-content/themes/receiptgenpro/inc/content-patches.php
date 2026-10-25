@@ -441,6 +441,7 @@ function rf_about_never_store_content() {
 <li><strong>Your logo</strong> is read by your browser and shown in the preview. It is not uploaded.</li>
 <li><strong>A reload doesn't lose your work:</strong> the form, and your logo, are kept in your browser tab's session storage, which is cleared when you close the tab.</li>
 HTML
+	. "\n" . rf_v140_about_profile_item()
 	. "\n" . rf_about_downloads_item() . "\n</ul>\n";
 }
 
@@ -710,6 +711,7 @@ function rf_v137_storage_list() {
 		. "<li><code>rgp-design</code> (localStorage): the receipt design you picked last.</li>\n"
 		. "<li><code>rgp-last-receipt-number</code> (localStorage): the number of the last receipt you downloaded, so the next one continues from it.</li>\n"
 		. "<li><code>rgp-form:&lt;page address&gt;</code> (sessionStorage): the form you are filling in, and your logo, so a reload doesn't lose them. It is deleted when you close the tab.</li>\n"
+		. rf_v140_storage_item() . "\n" // 1.4.0; pages patched before get it from rf_v140_patches()
 		. '</ul>';
 }
 
@@ -805,6 +807,123 @@ function rf_migrate_v137_content() {
 		kses_init_filters();
 	}
 	update_option( 'rf_migration_v137', array( 'done' => gmdate( 'c' ), 'log' => $state['log'] ), true );
+	do_action( 'litespeed_purge_all' );
+}
+
+/**
+ * Theme 1.4.0 (audit 25 Oct, v2 phase 4, G-1): the opt-in business profile
+ * in localStorage (rgp-business-profile, assets/js/receipt-generator.js),
+ * listed with the other storage keys.
+ */
+function rf_v140_storage_item() {
+	return '<li><code>rgp-business-profile</code> (localStorage, only if you tick "Remember my business details on this device"): your business name, address, contact details, tax number, logo and currency, so your next receipt starts with them on any page of the generator. It stays on your device until you click "Forget saved details", untick the box, or clear this site\'s data in your browser, and it is never uploaded.</li>';
+}
+
+/** The About Us line on the same profile ("What We Never Store"). */
+function rf_v140_about_profile_item() {
+	return '<li><strong>Remembering your business details is up to you:</strong> only if you tick "Remember my business details on this device" are your business name, address, contact details, tax number, logo and currency kept in this browser\'s localStorage, so your next receipt starts with them. "Forget saved details" removes them. They are never uploaded.</li>';
+}
+
+/**
+ * Database text of theme 1.4.0. Every 'find' was copied from the live REST
+ * content on 25 Oct 2026 (tests/php/fixtures/v140/).
+ *
+ * @param string $today Date for the policies' "Last updated" line.
+ * @return array slug => array( 'type' => post type, 'patches' => list )
+ */
+function rf_v140_patches( $today = '' ) {
+	$today   = $today ? $today : date_i18n( 'F j, Y' );
+	$session = '<li><code>rgp-form:&lt;page address&gt;</code> (sessionStorage): the form you are filling in, and your logo, so a reload doesn\'t lose them. It is deleted when you close the tab.</li>';
+	$policy  = function () use ( $today, $session ) {
+		return array(
+			'type'    => 'page',
+			'patches' => array(
+				array(
+					'label'   => 'last updated',
+					'regex'   => true,
+					'find'    => '#<p><em>Last updated:[^<]*</em></p>#',
+					'replace' => '<p><em>Last updated: ' . $today . '.</em></p>',
+					'unless'  => 'rgp-business-profile',
+				),
+				rf_v137_insert_after( 'rgp-business-profile in the storage list', $session, rf_v140_storage_item(), 'rgp-business-profile' ),
+			),
+		);
+	};
+
+	return array(
+		'privacy-policy' => $policy(),
+		'cookie-policy'  => $policy(),
+		'about-us'       => array(
+			'type'    => 'page',
+			'patches' => array(
+				rf_v137_insert_after(
+					'remembering business details',
+					'<li><strong>A reload doesn\'t lose your work:</strong> the form, and your logo, are kept in your browser tab\'s session storage, which is cleared when you close the tab.</li>',
+					rf_v140_about_profile_item(),
+					'Remembering your business details'
+				),
+			),
+		),
+	);
+}
+
+/**
+ * One-time migration of theme 1.4.0, run from inc/setup-tasks.php like the
+ * 1.3.7 one: through wp_update_post() (each page keeps a revision), each
+ * finished slug recorded in rf_migration_v140, so it never runs twice.
+ */
+function rf_migration_v140_done() {
+	$state = get_option( 'rf_migration_v140' );
+	return is_array( $state ) && ! empty( $state['done'] );
+}
+
+function rf_migrate_v140_content() {
+	if ( rf_migration_v140_done() || wp_installing() ) {
+		return;
+	}
+	$state = get_option( 'rf_migration_v140' );
+	if ( is_array( $state ) ) {
+		if ( isset( $state['started'] ) && time() - strtotime( $state['started'] ) < 10 * MINUTE_IN_SECONDS ) {
+			return; // another run is still going
+		}
+		$state['started'] = gmdate( 'c' );
+		update_option( 'rf_migration_v140', $state, true );
+	} else {
+		$state = array( 'started' => gmdate( 'c' ), 'slugs' => array(), 'log' => array() );
+		if ( ! add_option( 'rf_migration_v140', $state, '', true ) ) {
+			return;
+		}
+	}
+	$state += array( 'slugs' => array(), 'log' => array() );
+
+	$kses = (bool) has_filter( 'content_save_pre', 'wp_filter_post_kses' );
+	kses_remove_filters();
+
+	foreach ( rf_v140_patches() as $slug => $page ) {
+		if ( in_array( $slug, $state['slugs'], true ) ) {
+			continue;
+		}
+		$found = get_posts( array( 'name' => $slug, 'post_type' => $page['type'], 'post_status' => 'publish', 'numberposts' => 1 ) );
+		if ( ! $found ) {
+			$state['log'][] = "/$slug/: not found";
+		} else {
+			$content = $found[0]->post_content;
+			foreach ( $page['patches'] as $patch ) {
+				list( $content, $status ) = rf_fixes_apply_patch( $content, $patch );
+				$state['log'][]           = "/$slug/: {$patch['label']}: $status";
+			}
+			if ( $content !== $found[0]->post_content ) {
+				wp_update_post( array( 'ID' => $found[0]->ID, 'post_content' => wp_slash( $content ) ) );
+			}
+		}
+		$state['slugs'][] = $slug;
+		update_option( 'rf_migration_v140', $state, true );
+	}
+
+	if ( $kses ) {
+		kses_init_filters();
+	}
+	update_option( 'rf_migration_v140', array( 'done' => gmdate( 'c' ), 'log' => $state['log'] ), true );
 	do_action( 'litespeed_purge_all' );
 }
 
