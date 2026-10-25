@@ -14,7 +14,9 @@
  *   label     What the receipt needs, in plain words.
  *   field     What the checker looks at:
  *               business | client | date | items | total | words |
- *               signature | statement | x:<extra field id>
+ *               signature | statement | business_address (v1.3.6,
+ *               the "Business details" address on every form) |
+ *               x:<extra field id>
  *             An array means "any one of these".
  *   all       true → every field in the 'field' array is needed.
  *   manual    true → something the person does on paper (sign, stamp);
@@ -164,7 +166,7 @@ function rf_receipt_purposes() {
 				array( 'label' => 'Date of the expense', 'field' => 'date' ),
 				array( 'label' => 'What was bought (itemized)', 'field' => 'items' ),
 				array( 'label' => 'Amount paid', 'field' => 'total' ),
-				array( 'label' => 'Place of the expense (the business address)', 'field' => array( 'x:hotel_address', 'x:restaurant_address', 'x:business_address', 'x:store_address', 'x:pickup', 'x:service_address', 'x:project_address' ), 'note' => 'If your template has no address field, add the address under your business name or in Notes.' ),
+				array( 'label' => 'Place of the expense (the business address)', 'field' => array( 'business_address', 'x:hotel_address', 'x:restaurant_address', 'x:business_address', 'x:store_address', 'x:pickup', 'x:service_address', 'x:project_address' ), 'note' => 'Fill in Business address under "Business details (optional)", below the business name.' ),
 				array( 'label' => 'Name of the customer', 'field' => 'client', 'optional' => true ),
 			),
 		),

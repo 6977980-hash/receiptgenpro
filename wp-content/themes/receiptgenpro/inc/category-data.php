@@ -308,7 +308,11 @@ function rf_receipt_categories() {
 					array( 'id' => 'ein', 'label' => 'EIN / Charity Registration No.', 'type' => 'text', 'ph' => 'e.g. 12-3456789' ),
 					array( 'id' => 'status', 'label' => 'Tax Status', 'type' => 'text', 'ph' => 'e.g. 501(c)(3) tax-exempt organization' ),
 					array( 'id' => 'gift_type', 'label' => 'Gift Type', 'type' => 'select', 'options' => array( 'Cash / cheque / card', 'In-kind (non-cash)' ) ),
+					array( 'id' => 'qpq_desc', 'label' => 'Goods or services given in return (if any)', 'type' => 'text', 'ph' => 'e.g. Gala dinner ticket' ),
+					array( 'id' => 'qpq_value', 'label' => 'Their estimated value', 'type' => 'number', 'ph' => 'e.g. 60.00' ),
 				),
+				'no_tax'         => true,
+				'in_kind'        => true,
 				'signature'      => 'Authorized Signature',
 				'statement'      => array(
 					'label'   => 'No goods or services were provided in exchange',
@@ -613,6 +617,7 @@ function rf_receipt_categories() {
 				),
 				'signature'      => 'Employee Signature',
 				'signature2'     => 'Approved By (Manager)',
+				'no_tax'         => true, // the amounts already paid, nothing charged on top
 				'statement'      => array(
 					'label'   => 'Print the employee declaration',
 					'text'    => 'I declare that the expenses above were incurred by me for business purposes, that the original receipt is not available for the reason given, and that I have not claimed and will not claim reimbursement for them anywhere else.',
@@ -679,6 +684,8 @@ function rf_generator_form( $form, $item_default = 'e.g. Service or product name
 			'signature2'     => '',
 			'number_label'   => 'Receipt #',
 			'statement'      => array(),
+			'no_tax'         => false, // v1.3.6: no tax, discount or tip (donations)
+			'in_kind'        => false, // v1.3.6: an item with no price prints "No value stated"
 		)
 	);
 }

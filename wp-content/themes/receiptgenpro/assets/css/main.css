@@ -632,3 +632,20 @@ p a:not(.rf-btn), li a:not(.rf-btn), .rf-field-hint a, .rf-sources-note a, .rf-l
 	#rf-receipt-preview .rf-receipt-qr, #rf-receipt-preview tr, #rf-receipt-preview .rf-receipt-totals,
 	#rf-receipt-preview .rf-receipt-signature { break-inside: avoid; }
 }
+
+/* ==========================================================================
+   v1.3.6 — audit of 25 Oct, Phase 1 (receipt tools)
+   ========================================================================== */
+/* The seller's address, contact and tax number under the business name,
+   in every design. */
+.rf-receipt-seller { margin: .1rem 0 0; font-size: .8rem; line-height: 1.4; color: var(--rf-ink-soft); overflow-wrap: anywhere; }
+.rf-receipt-seller + .rf-receipt-label { margin-top: .4rem; }
+.rf-receipt-taxid { font-weight: 600; color: var(--rf-ink); }
+.rf-design-modern .rf-receipt-seller, .rf-design-modern .rf-receipt-taxid { color: #fff; }
+.rf-design-bold .rf-receipt-seller, .rf-design-bold .rf-receipt-taxid { color: #e2e8f0; }
+.rf-design-minimal .rf-receipt-taxid { font-weight: 500; }
+.rf-design-thermal .rf-receipt-seller { font-size: .75rem; color: #0f172a; }
+.rf-design-compact .rf-receipt-seller { font-size: .72rem; line-height: 1.3; }
+/* An in-kind gift with no value (donation receipts). */
+.rf-receipt-table .rf-no-value { font-style: italic; color: var(--rf-ink-soft); }
+.rf-business-details[hidden], #rf-more-options[hidden], #rf-tax-rate-field[hidden] { display: none; }

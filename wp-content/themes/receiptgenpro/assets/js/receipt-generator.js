@@ -1,5 +1,5 @@
 /**
- * ReceiptGenPro — Receipt Generator (v1.3.3)
+ * ReceiptGenPro — Receipt Generator (v1.3.6)
  *
  * 100% client-side: no fetch(), no form submission, no data ever leaves
  * the browser.
@@ -53,6 +53,13 @@
  * iOS's limit, logos shrunk to 400 px, values carried over between
  * receipt types, ?type= in the address bar, bidi controls stripped, and
  * checker limits applied only in their own currency (HRA PAN per month).
+ *
+ * v1.3.6 (audit of 25 Oct, Phase 1): downloading the same receipt again
+ * keeps its number (it moves on once the receipt changes); an optional
+ * business address, contact and tax number under the business name (the
+ * tax number never goes in the QR code); no tax, discount or tip on a
+ * no-tax type (donations), a quid pro quo line and "No value stated" for
+ * an in-kind gift; the QR caption no longer says "verify".
  */
 ( function () {
 	'use strict';
@@ -619,6 +626,9 @@
 	// Export width in px per design (others use the 800 px default).
 	var DESIGN_WIDTH = { thermal: 380 };
 
+	// Donation extras printed as one sentence, not as "Label: value" lines.
+	var QPQ_FIELDS = { qpq_desc: true, qpq_value: true };
+
 	// "Office + Customer Copy" prints the same receipt twice with a cut line.
 	function wrapDesign( design, body ) {
 		if ( design !== 'copies' ) {
@@ -728,7 +738,9 @@
 			signature2: form.dataset.signature2 || '',
 			numberLabel: form.dataset.numberLabel || 'Receipt #',
 			businessLabel: form.dataset.businessLabel || 'From',
-			clientLabel: form.dataset.clientLabel || 'Received From'
+			clientLabel: form.dataset.clientLabel || 'Received From',
+			noTax: form.dataset.noTax === '1',
+			inKind: form.dataset.inKind === '1'
 		};
 		var itemPlaceholders = [];
 		try {
@@ -933,7 +945,10 @@
 			cfg.numberLabel   = f.number_label || 'Receipt #';
 			cfg.businessLabel = f.business_label || 'From';
 			cfg.clientLabel   = f.client_label || 'Received From';
+			cfg.noTax         = !! f.no_tax;
+			cfg.inKind        = !! f.in_kind;
 			itemPlaceholders  = [].concat( f.item_ph || [] );
+			showTaxControls();
 
 			setLabel( 'rf-business-name', f.business_label, f.business_ph );
 			setLabel( 'rf-client-name', f.client_label, f.client_ph );
@@ -1013,6 +1028,16 @@
 				}
 			}
 			return true;
+		}
+
+		// A no-tax type (donation) has no tax rate or discount controls.
+		function showTaxControls() {
+			[ 'rf-tax-rate-field', 'rf-more-options' ].forEach( function ( id ) {
+				var el = document.getElementById( id );
+				if ( el ) {
+					el.hidden = cfg.noTax;
+				}
+			} );
 		}
 
 		// ?type=<slug> in the address bar, so a reload or a shared link opens
@@ -1351,8 +1376,33 @@
 			}
 		} catch ( e ) {}
 
-		// After a download: remember the number used and move the field on to
-		// the next one, so the next receipt never repeats it.
+		// What the receipt says, apart from its number and its look (design,
+		// logo, QR code): a download of the same receipt in another format
+		// keeps the number, and the first real change moves it on.
+		var NOT_CONTENT = { 'rf-receipt-number': true, 'rf-qr': true };
+		function receiptPrint() {
+			var data = { type: currentType, fields: {}, items: [] };
+			storeFields().forEach( function ( el ) {
+				if ( ! NOT_CONTENT[ el.id ] ) {
+					data.fields[ el.id ] = el.type === 'checkbox' ? el.checked : el.value;
+				}
+			} );
+			itemsList.querySelectorAll( '.rf-item-row' ).forEach( function ( row ) {
+				var it = [ row.querySelector( '.rf-item-name' ).value, row.querySelector( '.rf-item-qty' ).value, row.querySelector( '.rf-item-price' ).value ];
+				if ( it[0].trim() || it[2].trim() ) {
+					data.items.push( it ); // an empty row changes nothing
+				}
+			} );
+			return JSON.stringify( data );
+		}
+
+		// The number of the last download in this page view and what that
+		// receipt said; null once the field has moved on.
+		var usedNumber = null;
+		var usedPrint  = '';
+
+		// After a download: remember the number used. The field keeps it, so
+		// a PDF and a PNG of the same receipt carry the same number.
 		function rememberNumber() {
 			if ( ! numberInput ) {
 				return;
@@ -1361,8 +1411,20 @@
 			try {
 				window.localStorage.setItem( LAST_NUMBER_KEY, used );
 			} catch ( e ) {}
-			numberInput.value = nextReceiptNumber( used );
-			numberInput.dispatchEvent( new Event( 'input', { bubbles: true } ) );
+			usedNumber = used;
+			usedPrint  = receiptPrint();
+		}
+
+		// On the first change after a download, the field moves to the next
+		// number, once; a number the visitor typed themselves is kept.
+		function advanceNumber() {
+			if ( usedNumber === null || receiptPrint() === usedPrint ) {
+				return;
+			}
+			if ( numberInput.value.trim() === usedNumber ) {
+				numberInput.value = nextReceiptNumber( usedNumber );
+			}
+			usedNumber = null;
 		}
 
 		restoreForm();
@@ -1379,6 +1441,10 @@
 
 		// Show the extra options when a restored form uses them.
 		var moreOptions = document.getElementById( 'rf-more-options' );
+		var businessDetails = document.getElementById( 'rf-business-details' );
+		if ( businessDetails && ( fieldValue( 'rf-business-address' ) || fieldValue( 'rf-business-contact' ) || fieldValue( 'rf-tax-id' ) ) ) {
+			businessDetails.open = true;
+		}
 		if ( moreOptions && ( nonNegative( ( document.getElementById( 'rf-discount' ) || {} ).value ) || nonNegative( ( document.getElementById( 'rf-tax2-rate' ) || {} ).value ) ) ) {
 			moreOptions.open = true;
 		}
@@ -1463,7 +1529,8 @@
 					notes.max = true;
 				}
 				if ( name || price ) {
-					items.push( { name: name || 'Item', qty: qty, price: price, lineCents: lineCents( qty, price ) } );
+					// An in-kind gift is described, not valued (IRS Pub. 1771).
+					items.push( { name: name || 'Item', qty: qty, price: price, lineCents: lineCents( qty, price ), noValue: cfg.inKind && ! price } );
 				}
 			} );
 			return items;
@@ -1491,6 +1558,7 @@
 		}
 
 		function renderReceipt() {
+			advanceNumber();
 			var business  = document.getElementById( 'rf-business-name' ).value.trim() || 'Your Business Name';
 			var client    = document.getElementById( 'rf-client-name' ).value.trim();
 			var number    = document.getElementById( 'rf-receipt-number' ).value.trim() || '1001';
@@ -1498,9 +1566,10 @@
 			var currency  = currencySel.value || 'USD';
 			var symbol    = getCurrencySymbol( currency );
 			var fix       = {};
-			var taxRaw    = fieldValue( 'rf-tax-rate' );
-			var tax2Raw   = fieldValue( 'rf-tax2-rate' );
-			var discRaw   = fieldValue( 'rf-discount' );
+			// A no-tax type (donation) ignores whatever the hidden controls hold.
+			var taxRaw    = cfg.noTax ? '' : fieldValue( 'rf-tax-rate' );
+			var tax2Raw   = cfg.noTax ? '' : fieldValue( 'rf-tax2-rate' );
+			var discRaw   = cfg.noTax ? '' : fieldValue( 'rf-discount' );
 			var discType  = fieldValue( 'rf-discount-type' ) === 'amount' ? 'amount' : 'percent';
 			var taxRate   = capped( taxRaw, MAX_RATE );
 			var taxLabel  = fieldValue( 'rf-tax-label' ) || 'Tax';
@@ -1510,7 +1579,7 @@
 			var payMethod = document.getElementById( 'rf-payment-method' ).value;
 			var notes     = document.getElementById( 'rf-notes' ).value.trim();
 			var items     = collectItems( fix );
-			var tipRaw    = tipInput ? tipInput.value : '';
+			var tipRaw    = tipInput && ! cfg.noTax ? tipInput.value : '';
 			var tipCents  = toCents( capped( tipRaw, MAX_AMOUNT ) );
 			var paidRaw   = paidInput ? paidInput.value.trim() : '';
 
@@ -1550,8 +1619,10 @@
 						'<tr>' +
 						'<td>' + escapeHtml( it.name ) + '</td>' +
 						'<td class="rf-num">' + escapeHtml( String( it.qty ) ) + '</td>' +
-						'<td class="rf-num">' + money( symbol, it.price ) + '</td>' +
-						'<td class="rf-num">' + money( symbol, it.lineCents / 100 ) + '</td>' +
+						( it.noValue ?
+							'<td class="rf-num rf-no-value">No value stated</td><td class="rf-num rf-no-value">No value stated</td>' :
+							'<td class="rf-num">' + money( symbol, it.price ) + '</td>' +
+							'<td class="rf-num">' + money( symbol, it.lineCents / 100 ) + '</td>' ) +
 						'</tr>'
 					);
 				} )
@@ -1571,10 +1642,35 @@
 				var val = formatExtra( el );
 				if ( val ) {
 					var label = ( el.dataset.label || '' ).replace( / \(optional\)$/i, '' );
-					meta.push( '<div><strong>' + escapeHtml( label ) + ':</strong> ' + escapeHtml( val ) + '</div>' );
-					extras.push( [ label, val, el.id.replace( /^rf-x-/, '' ) ] );
+					var id = el.id.replace( /^rf-x-/, '' );
+					if ( ! QPQ_FIELDS[ id ] ) { // printed in their own sentence
+						meta.push( '<div><strong>' + escapeHtml( label ) + ':</strong> ' + escapeHtml( val ) + '</div>' );
+					}
+					extras.push( [ label, val, id ] );
 				}
 			} );
+
+			// The seller's details under the business name. The tax number
+			// stays off the QR code; the address goes in it, clipped.
+			var bizAddress = fieldValue( 'rf-business-address' );
+			var bizContact = fieldValue( 'rf-business-contact' );
+			var taxId      = fieldValue( 'rf-tax-id' );
+			var sellerHtml =
+				( bizAddress ? '<p class="rf-receipt-seller">' + escapeHtml( bizAddress ).replace( /\s*\n\s*/g, '<br>' ) + '</p>' : '' ) +
+				( bizContact ? '<p class="rf-receipt-seller">' + escapeHtml( bizContact ) + '</p>' : '' ) +
+				( taxId ? '<p class="rf-receipt-seller rf-receipt-taxid">' + escapeHtml( fieldValue( 'rf-tax-id-label' ) || 'Tax ID' ) + ': ' + escapeHtml( taxId ) + '</p>' : '' );
+			var qrExtras = bizAddress ? [ [ 'Business address', clip( bizAddress.replace( /\s*\n\s*/g, ', ' ), 60 ), 'business_address' ] ].concat( extras ) : extras;
+
+			// Quid pro quo: what the donor received replaces the "no goods or
+			// services" statement.
+			var qpqDesc  = fieldValue( 'rf-x-qpq_desc' );
+			var qpqValue = fieldValue( 'rf-x-qpq_value' );
+			var qpqHtml  = '';
+			if ( qpqDesc || qpqValue ) {
+				qpqHtml = '<p class="rf-receipt-statement">In return for this contribution the donor received ' + escapeHtml( qpqDesc || 'goods or services' ) +
+					( qpqValue ? ', with an estimated value of ' + money( symbol, capped( qpqValue, MAX_AMOUNT ) ) + '. Only the amount above this value may be tax-deductible.' :
+						'. Only the amount above their value may be tax-deductible.' ) + '</p>';
+			}
 
 			var totalsHtml =
 				'<div><span>Subtotal</span><span>' + money( symbol, subtotal ) + '</span></div>' +
@@ -1598,8 +1694,8 @@
 			var wordsHtml = ( cfg.words && wordsAmount > 0 ) ?
 				'<p class="rf-receipt-words"><strong>Amount received in words:</strong> ' + escapeHtml( amountInWords( wordsAmount, currency ) ) + '</p>' : '';
 
-			var statementHtml = ( statement && statement.checked ) ?
-				'<p class="rf-receipt-statement">' + escapeHtml( statement.dataset.text ) + '</p>' : '';
+			var statementHtml = qpqHtml || ( ( statement && statement.checked ) ?
+				'<p class="rf-receipt-statement">' + escapeHtml( statement.dataset.text ) + '</p>' : '' );
 
 			var signatureHtml = [ cfg.signature, cfg.signature2 ].filter( Boolean ).map( function ( label ) {
 				return '<div class="rf-receipt-signature"><span class="rf-sig-line"></span><span>' + escapeHtml( label ) + '</span></div>';
@@ -1629,20 +1725,20 @@
 					totalCents: totalCents,
 					paidCents: paid === null ? null : toCents( paid ),
 					payMethod: payMethod,
-					extras: extras
+					extras: qrExtras
 				} );
 				var qr = qrDataUrl( verifyLink );
-				var qrText = '<span>Scan to verify this receipt<br>' + escapeHtml( verifyBase.replace( /^https?:\/\//, '' ) ) + '</span>';
+				var qrText = '<span>Scan to view the details in this code<br>' + escapeHtml( verifyBase.replace( /^https?:\/\//, '' ) ) + '</span>';
 				// While the QR library loads, an empty box holds its place so
 				// the receipt (and an embedding iframe) doesn't jump.
 				qrHtml = qr ?
-					'<div class="rf-receipt-qr"><img src="' + qr.url + '" width="' + qr.size + '" height="' + qr.size + '" style="width:' + qr.size + 'px;height:' + qr.size + 'px" alt="Verification QR code">' + qrText + '</div>' :
+					'<div class="rf-receipt-qr"><img src="' + qr.url + '" width="' + qr.size + '" height="' + qr.size + '" style="width:' + qr.size + 'px;height:' + qr.size + 'px" alt="QR code with this receipt\'s details">' + qrText + '</div>' :
 					'<div class="rf-receipt-qr"><span class="rf-qr-pending" aria-hidden="true"></span>' + qrText + '</div>';
 			}
 
 			preview.innerHTML = wrapDesign( design,
 				'<div class="rf-receipt-head">' +
-				'<div><h3>' + escapeHtml( business ) + '</h3><p class="rf-receipt-label">' + escapeHtml( cfg.title ) + '</p></div>' +
+				'<div><h3>' + escapeHtml( business ) + '</h3>' + sellerHtml + '<p class="rf-receipt-label">' + escapeHtml( cfg.title ) + '</p></div>' +
 				'</div>' +
 				'<div class="rf-receipt-meta">' + meta.join( '' ) + '</div>' +
 				'<table class="rf-receipt-table"><thead><tr><th>Description</th><th class="rf-num">Qty</th><th class="rf-num">Price</th><th class="rf-num">Total</th></tr></thead><tbody>' +
@@ -1681,7 +1777,8 @@
 				total: totalCents > 0,
 				words: cfg.words ? true : null,
 				signature: ( cfg.signature || cfg.signature2 ) ? true : null,
-				statement: statement ? statement.checked : null,
+				statement: statement ? statement.checked || !! qpqHtml : null,
+				business_address: !! bizAddress,
 				x: extraFacts(),
 				amount: total,
 				cash: payMethod === 'Cash',

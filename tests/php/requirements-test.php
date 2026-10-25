@@ -100,6 +100,17 @@ foreach ( rf_receipt_categories() as $slug => $cat ) {
 	}
 }
 
+// Audit 25 Oct (A25-H2): every form has a business address under
+// "Business details", and the expense check counts it.
+$expense_place = rf_receipt_purposes()['expense']['checks'][4];
+check( false !== strpos( $expense_place['label'], 'Place of the expense' ), 'the fifth expense check is the place of the expense' );
+check( in_array( 'business_address', (array) $expense_place['field'], true ), 'the expense place check counts the Business details address' );
+$embed = file_get_contents( $theme . '/template-parts/generator-embed.php' );
+foreach ( array( 'rf-business-address', 'rf-business-contact', 'rf-tax-id-label', 'rf-tax-id' ) as $id ) {
+	check( false !== strpos( $embed, 'id="' . $id . '"' ), "the generator has #$id" );
+}
+check( ! empty( rf_get_category_data( 'donation-receipt' )['form']['no_tax'] ), 'the donation form has no tax' );
+
 // The PHP and JS widget scripts are the same.
 $js = shell_exec( 'node -e ' . escapeshellarg( 'process.stdout.write(require(' . json_encode( $theme . '/assets/js/widget-builder.js' ) . ').heightScript("https://example.com/"))' ) );
 if ( null !== $js && '' !== $js ) {

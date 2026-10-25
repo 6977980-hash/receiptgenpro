@@ -30,6 +30,10 @@
  * v1.3.3: amount inputs have max="999999999999.99" and rate inputs
  * max="100" (the script applies the same limits), and #rf-form-notice
  * says when an entry was capped or counted as 0.
+ *
+ * v1.3.6 (audit of 25 Oct, Phase 1): an optional "Business details" group
+ * under the business name on every form (address, contact, tax ID), and
+ * no tax rate or discount controls on a form with 'no_tax' (donations).
  */
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -74,7 +78,9 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 			data-signature2="<?php echo esc_attr( $form['signature2'] ); ?>"
 			data-number-label="<?php echo esc_attr( $form['number_label'] ); ?>"
 			data-business-label="<?php echo esc_attr( $form['business_label'] ); ?>"
-			data-client-label="<?php echo esc_attr( $form['client_label'] ); ?>">
+			data-client-label="<?php echo esc_attr( $form['client_label'] ); ?>"
+			data-no-tax="<?php echo $form['no_tax'] ? '1' : '0'; ?>"
+			data-in-kind="<?php echo $form['in_kind'] ? '1' : '0'; ?>">
 			<h2><?php echo esc_html( $heading ); ?></h2>
 
 			<div class="rf-form-row rf-form-row-2col">
@@ -89,6 +95,34 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 				</div>
 			</div>
 
+			<?php // Part of the shared form (not of a type's extra fields), so switching type keeps it. ?>
+			<details class="rf-more-options rf-business-details" id="rf-business-details">
+				<summary>Business details (optional)</summary>
+				<div class="rf-field">
+					<label for="rf-business-address">Business address</label>
+					<textarea id="rf-business-address" rows="2" placeholder="e.g. 12 High Street, Leeds LS1 4AB"></textarea>
+				</div>
+				<div class="rf-field">
+					<label for="rf-business-contact">Phone, email or website</label>
+					<input type="text" id="rf-business-contact" placeholder="e.g. 0113 496 0000 · hello@example.com">
+				</div>
+				<div class="rf-form-row rf-form-row-2col">
+					<div class="rf-field">
+						<label for="rf-tax-id-label">Tax number type</label>
+						<select id="rf-tax-id-label">
+							<?php foreach ( array( 'Tax ID', 'VAT No.', 'GSTIN', 'ABN', 'EIN', 'NTN', 'TRN' ) as $rf_tax_id ) : ?>
+								<option><?php echo esc_html( $rf_tax_id ); ?></option>
+							<?php endforeach; ?>
+						</select>
+					</div>
+					<div class="rf-field">
+						<label for="rf-tax-id">Tax number</label>
+						<input type="text" id="rf-tax-id" placeholder="e.g. GB123456789">
+					</div>
+				</div>
+				<p class="rf-field-hint">Printed under your business name. VAT and GST receipts usually need your address and registration number. The tax number is never put in the QR code.</p>
+			</details>
+
 			<div class="rf-form-row rf-form-row-2col">
 				<div class="rf-field">
 					<label for="rf-client-name"><?php echo esc_html( $form['client_label'] ); ?></label>
@@ -97,7 +131,7 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 				<div class="rf-field">
 					<label for="rf-receipt-number"><?php echo esc_html( $form['number_label'] ); ?></label>
 					<input type="text" id="rf-receipt-number" value="1001" aria-describedby="rf-receipt-number-hint">
-					<p class="rf-field-hint" id="rf-receipt-number-hint">Next time, this starts after the last number you downloaded on this device.</p>
+					<p class="rf-field-hint" id="rf-receipt-number-hint">Downloading the same receipt again keeps this number; once you change the receipt, it moves to the next one. Next time, it starts after the last number you downloaded on this device.</p>
 				</div>
 			</div>
 
@@ -147,10 +181,13 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 			<button type="button" class="rf-btn rf-btn-secondary" id="rf-add-item">+ Add Item</button>
 
 			<div class="rf-form-row rf-form-row-2col">
-				<div class="rf-field">
-					<label for="rf-tax-rate">Tax Rate (%)</label>
-					<input type="number" id="rf-tax-rate" value="0" min="0" max="100" step="0.01">
-				</div>
+				<?php // The homepage picker hides it for a no-tax type; a no-tax page never has it. ?>
+				<?php if ( ! $form['no_tax'] || $picker ) : ?>
+					<div class="rf-field" id="rf-tax-rate-field"<?php echo $form['no_tax'] ? ' hidden' : ''; ?>>
+						<label for="rf-tax-rate">Tax Rate (%)</label>
+						<input type="number" id="rf-tax-rate" value="0" min="0" max="100" step="0.01">
+					</div>
+				<?php endif; ?>
 				<div class="rf-field">
 					<label for="rf-payment-method">Payment Method</label>
 					<select id="rf-payment-method">
@@ -163,7 +200,8 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 
 			<p class="rf-form-notice" id="rf-form-notice" role="status" hidden></p>
 
-			<details class="rf-more-options" id="rf-more-options">
+			<?php if ( ! $form['no_tax'] || $picker ) : ?>
+			<details class="rf-more-options" id="rf-more-options"<?php echo $form['no_tax'] ? ' hidden' : ''; ?>>
 				<summary>Discount and a second tax (e.g. CGST + SGST)</summary>
 				<div class="rf-form-row rf-form-row-2col">
 					<div class="rf-field">
@@ -196,6 +234,7 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 				</div>
 				<p class="rf-field-hint">The discount comes off the subtotal before tax, and both taxes are charged on the discounted amount.</p>
 			</details>
+			<?php endif; ?>
 
 			<div id="rf-type-tippaid">
 			<?php if ( $form['tip'] || $form['paid'] ) : ?>
