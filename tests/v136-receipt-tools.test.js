@@ -59,7 +59,7 @@ function openGenerator( { slug = '', before, qr = false } = {} ) {
 	w.html2canvas = () => Promise.resolve( canvas );
 	w.jspdf = {
 		jsPDF: function () {
-			return { addImage() {}, addPage() {}, save( name ) {
+			return { addImage() {}, addPage() {}, setProperties() {}, setFont() {}, setFontSize() {}, splitTextToSize: ( l ) => l, text() {}, save( name ) {
 				w.files.push( name );
 			} };
 		}

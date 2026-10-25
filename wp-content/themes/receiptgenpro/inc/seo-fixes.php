@@ -114,10 +114,17 @@ function rf_security_headers( $wp = null ) {
 	header( 'Referrer-Policy: strict-origin-when-cross-origin' );
 	// v1.2.0: /embed/<template>/ is made to be shown in other sites' iframes.
 	// Only a valid template on an /embed/ path gets frame-ancestors *.
-	if ( $wp instanceof WP && isset( $wp->query_vars['rf_embed'] ) && function_exists( 'rf_embed_slug' ) && '' !== rf_embed_slug( $wp->query_vars['rf_embed'] ) ) {
+	$embed = $wp instanceof WP && isset( $wp->query_vars['rf_embed'] ) && function_exists( 'rf_embed_slug' ) && '' !== rf_embed_slug( $wp->query_vars['rf_embed'] );
+	if ( $embed ) {
 		header( "Content-Security-Policy: frame-ancestors *" );
 	} else {
 		header( 'X-Frame-Options: SAMEORIGIN' );
+	}
+	// v1.3.9 (A25-L13): a full policy in report-only mode, so the browser
+	// console lists anything it would block. It is switched to enforcing
+	// later, once it has run clean.
+	if ( rf_is_frontend_html( $wp ) ) {
+		header( 'Content-Security-Policy-Report-Only: ' . rf_csp_policy( $embed ) );
 	}
 	header( 'Permissions-Policy: camera=(), microphone=(), geolocation=()' );
 	if ( is_ssl() ) {
@@ -127,6 +134,50 @@ function rf_security_headers( $wp = null ) {
 	}
 }
 add_action( 'send_headers', 'rf_security_headers' );
+
+/**
+ * The Content-Security-Policy for theme pages. The cdnjs, AdSense and
+ * Google tag hosts are there so the export libraries, and ads and
+ * analytics once they are switched on (inc/adsense.php), are allowed.
+ * frame-src has 'self' for the live preview on /receipt-generator-widget/.
+ * `$embed`: an /embed/<template>/ page, which any site may frame.
+ */
+function rf_csp_policy( $embed = false ) {
+	return implode(
+		'; ',
+		array(
+			"default-src 'self'",
+			"script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://pagead2.googlesyndication.com https://www.googletagmanager.com",
+			"style-src 'self' 'unsafe-inline'",
+			"img-src 'self' data: blob: https:",
+			"font-src 'self' data:",
+			"connect-src 'self' https:",
+			"frame-src 'self' https://googleads.g.doubleclick.net https://tpc.googlesyndication.com",
+			"object-src 'none'",
+			"base-uri 'self'",
+			"form-action 'self'",
+			$embed ? 'frame-ancestors *' : "frame-ancestors 'self'",
+		)
+	);
+}
+
+/**
+ * True for a front-end page that is HTML: not wp-admin, REST, a feed, a
+ * sitemap, robots.txt or a trackback.
+ */
+function rf_is_frontend_html( $wp = null ) {
+	if ( is_admin() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) || ( defined( 'DOING_AJAX' ) && DOING_AJAX ) || ( defined( 'XMLRPC_REQUEST' ) && XMLRPC_REQUEST ) ) {
+		return false;
+	}
+	if ( $wp instanceof WP ) {
+		foreach ( array( 'feed', 'sitemap', 'sitemap-stylesheet', 'robots', 'tb', 'rest_route', 'favicon' ) as $var ) {
+			if ( ! empty( $wp->query_vars[ $var ] ) ) {
+				return false;
+			}
+		}
+	}
+	return true;
+}
 
 /* ==========================================================================
    4. Sitemap hygiene (H4)

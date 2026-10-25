@@ -1,5 +1,5 @@
 /**
- * ReceiptGenPro — Receipt Generator (v1.3.8)
+ * ReceiptGenPro — Receipt Generator (v1.3.9)
  *
  * 100% client-side: no fetch(), no form submission, no data ever leaves
  * the browser.
@@ -60,6 +60,11 @@
  * tax number never goes in the QR code); no tax, discount or tip on a
  * no-tax type (donations), a quid pro quo line and "No value stated" for
  * an in-kind gift; the QR caption no longer says "verify".
+ *
+ * v1.3.9 (audit of 25 Oct, v2 Phase 3): a PDF paper size (US Letter for
+ * USD and CAD, A4 otherwise, or the visitor's choice) and an invisible
+ * text layer, so the PDF can be searched and copied; the empty QR box has
+ * the code's final size.
  *
  * v1.3.8 (audit of 25 Oct, v2 Phase 2): prices that include tax (the tax
  * is worked back out and printed as "Includes VAT (20%)"), a GST bill
@@ -666,6 +671,100 @@
 		return modules * Math.max( 2, Math.ceil( 112 / modules ) );
 	}
 
+	// Bytes a QR code holds at error level L, versions 1-20 (qrcode(0, 'L')
+	// picks the smallest that fits). The empty box shown while the QR
+	// library loads gets the size the code will have, so nothing moves.
+	var QR_CAPACITY_L = [ 17, 32, 53, 78, 106, 134, 154, 192, 230, 271, 321, 367, 425, 458, 520, 586, 644, 718, 792, 858 ];
+	function qrModulesFor( bytes ) {
+		for ( var v = 0; v < QR_CAPACITY_L.length; v++ ) {
+			if ( bytes <= QR_CAPACITY_L[ v ] ) {
+				return 21 + 4 * v;
+			}
+		}
+		return 21 + 4 * ( QR_CAPACITY_L.length - 1 );
+	}
+
+	// ---- PDF paper and text --------------------------------------------------
+	// Sizes in mm. The receipt fills the width inside 10 mm margins and a
+	// long one continues on the next page. Letter is what printers in the
+	// US and Canada hold, so USD and CAD receipts default to it.
+	var PAPER = { a4: { width: 210, height: 297 }, letter: { width: 215.9, height: 279.4 } };
+	var PAPER_MARGIN = 10;
+	var LETTER_CURRENCIES = { USD: true, CAD: true };
+
+	function paperFor( currency ) {
+		return LETTER_CURRENCIES[ currency ] ? 'letter' : 'a4';
+	}
+
+	// 'a4' | 'letter' → { format, width, height, margin, contentWidth,
+	// pageHeight } (mm); anything else is A4.
+	function paperSize( name ) {
+		var format = PAPER[ name ] ? name : 'a4';
+		var p = PAPER[ format ];
+		var round = function ( mm ) {
+			return Math.round( mm * 10 ) / 10;
+		};
+		return {
+			format: format,
+			width: p.width,
+			height: p.height,
+			margin: PAPER_MARGIN,
+			contentWidth: round( p.width - 2 * PAPER_MARGIN ),
+			pageHeight: round( p.height - 2 * PAPER_MARGIN )
+		};
+	}
+
+	// The PDF's hidden text is in the built-in Helvetica, which has only
+	// Latin-1: a symbol outside it is written as the currency code
+	// ("₹1,000.00" → "INR 1,000.00"), and text that still can't be encoded
+	// (Hindi, Arabic) is left out instead of printed as junk.
+	var LATIN1_RE = /^[\x20-\x7e\xa0-\xff]*$/;
+	function pdfText( str, symbol, code ) {
+		var s = String( str === undefined || str === null ? '' : str ).replace( /\s+/g, ' ' ).trim();
+		if ( symbol && code && ! LATIN1_RE.test( symbol ) ) {
+			s = s.split( symbol ).join( code + ' ' );
+		}
+		return LATIN1_RE.test( s ) ? s : '';
+	}
+
+	// The receipt's text, line by line, from the rendered preview (`root`):
+	// business, title, number, date and the other details, each item row,
+	// the totals, the amount in words and the statement. Only the first copy
+	// of "Office + Customer Copy" is read.
+	function pdfTextLines( root, symbol, code ) {
+		var inner = root.querySelector( '.rf-receipt-inner' ) || root;
+		var lines = [];
+		var add = function ( parts ) {
+			var out = parts.map( function ( p ) {
+				return pdfText( p, symbol, code );
+			} ).filter( Boolean );
+			if ( out.length ) {
+				lines.push( out.join( '  ' ) );
+			}
+		};
+		var texts = function ( el, sel ) {
+			return Array.prototype.map.call( el.querySelectorAll( sel ), function ( c ) {
+				return c.textContent;
+			} );
+		};
+		var each = function ( sel, fn ) {
+			Array.prototype.forEach.call( inner.querySelectorAll( sel ), fn );
+		};
+		each( '.rf-receipt-head h3, .rf-receipt-seller, .rf-receipt-label, .rf-receipt-meta > div', function ( el ) {
+			add( [ el.textContent ] );
+		} );
+		each( '.rf-receipt-table tr', function ( tr ) {
+			add( texts( tr, 'th, td' ) );
+		} );
+		each( '.rf-receipt-totals > div', function ( div ) {
+			add( texts( div, 'span' ) );
+		} );
+		each( '.rf-receipt-words, .rf-receipt-statement', function ( el ) {
+			add( [ el.textContent ] );
+		} );
+		return lines;
+	}
+
 	// ---- Receipt type fields (homepage picker) -----------------------------
 	// The same markup generator-embed.php renders for a template's extra
 	// fields, tip / amount paid and statement, built from its form config.
@@ -786,6 +885,11 @@
 			monthsBetween: monthsBetween,
 			clip: clip,
 			qrPixels: qrPixels,
+			qrModulesFor: qrModulesFor,
+			paperFor: paperFor,
+			paperSize: paperSize,
+			pdfText: pdfText,
+			pdfTextLines: pdfTextLines,
 			pageSlices: pageSlices,
 			MAX_AMOUNT: MAX_AMOUNT,
 			QR_MAX: QR_MAX,
@@ -1402,10 +1506,13 @@
 		// sessionStorage stays in this browser tab only; nothing is uploaded.
 		var STORE_KEY = 'rgp-form:' + window.location.pathname;
 
+		// The PDF paper size sits by the download buttons, outside the form,
+		// and is kept with it.
+		var paperSel = document.getElementById( 'rf-paper-size' );
 		function storeFields() {
 			return Array.prototype.filter.call( form.querySelectorAll( 'input[id], select[id], textarea[id]' ), function ( el ) {
 				return el.type !== 'file';
-			} );
+			} ).concat( paperSel ? [ paperSel ] : [] );
 		}
 
 		// Saved once typing pauses, not on every keystroke.
@@ -1492,9 +1599,9 @@
 		} catch ( e ) {}
 
 		// What the receipt says, apart from its number and its look (design,
-		// logo, QR code, footer line, date format): a download of the same receipt in another format
+		// logo, QR code, footer line, date format, paper size): a download of the same receipt in another format
 		// keeps the number, and the first real change moves it on.
-		var NOT_CONTENT = { 'rf-receipt-number': true, 'rf-qr': true, 'rf-show-footer': true, 'rf-date-format': true };
+		var NOT_CONTENT = { 'rf-receipt-number': true, 'rf-qr': true, 'rf-show-footer': true, 'rf-date-format': true, 'rf-paper-size': true };
 		function receiptPrint() {
 			var data = { type: currentType, fields: {}, items: [] };
 			storeFields().forEach( function ( el ) {
@@ -2010,12 +2117,13 @@
 					extras: qrExtras
 				} );
 				var qr = qrDataUrl( verifyLink );
+				var pendingPx = qr ? 0 : qrPixels( qrModulesFor( new TextEncoder().encode( verifyLink ).length ) );
 				var qrText = '<span>Scan to view the details in this code<br>' + escapeHtml( verifyBase.replace( /^https?:\/\//, '' ) ) + '</span>';
 				// While the QR library loads, an empty box holds its place so
 				// the receipt (and an embedding iframe) doesn't jump.
 				qrHtml = qr ?
 					'<div class="rf-receipt-qr"><img src="' + qr.url + '" width="' + qr.size + '" height="' + qr.size + '" style="width:' + qr.size + 'px;height:' + qr.size + 'px" alt="QR code with this receipt\'s details">' + qrText + '</div>' :
-					'<div class="rf-receipt-qr"><span class="rf-qr-pending" aria-hidden="true"></span>' + qrText + '</div>';
+					'<div class="rf-receipt-qr"><span class="rf-qr-pending" aria-hidden="true" style="width:' + pendingPx + 'px;height:' + pendingPx + 'px"></span>' + qrText + '</div>';
 			}
 
 			preview.innerHTML = wrapDesign( design,
@@ -2259,6 +2367,45 @@
 			} );
 		}
 
+		if ( paperSel ) {
+			paperSel.addEventListener( 'change', saveFormSoon );
+		}
+
+		// The visitor's paper size, or the one their currency usually uses.
+		function paperChoice() {
+			var v = paperSel ? paperSel.value : '';
+			return PAPER[ v ] ? v : paperFor( currencySel.value );
+		}
+
+		// The receipt's text on page 1 in invisible ink over the image, so the
+		// PDF can be searched, copied and read aloud. It is shrunk to fit the
+		// box (x, y, width, height in mm) when the receipt is long.
+		function addPdfText( pdf, x, y, width, height ) {
+			var code  = currencySel.value || 'USD';
+			var lines = pdfTextLines( preview, getCurrencySymbol( code ), code );
+			var brand = pdfText( ( window.rfReceipt && window.rfReceipt.brand ) || 'ReceiptGenPro' ) || 'ReceiptGenPro';
+			pdf.setProperties( {
+				title: 'Receipt ' + pdfText( document.getElementById( 'rf-receipt-number' ).value.trim() || '1001' ),
+				subject: pdfText( document.getElementById( 'rf-business-name' ).value.trim() ),
+				creator: brand
+			} );
+			if ( ! lines.length ) {
+				return;
+			}
+			var LINE = 1.15;
+			var PT_MM = 25.4 / 72;
+			var size = 8;
+			pdf.setFont( 'helvetica', 'normal' );
+			pdf.setFontSize( size );
+			var wrapped = pdf.splitTextToSize( lines, width );
+			if ( wrapped.length * size * PT_MM * LINE > height ) {
+				size = Math.max( 1, height / ( wrapped.length * PT_MM * LINE ) );
+				pdf.setFontSize( size );
+				wrapped = pdf.splitTextToSize( lines, width );
+			}
+			pdf.text( wrapped, x, y + size * PT_MM, { renderingMode: 'invisible', lineHeightFactor: LINE } );
+		}
+
 		function savePdf( canvas ) {
 			// JPEG inside the PDF keeps files ~10x smaller than PNG (was ~5 MB).
 			var imgData   = canvas.toDataURL( 'image/jpeg', 0.92 );
@@ -2268,15 +2415,18 @@
 				var slipHeight = ( canvas.height * 72 ) / canvas.width;
 				var slip = new jsPDF( { orientation: 'portrait', unit: 'mm', format: [ 80, slipHeight + 8 ] } );
 				slip.addImage( imgData, 'JPEG', 4, 4, 72, slipHeight );
+				addPdfText( slip, 4, 4, 72, slipHeight );
 				slip.save( fileName( 'pdf' ) );
 				return;
 			}
-			// A4 at full width (190 mm inside 10 mm margins); a receipt
-			// taller than one page (277 mm) continues on the next
-			// pages, cut between rows, instead of shrinking.
-			var pdf    = new jsPDF( { orientation: 'portrait', unit: 'mm', format: 'a4' } );
-			var pageMm = 277;
-			var pagePx = Math.floor( canvas.width * pageMm / 190 );
+			// A4 or Letter at full width inside 10 mm margins; a receipt
+			// taller than one page continues on the next pages, cut between
+			// rows, instead of shrinking.
+			var paper  = paperSize( paperChoice() );
+			var m      = paper.margin;
+			var w      = paper.contentWidth;
+			var pdf    = new jsPDF( { orientation: 'portrait', unit: 'mm', format: paper.format } );
+			var pagePx = Math.floor( canvas.width * paper.pageHeight / w );
 			var slices = pageSlices( canvas.height, pagePx, canvas.rfBreaks || [] );
 			slices.forEach( function ( sl, n ) {
 				var part = canvas;
@@ -2290,9 +2440,12 @@
 					ctx.drawImage( canvas, 0, sl[0], canvas.width, part.height, 0, 0, canvas.width, part.height );
 				}
 				if ( n ) {
-					pdf.addPage( 'a4', 'portrait' );
+					pdf.addPage( paper.format, 'portrait' );
 				}
-				pdf.addImage( slices.length > 1 ? part.toDataURL( 'image/jpeg', 0.92 ) : imgData, 'JPEG', 10, 10, 190, ( part.height * 190 ) / canvas.width );
+				pdf.addImage( slices.length > 1 ? part.toDataURL( 'image/jpeg', 0.92 ) : imgData, 'JPEG', m, m, w, ( part.height * w ) / canvas.width );
+				if ( ! n ) {
+					addPdfText( pdf, m, m, w, paper.pageHeight );
+				}
 			} );
 			pdf.save( fileName( 'pdf' ) );
 		}

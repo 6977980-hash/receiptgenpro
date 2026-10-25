@@ -342,6 +342,16 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 					<button type="button" class="rf-btn rf-btn-secondary" id="rf-export-back">Go back</button>
 				</div>
 			</div>
+			<?php // v1.3.9: kept with the form in sessionStorage; "Automatic" is Letter for USD and CAD, A4 for the rest. ?>
+			<div class="rf-paper-size">
+				<label for="rf-paper-size">PDF paper size</label>
+				<select id="rf-paper-size" aria-describedby="rf-paper-size-hint">
+					<option value="">Automatic (by currency)</option>
+					<option value="letter">US Letter</option>
+					<option value="a4">A4</option>
+				</select>
+				<p class="rf-field-hint" id="rf-paper-size-hint">Automatic is US Letter for USD and CAD, A4 for other currencies.</p>
+			</div>
 			<div class="rf-preview-actions">
 				<button type="button" class="rf-btn rf-btn-primary" id="rf-download-pdf">Download PDF</button>
 				<button type="button" class="rf-btn rf-btn-secondary" id="rf-download-png">Download PNG</button>

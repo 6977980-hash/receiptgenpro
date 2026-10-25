@@ -158,6 +158,12 @@ p a:not(.rf-btn), li a:not(.rf-btn), .rf-field-hint a, .rf-sources-note a, .rf-l
 .rf-receipt-footer { text-align: center; font-size: .75rem; color: #64748b; margin: 1.25rem 0 0; }
 
 .rf-preview-actions { display: flex; gap: .75rem; margin-top: 1rem; }
+/* PDF paper size (v1.3.9), above the download buttons. */
+.rf-paper-size { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem .6rem; margin-top: 1rem; font-size: .85rem; }
+.rf-paper-size label { font-weight: 600; color: var(--rf-ink); }
+.rf-paper-size select { flex: 1 1 14rem; min-width: 0; min-height: 44px; padding: .4rem .5rem; border: 1px solid var(--rf-input-border); border-radius: 8px; background: #fff; font: inherit; color: var(--rf-ink); }
+.rf-paper-size .rf-field-hint { flex: 1 1 100%; margin: 0; }
+.rf-paper-size + .rf-preview-actions { margin-top: .6rem; }
 .rf-preview-actions .rf-btn { flex: 1; text-align: center; }
 .rf-privacy-note { font-size: .82rem; text-align: center; margin-top: .6rem; color: var(--rf-ink-soft); }
 .rf-usage-note { font-size: .78rem; text-align: center; margin-top: .35rem; color: var(--rf-ink-soft); }
@@ -438,6 +444,10 @@ p a:not(.rf-btn), li a:not(.rf-btn), .rf-field-hint a, .rf-sources-note a, .rf-l
 .rf-embed-body { background: #fff; }
 .rf-embed-body .rf-generator { padding: 1rem 0; }
 .rf-embed-body .rf-generator-preview { position: static; }
+/* Until the script draws the first receipt, the empty preview holds about
+   its height (525-706 px across the templates at 768-1366 px), so the
+   buttons under it don't jump (A25-L11, CLS 0.09 before). */
+.rf-embed-body #rf-receipt-preview:empty { min-height: 640px; }
 .rf-embed-credit { text-align: center; font-size: .8rem; color: #64748b; padding: .5rem 0 1rem; margin: 0; }
 .rf-receipt-signatures { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 .rf-receipt-signatures .rf-sig-line { width: 100%; max-width: 180px; }
@@ -620,7 +630,7 @@ p a:not(.rf-btn), li a:not(.rf-btn), .rf-field-hint a, .rf-sources-note a, .rf-l
 @media print {
 	@page { size: A4; margin: 10mm; }
 	.rf-site-header, .rf-breadcrumbs, .rf-site-footer, .rf-consent-banner, .rf-skip-link,
-	.rf-type-picker, .rf-generator-form, .rf-design-picker, .rf-preview-actions, .rf-privacy-note,
+	.rf-type-picker, .rf-generator-form, .rf-design-picker, .rf-preview-actions, .rf-paper-size, .rf-privacy-note,
 	.rf-checker, .rf-usage-note, .rf-embed-credit, #rf-total-live { display: none !important; }
 	/* Everything else on a page with the generator, except the receipt and
 	   the boxes around it. */

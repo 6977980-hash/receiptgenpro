@@ -26,7 +26,8 @@ CI (`.github/workflows/ci.yml`) runs `php -l` on every PHP file, the PHP tests
 in `tests/php/`, `node --check` on the theme's scripts and the JS tests. Locally:
 
 ```
-node --test tests/          # or: node --test tests/*.test.js
+npm i --no-save jsdom@26.1.0   # once, for the DOM tests
+node --test tests/*.test.js     # Node 22, as in CI
 for f in tests/php/*-test.php; do php "$f"; done
 ```
 
