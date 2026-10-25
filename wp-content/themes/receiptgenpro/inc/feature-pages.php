@@ -6,7 +6,8 @@
  *  /verify-receipt/            reads the QR code printed on a receipt
  *  /missing-receipt-form/      lost-receipt declaration (generator template)
  *  /refund-receipt/            refund receipt or credit note (generator template, 1.4.1)
- *  /rent-receipt-laws/<state>/ rent receipt laws by US state
+ *  /rent-receipt-laws/<state>/ rent receipt laws by US state, plus (1.4.2)
+ *                              Ohio's cities, the UK and Canada's provinces
  *  /receipt-generator-widget/  embed code for other websites
  *  /embed/<template>/          the generator alone, for iframes (noindex)
  *
@@ -66,13 +67,15 @@ function rf_feature_pages() {
 			'seo_title'   => 'Rent Receipt Laws by State — When Landlords Must Give One',
 			'description' => 'Which US states require a landlord to give a rent receipt, when (cash, any payment or on request), what it must show, and the statute for each state.',
 		);
-		foreach ( rf_rent_receipt_laws() as $slug => $law ) {
-			$pages[ 'rent-receipt-laws/' . $slug ] = array(
-				'title'       => $law['state'] . ' Rent Receipt Law',
+		// 1.4.2 (G-6): states, Ohio and its cities, the UK and Canada and its
+		// provinces; parents are listed before their children.
+		foreach ( rf_rent_law_entries() as $sub => $law ) {
+			$pages[ 'rent-receipt-laws/' . $sub ] = array(
+				'title'       => $law['name'] . ' Rent Receipt Law',
 				'template'    => 'page-rent-receipt-laws.php',
-				'parent'      => 'rent-receipt-laws',
+				'parent'      => rtrim( 'rent-receipt-laws/' . $law['parent'], '/' ),
 				// Audit 20 Oct (#12): the old pattern ran to 61–73 characters.
-				'seo_title'   => ( $law['short'] ?? $law['state'] ) . ' Rent Receipt Law: Is a Receipt Required?',
+				'seo_title'   => ( $law['short'] ?? $law['name'] ) . ' Rent Receipt Law: Is a Receipt Required?',
 				'description' => $law['meta'] ?? $law['summary'],
 			);
 		}
@@ -183,7 +186,8 @@ function rf_ensure_feature_pages() {
  * Audit 20 Oct (#16): a state page whose state is no longer in
  * rf_rent_receipt_laws() is set to draft, so it leaves the sitemap and
  * stops showing the hub under a state's URL. Draft, not trash, so nothing
- * is lost if the state comes back.
+ * is lost if the state comes back. 1.4.2: every page under the hub, at any
+ * depth (/rent-receipt-laws/ohio/columbus/), is checked by its full path.
  */
 function rf_draft_removed_law_pages( $pages ) {
 	if ( ! function_exists( 'rf_rent_receipt_laws' ) ) {
@@ -195,12 +199,12 @@ function rf_draft_removed_law_pages( $pages ) {
 	}
 	$children = get_pages(
 		array(
-			'parent'      => $hub->ID,
+			'child_of'    => $hub->ID,
 			'post_status' => 'publish',
 		)
 	);
 	foreach ( $children as $child ) {
-		if ( ! isset( $pages[ 'rent-receipt-laws/' . $child->post_name ] ) ) {
+		if ( ! isset( $pages[ trim( (string) get_page_uri( $child ), '/' ) ] ) ) {
 			wp_update_post(
 				array(
 					'ID'          => $child->ID,
@@ -209,6 +213,12 @@ function rf_draft_removed_law_pages( $pages ) {
 			);
 		}
 	}
+}
+
+/** 1.4.2: path of the current law page below the hub ('ohio/columbus'), '' on the hub. */
+function rf_rent_law_sub() {
+	$path = rf_current_page_path();
+	return 0 === strpos( $path, 'rent-receipt-laws/' ) ? substr( $path, strlen( 'rent-receipt-laws/' ) ) : '';
 }
 
 /**
@@ -220,7 +230,7 @@ function rf_redirect_orphan_law_page() {
 	if ( ! is_page_template( 'page-rent-receipt-laws.php' ) || ! wp_get_post_parent_id( get_queried_object_id() ) ) {
 		return;
 	}
-	if ( ! isset( rf_rent_receipt_laws()[ basename( rf_current_page_path() ) ] ) ) {
+	if ( ! rf_rent_law_entry( rf_rent_law_sub() ) ) {
 		wp_safe_redirect( home_url( '/rent-receipt-laws/' ), 301 );
 		exit;
 	}
@@ -268,7 +278,7 @@ function rf_feature_pages_schema( $graph ) {
 	} elseif ( is_page_template( 'page-receipt-widget.php' ) ) {
 		$pairs = rf_widget_faqs();
 	} elseif ( is_page_template( 'page-rent-receipt-laws.php' ) && function_exists( 'rf_rent_laws_faqs' ) ) {
-		$pairs = rf_rent_laws_faqs( wp_get_post_parent_id( get_queried_object_id() ) ? basename( rf_current_page_path() ) : '' );
+		$pairs = rf_rent_laws_faqs( rf_rent_law_sub() );
 	}
 	if ( $pairs ) {
 		$graph[] = rf_schema_faq_from_pairs( $pairs );
@@ -286,11 +296,7 @@ function rf_legal_pages_schema( $graph ) {
 	$citations = array();
 	$reviewed  = '';
 	if ( is_page_template( 'page-rent-receipt-laws.php' ) && function_exists( 'rf_rent_receipt_laws' ) ) {
-		$laws = rf_rent_receipt_laws();
-		$slug = wp_get_post_parent_id( get_queried_object_id() ) ? basename( rf_current_page_path() ) : '';
-		foreach ( ( $slug && isset( $laws[ $slug ] ) ) ? array( $laws[ $slug ] ) : $laws as $law ) {
-			$citations[ $law['citation'] ] = $law['url'];
-		}
+		$citations = rf_rent_law_citations( rf_rent_law_sub() );
 		$reviewed = rf_rent_laws_reviewed()['date'];
 	} elseif ( is_page_template( 'page-receipt-requirements.php' ) ) {
 		foreach ( rf_receipt_purposes() as $purpose ) {

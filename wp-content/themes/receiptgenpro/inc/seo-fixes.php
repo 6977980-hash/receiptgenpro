@@ -325,7 +325,7 @@ function rf_render_llms_txt() {
 	}
 	$lines[] = '- [Receipt Requirements Checker](' . home_url( '/receipt-requirements/' ) . '): what a receipt must show for an HRA claim, a dependent care FSA, a $250+ donation, an expense report or a US rent payment, with official sources';
 	$lines[] = '- [Verify a Receipt](' . home_url( '/verify-receipt/' ) . '): reads the verification QR code printed on ' . RF_BRAND_NAME . ' receipts to show the details stored in it (not proof of authenticity)';
-	$lines[] = '- [Rent Receipt Laws by State](' . home_url( '/rent-receipt-laws/' ) . '): US states that require landlords to give rent receipts, with statute citations';
+	$lines[] = '- [Rent Receipt Laws by State](' . home_url( '/rent-receipt-laws/' ) . '): US states and cities (Columbus and Cincinnati, Ohio) that require landlords to give rent receipts, plus the UK and Canada\'s provinces, with citations to the law';
 	$lines[] = '- [Receipt Generator Widget](' . home_url( '/receipt-generator-widget/' ) . '): free embed code to put any template on another website';
 	$lines[] = '';
 	$lines[] = '## Guides';
