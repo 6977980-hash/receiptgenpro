@@ -1,5 +1,5 @@
 /**
- * ReceiptGenPro — Receipt Generator (v1.3.6)
+ * ReceiptGenPro — Receipt Generator (v1.3.8)
  *
  * 100% client-side: no fetch(), no form submission, no data ever leaves
  * the browser.
@@ -60,6 +60,14 @@
  * tax number never goes in the QR code); no tax, discount or tip on a
  * no-tax type (donations), a quid pro quo line and "No value stated" for
  * an in-kind gift; the QR caption no longer says "verify".
+ *
+ * v1.3.8 (audit of 25 Oct, v2 Phase 2): prices that include tax (the tax
+ * is worked back out and printed as "Includes VAT (20%)"), a GST bill
+ * mode (HSN/SAC per item, place of supply), a choice of date format, an
+ * option to leave out the "Generated with" line, a check before
+ * downloading a receipt with no business name or a zero total, a PAN
+ * hint on the HRA form, "SAR" and "AED" as symbols, and on phones a bar
+ * at the bottom with the total and a shortcut to the preview.
  */
 ( function () {
 	'use strict';
@@ -125,6 +133,13 @@
 		return String( label ).split( ' — ' )[0];
 	}
 
+	// What goes before an amount: a symbol made of letters ("SAR", "AED")
+	// gets a space ("SAR 1,000.00"); "$", "€" and "CA$" don't.
+	function symbolPrefix( symbol ) {
+		symbol = String( symbol || '' );
+		return /^[A-Za-z]{2,}$/.test( symbol ) ? symbol + ' ' : symbol;
+	}
+
 	// All totals are built from amounts rounded to whole cents, so the figures
 	// printed on the receipt always add up (subtotal + tax + tip = total).
 	function toCents( n ) {
@@ -169,20 +184,37 @@
 	// discountType is 'percent' or 'amount'; a discount never exceeds the
 	// subtotal (discountClamped says when it was cut), and every tax is
 	// charged on the discounted amount.
-	function calcTotals( subtotalCents, discount, discountType, taxRates, tipCents ) {
+	// With `inclusive` the prices already include the taxes: each tax is
+	// worked back out of the discounted amount (taxable × rate / (100 + all
+	// rates)) and not added on top. netCents is what is left without tax,
+	// so any rounding cent stays in the net and net + taxes = gross.
+	function calcTotals( subtotalCents, discount, discountType, taxRates, tipCents, inclusive ) {
 		var discountCents = discountType === 'percent' ?
 			toCents( subtotalCents * Math.min( discount, 100 ) / 10000 ) :
 			toCents( discount );
 		var discountClamped = discountCents > subtotalCents;
 		discountCents = Math.min( discountCents, subtotalCents );
 		var taxableCents = subtotalCents - discountCents;
-		var taxCents = taxRates.map( function ( rate ) {
-			return toCents( taxableCents * rate / 10000 );
-		} );
-		var totalCents = taxableCents + tipCents + taxCents.reduce( function ( a, b ) {
+		var rateSum = taxRates.reduce( function ( a, b ) {
 			return a + b;
 		}, 0 );
-		return { discountCents: discountCents, discountClamped: discountClamped, taxCents: taxCents, totalCents: totalCents };
+		var taxCents = taxRates.map( function ( rate ) {
+			return inclusive ?
+				toCents( taxableCents * rate / ( 100 * ( 100 + rateSum ) ) ) :
+				toCents( taxableCents * rate / 10000 );
+		} );
+		var taxSum = taxCents.reduce( function ( a, b ) {
+			return a + b;
+		}, 0 );
+		var totalCents = taxableCents + tipCents + ( inclusive ? 0 : taxSum );
+		return {
+			discountCents: discountCents,
+			discountClamped: discountClamped,
+			taxCents: taxCents,
+			totalCents: totalCents,
+			inclusive: !! inclusive,
+			netCents: inclusive ? taxableCents - taxSum : taxableCents
+		};
 	}
 
 	// 1234567.89 → "1,234,567.89"; INR and PKR group in lakh and crore
@@ -278,6 +310,54 @@
 			return ( n < 10 ? '0' : '' ) + n;
 		};
 		return d.getFullYear() + '-' + pad( d.getMonth() + 1 ) + '-' + pad( d.getDate() );
+	}
+
+	// ---- Date formats --------------------------------------------------------
+	// 'long' 25 Oct 2026, 'mdy' 10/25/2026, 'dmy' 25/10/2026, 'iso' 2026-10-25.
+	// The QR code always keeps ISO dates.
+	var MONTHS_SHORT = [ 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec' ];
+	var DATE_FORMATS = { long: true, mdy: true, dmy: true, iso: true };
+	var DMY_CURRENCIES = { INR: true, PKR: true, GBP: true, AUD: true, AED: true, SAR: true };
+
+	// The format a currency's receipts usually use: USD month first, the
+	// day-first countries day first, the rest "25 Oct 2026" (no doubt
+	// about which number is the month).
+	function dateFormatFor( currency ) {
+		if ( currency === 'USD' ) {
+			return 'mdy';
+		}
+		return DMY_CURRENCIES[ currency ] ? 'dmy' : 'long';
+	}
+
+	// A YYYY-MM-DD date in `fmt`; anything else comes back unchanged.
+	function formatDate( iso, fmt ) {
+		var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec( String( iso || '' ) );
+		if ( ! m || ! MONTHS_SHORT[ +m[2] - 1 ] ) {
+			return String( iso || '' );
+		}
+		if ( fmt === 'mdy' ) {
+			return m[2] + '/' + m[3] + '/' + m[1];
+		}
+		if ( fmt === 'dmy' ) {
+			return m[3] + '/' + m[2] + '/' + m[1];
+		}
+		if ( fmt === 'long' ) {
+			return +m[3] + ' ' + MONTHS_SHORT[ +m[2] - 1 ] + ' ' + m[1];
+		}
+		return iso;
+	}
+
+	// An Indian PAN: five letters, four digits, one letter (ABCDE1234F).
+	function isPan( value ) {
+		return /^[A-Z]{5}[0-9]{4}[A-Z]$/i.test( String( value || '' ).trim() );
+	}
+
+	// GST bill mode (HSN/SAC per item, place of supply): an INR receipt that
+	// charges tax, or a seller whose tax number is a GSTIN. Never on a
+	// no-tax type (donations), and not on an INR receipt without tax (an
+	// HRA rent receipt).
+	function isGstMode( o ) {
+		return ! o.noTax && ( o.taxIdLabel === 'GSTIN' || ( o.currency === 'INR' && o.taxed ) );
 	}
 
 	// ---- Number to words (for cash / rent receipts) -----------------------
@@ -463,7 +543,10 @@
 	// receipt could read them.
 	var TAX_ID_FIELDS = { landlord_pan: true, ein: true, provider_tax_id: true, tax_id: true };
 
-	// r.extras are [ label, value, field id ]; r.taxes [ { label, rate, cents } ].
+	// r.extras are [ label, value, field id ]; r.taxes [ { label, rate, cents } ];
+	// an item's optional `code` (HSN/SAC) is its 4th entry, dropped first
+	// when the code would be too long. r.inclusive sets ti: 1 (the taxes
+	// are inside the prices, not added to the total).
 	function buildPayload( r ) {
 		var p = {
 			v: 1,
@@ -474,7 +557,11 @@
 			d: r.date,
 			cu: r.currency,
 			i: ( r.items || [] ).map( function ( it ) {
-				return [ clip( it.name, 60 ), it.qty, it.priceCents ];
+				var row = [ clip( it.name, 60 ), it.qty, it.priceCents ];
+				if ( it.code ) {
+					row.push( clip( it.code, 12 ) );
+				}
+				return row;
 			} ),
 			tot: r.totalCents,
 			pm: r.payMethod,
@@ -495,6 +582,9 @@
 				return [ clip( t.label, 16 ), formatRate( t.rate ), t.cents ];
 			} );
 		}
+		if ( taxes.length && r.inclusive ) {
+			p.ti = 1;
+		}
 		if ( r.tipCents ) {
 			p.tp = r.tipCents;
 		}
@@ -508,6 +598,11 @@
 		// the business and customer names and drop the last item. Each step runs only while
 		// the code is still too long.
 		var steps = [
+			function () {
+				p.i = p.i.map( function ( it ) {
+					return it.slice( 0, 3 ); // HSN/SAC codes only if space allows
+				} );
+			},
 			function () {
 				p.t = clip( p.t, 24 );
 				p.b = clip( p.b, 40 );
@@ -673,6 +768,11 @@
 	if ( typeof module !== 'undefined' && module.exports ) {
 		module.exports = {
 			currencySymbol: currencySymbol,
+			symbolPrefix: symbolPrefix,
+			formatDate: formatDate,
+			dateFormatFor: dateFormatFor,
+			isPan: isPan,
+			isGstMode: isGstMode,
 			amountInWords: amountInWords,
 			intToWords: intToWords,
 			intToWordsIndian: intToWordsIndian,
@@ -720,6 +820,9 @@
 		var statement   = document.getElementById( 'rf-statement' );
 		var totalLive   = document.getElementById( 'rf-total-live' );
 		var totalLiveTimer = null;
+		var footerToggle = document.getElementById( 'rf-show-footer' );
+		var stickyTotal  = document.getElementById( 'rf-sticky-total' );
+		var exportFacts  = null; // set by renderReceipt() for the download check
 
 		// Says a short message once in #rf-total-live (a type switch); the
 		// next total update follows it.
@@ -1174,6 +1277,14 @@
 			price.placeholder = '0.00';
 			price.setAttribute( 'aria-label', 'Price' );
 
+			// GST bill mode only (CSS shows it under the description).
+			var hsn = document.createElement( 'input' );
+			hsn.type = 'text';
+			hsn.className = 'rf-item-hsn';
+			hsn.maxLength = 12;
+			hsn.placeholder = 'HSN/SAC code (optional)';
+			hsn.setAttribute( 'aria-label', 'HSN/SAC code' );
+
 			var remove = document.createElement( 'button' );
 			remove.type = 'button';
 			remove.className = 'rf-item-remove';
@@ -1184,12 +1295,14 @@
 				name.value  = values.name || '';
 				qty.value   = values.qty !== undefined ? values.qty : '1';
 				price.value = values.price || '';
+				hsn.value   = values.hsn || '';
 			}
 
 			row.appendChild( name );
 			row.appendChild( qty );
 			row.appendChild( price );
 			row.appendChild( remove );
+			row.appendChild( hsn );
 			itemsList.appendChild( row );
 
 			remove.addEventListener( 'click', function () {
@@ -1207,6 +1320,7 @@
 				row.querySelector( '.rf-item-name' ).setAttribute( 'aria-label', 'Item ' + n + ' description' );
 				row.querySelector( '.rf-item-qty' ).setAttribute( 'aria-label', 'Item ' + n + ' quantity' );
 				row.querySelector( '.rf-item-price' ).setAttribute( 'aria-label', 'Item ' + n + ' price' );
+				row.querySelector( '.rf-item-hsn' ).setAttribute( 'aria-label', 'Item ' + n + ' HSN/SAC code' );
 				row.querySelector( '.rf-item-remove' ).setAttribute( 'aria-label', 'Remove item ' + n );
 			} );
 		}
@@ -1317,7 +1431,8 @@
 				data.items.push( {
 					name: row.querySelector( '.rf-item-name' ).value,
 					qty: row.querySelector( '.rf-item-qty' ).value,
-					price: row.querySelector( '.rf-item-price' ).value
+					price: row.querySelector( '.rf-item-price' ).value,
+					hsn: row.querySelector( '.rf-item-hsn' ).value
 				} );
 			} );
 			try {
@@ -1377,9 +1492,9 @@
 		} catch ( e ) {}
 
 		// What the receipt says, apart from its number and its look (design,
-		// logo, QR code): a download of the same receipt in another format
+		// logo, QR code, footer line, date format): a download of the same receipt in another format
 		// keeps the number, and the first real change moves it on.
-		var NOT_CONTENT = { 'rf-receipt-number': true, 'rf-qr': true };
+		var NOT_CONTENT = { 'rf-receipt-number': true, 'rf-qr': true, 'rf-show-footer': true, 'rf-date-format': true };
 		function receiptPrint() {
 			var data = { type: currentType, fields: {}, items: [] };
 			storeFields().forEach( function ( el ) {
@@ -1388,7 +1503,7 @@
 				}
 			} );
 			itemsList.querySelectorAll( '.rf-item-row' ).forEach( function ( row ) {
-				var it = [ row.querySelector( '.rf-item-name' ).value, row.querySelector( '.rf-item-qty' ).value, row.querySelector( '.rf-item-price' ).value ];
+				var it = [ row.querySelector( '.rf-item-name' ).value, row.querySelector( '.rf-item-qty' ).value, row.querySelector( '.rf-item-price' ).value, row.querySelector( '.rf-item-hsn' ).value ];
 				if ( it[0].trim() || it[2].trim() ) {
 					data.items.push( it ); // an empty row changes nothing
 				}
@@ -1445,8 +1560,39 @@
 		if ( businessDetails && ( fieldValue( 'rf-business-address' ) || fieldValue( 'rf-business-contact' ) || fieldValue( 'rf-tax-id' ) ) ) {
 			businessDetails.open = true;
 		}
-		if ( moreOptions && ( nonNegative( ( document.getElementById( 'rf-discount' ) || {} ).value ) || nonNegative( ( document.getElementById( 'rf-tax2-rate' ) || {} ).value ) ) ) {
+		if ( moreOptions && ( nonNegative( ( document.getElementById( 'rf-discount' ) || {} ).value ) || nonNegative( ( document.getElementById( 'rf-tax2-rate' ) || {} ).value ) || ( document.getElementById( 'rf-tax-inclusive' ) || {} ).checked ) ) {
 			moreOptions.open = true;
+		}
+
+		// A PAN is printed in capitals.
+		form.addEventListener( 'change', function ( e ) {
+			if ( e.target.id === 'rf-x-landlord_pan' ) {
+				e.target.value = e.target.value.trim().toUpperCase();
+			}
+		} );
+
+		// Choosing GSTIN as the tax number names the taxes CGST and SGST
+		// (when they have no names yet) and splits a single rate between them.
+		var taxIdLabelSel = document.getElementById( 'rf-tax-id-label' );
+		if ( taxIdLabelSel ) {
+			taxIdLabelSel.addEventListener( 'change', function () {
+				var l1 = document.getElementById( 'rf-tax-label' );
+				var l2 = document.getElementById( 'rf-tax2-label' );
+				var r1 = document.getElementById( 'rf-tax-rate' );
+				var r2 = document.getElementById( 'rf-tax2-rate' );
+				if ( taxIdLabelSel.value !== 'GSTIN' || cfg.noTax || ! l1 || ! l2 || l1.value.trim() || l2.value.trim() ) {
+					return;
+				}
+				l1.value = 'CGST';
+				l2.value = 'SGST';
+				var rate = r1 ? capped( r1.value, MAX_RATE ) : 0;
+				if ( rate && r2 && ! nonNegative( r2.value ) ) {
+					r1.value = r2.value = formatRate( rate / 2 );
+				}
+				if ( moreOptions ) {
+					moreOptions.open = true;
+				}
+			} );
 		}
 
 		// ---- Live re-render on any field change ------------------------------
@@ -1470,24 +1616,32 @@
 		}
 
 		function money( symbol, n ) {
-			return symbol + formatAmount( toCents( n ), currencySel.value );
+			return symbolPrefix( symbol ) + formatAmount( toCents( n ), currencySel.value );
 		}
 
-		function formatExtra( el ) {
+		// The visitor's date format, or the one their currency usually uses.
+		function dateFormat( currency ) {
+			var v = fieldValue( 'rf-date-format' );
+			return DATE_FORMATS[ v ] ? v : dateFormatFor( currency );
+		}
+
+		// An extra field's value as printed; dates in `fmt` ('iso' for the QR).
+		function formatExtra( el, fmt ) {
 			var v = ( el.value || '' ).trim();
 			if ( ! v ) {
 				return '';
 			}
 			var t = el.dataset.type;
 			if ( t === 'date' && /^\d{4}-\d{2}-\d{2}$/.test( v ) ) {
-				return v;
+				return formatDate( v, fmt );
 			}
 			if ( t === 'month' && /^\d{4}-\d{2}$/.test( v ) ) {
 				var mm = [ 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December' ];
 				return mm[ parseInt( v.slice( 5 ), 10 ) - 1 ] + ' ' + v.slice( 0, 4 );
 			}
 			if ( t === 'datetime-local' ) {
-				return v.replace( 'T', ' ' );
+				var dt = v.split( 'T' );
+				return formatDate( dt[0], fmt ) + ( dt[1] ? ' ' + dt[1] : '' );
 			}
 			return v;
 		}
@@ -1513,13 +1667,15 @@
 			return n > max || n === Infinity;
 		}
 
-		function collectItems( notes ) {
+		// `gst`: GST bill mode, so each item keeps its HSN/SAC code.
+		function collectItems( notes, gst ) {
 			var rows = itemsList.querySelectorAll( '.rf-item-row' );
 			var items = [];
 			rows.forEach( function ( row ) {
 				var name     = row.querySelector( '.rf-item-name' ).value.trim();
 				var qtyRaw   = row.querySelector( '.rf-item-qty' ).value;
 				var priceRaw = row.querySelector( '.rf-item-price' ).value;
+				var code     = gst ? row.querySelector( '.rf-item-hsn' ).value.trim() : '';
 				var qty      = nonNegative( qtyRaw, 1 );
 				var price    = toCents( capped( priceRaw, MAX_AMOUNT ) ) / 100;
 				if ( isNegative( qtyRaw ) || isNegative( priceRaw ) ) {
@@ -1530,7 +1686,7 @@
 				}
 				if ( name || price ) {
 					// An in-kind gift is described, not valued (IRS Pub. 1771).
-					items.push( { name: name || 'Item', qty: qty, price: price, lineCents: lineCents( qty, price ), noValue: cfg.inKind && ! price } );
+					items.push( { name: name || 'Item', qty: qty, price: price, lineCents: lineCents( qty, price ), noValue: cfg.inKind && ! price, code: code } );
 				}
 			} );
 			return items;
@@ -1557,13 +1713,109 @@
 			formNotice.hidden = ! html;
 		}
 
+		// GST bill mode: an HSN/SAC box under each item, a place of supply.
+		var gstOn = null;
+		function showGstFields( gst ) {
+			if ( gst === gstOn ) {
+				return;
+			}
+			gstOn = gst;
+			itemsList.classList.toggle( 'rf-gst-mode', gst );
+			var field = document.getElementById( 'rf-place-of-supply-field' );
+			if ( field ) {
+				field.hidden = ! gst;
+			}
+		}
+
+		// HRA form: a hint (never a block) when the landlord PAN doesn't
+		// look like one. The field is rebuilt on a type switch, so is its hint.
+		function updatePanHint() {
+			var pan = document.getElementById( 'rf-x-landlord_pan' );
+			if ( ! pan ) {
+				return;
+			}
+			var hint = document.getElementById( 'rf-pan-hint' );
+			if ( ! hint ) {
+				hint = document.createElement( 'p' );
+				hint.id = 'rf-pan-hint';
+				hint.className = 'rf-field-hint rf-field-warn';
+				hint.textContent = 'This doesn\'t look like a PAN: 5 letters, 4 digits, then a letter (e.g. ABCDE1234F). Check it before you print.';
+				pan.parentNode.appendChild( hint );
+			}
+			var bad = !! pan.value.trim() && ! isPan( pan.value );
+			hint.hidden = ! bad;
+			if ( bad ) {
+				pan.setAttribute( 'aria-describedby', 'rf-pan-hint' );
+			} else {
+				pan.removeAttribute( 'aria-describedby' );
+			}
+		}
+
+		// ---- Check before downloading an empty receipt ------------------------
+		// No business name, or a total of 0: a notice above the buttons asks
+		// first (no alert / confirm). "Download anyway" holds for this
+		// receipt, so its other formats don't ask again.
+		var exportCheck     = document.getElementById( 'rf-export-check' );
+		var exportCheckText = document.getElementById( 'rf-export-check-text' );
+		var exportOkPrint   = null;
+		var pendingExport   = null;
+
+		function hideExportCheck() {
+			if ( exportCheck ) {
+				exportCheck.hidden = true;
+			}
+			pendingExport = null;
+		}
+
+		function checkBeforeExport( run ) {
+			var f = exportFacts;
+			if ( ! exportCheck || ! f || ( f.business && ! f.zero ) || exportOkPrint === receiptPrint() ) {
+				hideExportCheck();
+				run();
+				return;
+			}
+			var label = cfg.businessLabel.replace( / \(optional\)$/i, '' );
+			var problems = [];
+			if ( ! f.business ) {
+				problems.push( 'the "' + label + '" field is empty, so it says "Your Business Name"' );
+			}
+			if ( f.zero ) {
+				problems.push( 'the total is ' + f.total );
+			}
+			exportCheckText.textContent = 'Before you download: ' + problems.join( ', and ' ) + '.';
+			pendingExport = run;
+			exportCheck.hidden = false;
+			exportCheck.focus();
+		}
+
+		if ( exportCheck ) {
+			document.getElementById( 'rf-export-anyway' ).addEventListener( 'click', function () {
+				var run = pendingExport;
+				exportOkPrint = receiptPrint();
+				hideExportCheck();
+				if ( run ) {
+					run();
+				}
+			} );
+			document.getElementById( 'rf-export-back' ).addEventListener( 'click', function () {
+				var f = exportFacts || {};
+				hideExportCheck();
+				var target = ! f.business ? document.getElementById( 'rf-business-name' ) : itemsList.querySelector( '.rf-item-price' );
+				if ( target ) {
+					target.focus();
+				}
+			} );
+		}
+
 		function renderReceipt() {
 			advanceNumber();
 			var business  = document.getElementById( 'rf-business-name' ).value.trim() || 'Your Business Name';
 			var client    = document.getElementById( 'rf-client-name' ).value.trim();
 			var number    = document.getElementById( 'rf-receipt-number' ).value.trim() || '1001';
-			var date      = dateInput.value || todayLocal();
+			// A cleared date prints a dash, not today's date.
+			var isoDate   = dateInput.value;
 			var currency  = currencySel.value || 'USD';
+			var date      = isoDate ? formatDate( isoDate, dateFormat( currency ) ) : '—';
 			var symbol    = getCurrencySymbol( currency );
 			var fix       = {};
 			// A no-tax type (donation) ignores whatever the hidden controls hold.
@@ -1576,9 +1828,14 @@
 			var tax2Rate  = capped( tax2Raw, MAX_RATE );
 			var tax2Label = fieldValue( 'rf-tax2-label' ) || 'Tax 2';
 			var discount  = capped( discRaw, discType === 'percent' ? MAX_RATE : MAX_AMOUNT );
+			var inclusive = ! cfg.noTax && !! ( document.getElementById( 'rf-tax-inclusive' ) || {} ).checked;
+			var gst       = isGstMode( { noTax: cfg.noTax, currency: currency, taxIdLabel: fieldValue( 'rf-tax-id-label' ), taxed: taxRate > 0 || tax2Rate > 0 } );
+			var place     = gst ? fieldValue( 'rf-place-of-supply' ) : '';
 			var payMethod = document.getElementById( 'rf-payment-method' ).value;
 			var notes     = document.getElementById( 'rf-notes' ).value.trim();
-			var items     = collectItems( fix );
+			var items     = collectItems( fix, gst );
+			showGstFields( gst );
+			updatePanHint();
 			var tipRaw    = tipInput && ! cfg.noTax ? tipInput.value : '';
 			var tipCents  = toCents( capped( tipRaw, MAX_AMOUNT ) );
 			var paidRaw   = paidInput ? paidInput.value.trim() : '';
@@ -1602,7 +1859,7 @@
 				subtotalCents = MAX_CENTS;
 				fix.max = true;
 			}
-			var calc       = calcTotals( subtotalCents, discount, discType, [ taxRate, tax2Rate ], tipCents );
+			var calc       = calcTotals( subtotalCents, discount, discType, [ taxRate, tax2Rate ], tipCents, inclusive );
 			var totalCents = calc.totalCents;
 			var subtotal   = subtotalCents / 100;
 			var tip        = tipCents / 100;
@@ -1613,16 +1870,26 @@
 			}
 			showNotices( fix, symbol );
 
+			// Amounts in the table may wrap only after a thousands comma, and
+			// the Thermal Slip sizes its Price and Total columns to the longest
+			// one, up to 10 characters (--rf-amount-ch), so words in the
+			// description stay whole.
+			var amountCh = 5; // "PRICE"
+			var cellMoney = function ( n ) {
+				var str = money( symbol, n );
+				amountCh = Math.max( amountCh, Array.from( str ).length );
+				return str.replace( /,/g, ',<wbr>' );
+			};
 			var rowsHtml = items
 				.map( function ( it ) {
 					return (
 						'<tr>' +
-						'<td>' + escapeHtml( it.name ) + '</td>' +
+						'<td>' + escapeHtml( it.name ) + ( it.code ? '<span class="rf-item-code">HSN/SAC: ' + escapeHtml( it.code ) + '</span>' : '' ) + '</td>' +
 						'<td class="rf-num">' + escapeHtml( String( it.qty ) ) + '</td>' +
 						( it.noValue ?
 							'<td class="rf-num rf-no-value">No value stated</td><td class="rf-num rf-no-value">No value stated</td>' :
-							'<td class="rf-num">' + money( symbol, it.price ) + '</td>' +
-							'<td class="rf-num">' + money( symbol, it.lineCents / 100 ) + '</td>' ) +
+							'<td class="rf-num">' + cellMoney( it.price ) + '</td>' +
+							'<td class="rf-num">' + cellMoney( it.lineCents / 100 ) + '</td>' ) +
 						'</tr>'
 					);
 				} )
@@ -1636,15 +1903,20 @@
 				meta.push( '<div><strong>' + escapeHtml( cfg.clientLabel.replace( / \(optional\)$/i, '' ) ) + ':</strong> ' + escapeHtml( client ) + '</div>' );
 			}
 			meta.push( '<div><strong>Payment Method:</strong> ' + escapeHtml( payMethod ) + '</div>' );
+			if ( place ) {
+				meta.push( '<div><strong>Place of supply:</strong> ' + escapeHtml( place ) + '</div>' );
+			}
 
-			var extras = [];
+			// extras keep ISO dates: they go in the QR code.
+			var extras = place ? [ [ 'Place of supply', place, 'place_of_supply' ] ] : [];
+			var fmt = dateFormat( currency );
 			form.querySelectorAll( '[data-rf-extra]' ).forEach( function ( el ) {
-				var val = formatExtra( el );
+				var val = formatExtra( el, 'iso' );
 				if ( val ) {
 					var label = ( el.dataset.label || '' ).replace( / \(optional\)$/i, '' );
 					var id = el.id.replace( /^rf-x-/, '' );
 					if ( ! QPQ_FIELDS[ id ] ) { // printed in their own sentence
-						meta.push( '<div><strong>' + escapeHtml( label ) + ':</strong> ' + escapeHtml( val ) + '</div>' );
+						meta.push( '<div><strong>' + escapeHtml( label ) + ':</strong> ' + escapeHtml( formatExtra( el, fmt ) ) + '</div>' );
 					}
 					extras.push( [ label, val, id ] );
 				}
@@ -1672,13 +1944,22 @@
 						'. Only the amount above their value may be tax-deductible.' ) + '</p>';
 			}
 
+			// The tax lines: added ones before the total, or with prices that
+			// include tax, "Includes VAT (20%)" lines after it.
+			var taxLines = function ( prefix ) {
+				var cls = prefix ? ' class="rf-receipt-tax-incl"' : '';
+				return [ [ taxRate, taxLabel, 0 ], [ tax2Rate, tax2Label, 1 ] ].map( function ( t ) {
+					return t[0] ? '<div' + cls + '><span>' + prefix + escapeHtml( t[1] ) + ' (' + formatRate( t[0] ) + '%)</span><span>' + money( symbol, calc.taxCents[ t[2] ] / 100 ) + '</span></div>' : '';
+				} ).join( '' );
+			};
 			var totalsHtml =
 				'<div><span>Subtotal</span><span>' + money( symbol, subtotal ) + '</span></div>' +
 				( calc.discountCents ? '<div><span>Discount' + ( discType === 'percent' ? ' (' + formatRate( Math.min( discount, 100 ) ) + '%)' : '' ) + '</span><span>-' + money( symbol, calc.discountCents / 100 ) + '</span></div>' : '' ) +
-				( taxRate ? '<div><span>' + escapeHtml( taxLabel ) + ' (' + formatRate( taxRate ) + '%)</span><span>' + money( symbol, calc.taxCents[0] / 100 ) + '</span></div>' : '' ) +
-				( tax2Rate ? '<div><span>' + escapeHtml( tax2Label ) + ' (' + formatRate( tax2Rate ) + '%)</span><span>' + money( symbol, calc.taxCents[1] / 100 ) + '</span></div>' : '' ) +
+				( inclusive ? '' : taxLines( '' ) ) +
 				( tip ? '<div><span>Tip</span><span>' + money( symbol, tip ) + '</span></div>' : '' ) +
-				'<div class="rf-receipt-total-final"><span>Total</span><span>' + money( symbol, total ) + '</span></div>';
+				'<div class="rf-receipt-total-final"><span>Total</span><span>' + money( symbol, total ) + '</span></div>' +
+				// Prices with tax in them: the tax worked out, not added.
+				( inclusive ? taxLines( 'Includes ' ) : '' );
 
 			if ( paid !== null ) {
 				var diffCents = totalCents - toCents( paid );
@@ -1711,16 +1992,17 @@
 					business: document.getElementById( 'rf-business-name' ).value.trim(),
 					client: client,
 					number: number,
-					date: date,
+					date: isoDate,
 					currency: currency,
 					items: items.map( function ( it ) {
-						return { name: it.name, qty: it.qty, priceCents: toCents( it.price ) };
+						return { name: it.name, qty: it.qty, priceCents: toCents( it.price ), code: it.code };
 					} ),
 					discountCents: calc.discountCents,
 					taxes: [
 						{ label: taxLabel, rate: taxRate, cents: calc.taxCents[0] },
 						{ label: tax2Label, rate: tax2Rate, cents: calc.taxCents[1] }
 					],
+					inclusive: inclusive,
 					tipCents: tipCents,
 					totalCents: totalCents,
 					paidCents: paid === null ? null : toCents( paid ),
@@ -1741,8 +2023,8 @@
 				'<div><h3>' + escapeHtml( business ) + '</h3>' + sellerHtml + '<p class="rf-receipt-label">' + escapeHtml( cfg.title ) + '</p></div>' +
 				'</div>' +
 				'<div class="rf-receipt-meta">' + meta.join( '' ) + '</div>' +
-				'<table class="rf-receipt-table"><thead><tr><th>Description</th><th class="rf-num">Qty</th><th class="rf-num">Price</th><th class="rf-num">Total</th></tr></thead><tbody>' +
-				( rowsHtml || '<tr><td colspan="4" class="rf-empty">Add items on the left to see them here</td></tr>' ) +
+				'<table class="rf-receipt-table" style="--rf-amount-ch:' + Math.min( amountCh, 10 ) + '"><thead><tr><th>Description</th><th class="rf-num">Qty</th><th class="rf-num">Price</th><th class="rf-num">Total</th></tr></thead><tbody>' +
+				( rowsHtml || '<tr><td colspan="4" class="rf-empty">Add items in the form to see them here</td></tr>' ) +
 				'</tbody></table>' +
 				'<div class="rf-receipt-totals">' + totalsHtml + '</div>' +
 				wordsHtml +
@@ -1750,7 +2032,8 @@
 				( notes ? '<div class="rf-receipt-notes">' + escapeHtml( notes ) + '</div>' : '' ) +
 				signatureHtml +
 				qrHtml +
-				'<p class="rf-receipt-footer">Generated with ' + escapeHtml( ( window.rfReceipt && window.rfReceipt.brand ) || 'ReceiptGenPro' ) + '</p>' );
+				( footerToggle && ! footerToggle.checked ? '' :
+					'<p class="rf-receipt-footer">Generated with ' + escapeHtml( ( window.rfReceipt && window.rfReceipt.brand ) || 'ReceiptGenPro' ) + '</p>' ) );
 
 			// The logo is added as an element, never as HTML text.
 			if ( isLogoDataUrl( state.logoDataUrl ) ) {
@@ -1786,10 +2069,27 @@
 				months: monthsBetween( fieldValue( 'rf-x-period_from' ), fieldValue( 'rf-x-period_to' ) )
 			} );
 
+			// What the download check looks at (an empty receipt).
+			exportFacts = {
+				business: !! document.getElementById( 'rf-business-name' ).value.trim(),
+				zero: totalCents === 0 && ! items.some( function ( it ) {
+					return it.noValue; // an in-kind gift is described, not valued
+				} ),
+				total: money( symbol, total )
+			};
+
+			if ( exportCheck && ! exportCheck.hidden && exportFacts.business && ! exportFacts.zero ) {
+				hideExportCheck(); // fixed in the form
+			}
+
+			var totalText = 'Total: ' + money( symbol, total );
+			if ( stickyTotal && stickyTotal.textContent !== totalText ) {
+				stickyTotal.textContent = totalText;
+			}
+
 			// Screen readers hear only the new total, once typing pauses,
 			// instead of the whole receipt on every keystroke.
 			if ( totalLive ) {
-				var totalText = 'Total: ' + money( symbol, total );
 				clearTimeout( totalLiveTimer );
 				totalLiveTimer = setTimeout( function () {
 					if ( totalLive.textContent !== totalText ) {
@@ -1800,6 +2100,42 @@
 		}
 
 		renderReceipt();
+
+		// ---- Total bar on phones -----------------------------------------------
+		// main.css shows it only where the form sits above the preview. It
+		// shows while the form is on screen and the preview and download
+		// buttons are not, and sits above the cookie banner while that shows.
+		var stickyBar = document.getElementById( 'rf-sticky-bar' );
+		var actionsBox = document.querySelector( '.rf-preview-actions' );
+		if ( stickyBar && window.IntersectionObserver ) {
+			var inView = { form: false, preview: false, actions: false };
+			var consentBanner = document.getElementById( 'rf-consent-banner' );
+			var placeBar = function () {
+				var banner = document.getElementById( 'rf-consent-banner' );
+				stickyBar.hidden = ! inView.form || inView.preview || inView.actions;
+				stickyBar.style.bottom = banner && ! banner.hidden ? banner.offsetHeight + 'px' : '';
+			};
+			var io = new window.IntersectionObserver( function ( entries ) {
+				entries.forEach( function ( e ) {
+					inView[ e.target === form ? 'form' : ( e.target === preview ? 'preview' : 'actions' ) ] = e.isIntersecting;
+				} );
+				placeBar();
+			} );
+			io.observe( form );
+			io.observe( preview );
+			if ( actionsBox ) {
+				io.observe( actionsBox );
+			}
+			if ( consentBanner && window.MutationObserver ) {
+				new MutationObserver( placeBar ).observe( consentBanner, { attributes: true, attributeFilter: [ 'hidden' ] } );
+			}
+			window.addEventListener( 'resize', placeBar );
+			document.getElementById( 'rf-sticky-go' ).addEventListener( 'click', function ( e ) {
+				e.preventDefault();
+				var still = window.matchMedia && window.matchMedia( '(prefers-reduced-motion: reduce)' ).matches;
+				preview.scrollIntoView( { behavior: still ? 'auto' : 'smooth', block: 'start' } );
+			} );
+		}
 
 		// ---- Export helpers ----------------------------------------------------
 		var EXPORT_WIDTH = 800; // px; at scale 2 every export is 1600 px wide.
@@ -1895,8 +2231,10 @@
 		var pngBtn = document.getElementById( 'rf-download-png' );
 		if ( pngBtn ) {
 			pngBtn.addEventListener( 'click', function () {
-				withCanvas( false, pngBtn, function ( canvas ) {
-					download( canvas.toDataURL( 'image/png' ), fileName( 'png' ) );
+				checkBeforeExport( function () {
+					withCanvas( false, pngBtn, function ( canvas ) {
+						download( canvas.toDataURL( 'image/png' ), fileName( 'png' ) );
+					} );
 				} );
 			} );
 		}
@@ -1904,8 +2242,10 @@
 		var jpgBtn = document.getElementById( 'rf-download-jpg' );
 		if ( jpgBtn ) {
 			jpgBtn.addEventListener( 'click', function () {
-				withCanvas( false, jpgBtn, function ( canvas ) {
-					download( canvas.toDataURL( 'image/jpeg', 0.92 ), fileName( 'jpg' ) );
+				checkBeforeExport( function () {
+					withCanvas( false, jpgBtn, function ( canvas ) {
+						download( canvas.toDataURL( 'image/jpeg', 0.92 ), fileName( 'jpg' ) );
+					} );
 				} );
 			} );
 		}
@@ -1913,44 +2253,48 @@
 		var pdfBtn = document.getElementById( 'rf-download-pdf' );
 		if ( pdfBtn ) {
 			pdfBtn.addEventListener( 'click', function () {
-				withCanvas( true, pdfBtn, function ( canvas ) {
-					// JPEG inside the PDF keeps files ~10x smaller than PNG (was ~5 MB).
-					var imgData   = canvas.toDataURL( 'image/jpeg', 0.92 );
-					var jsPDF     = window.jspdf.jsPDF;
-					if ( design === 'thermal' ) {
-						// A real 80 mm till roll: 72 mm printable, page as long as the slip.
-						var slipHeight = ( canvas.height * 72 ) / canvas.width;
-						var slip = new jsPDF( { orientation: 'portrait', unit: 'mm', format: [ 80, slipHeight + 8 ] } );
-						slip.addImage( imgData, 'JPEG', 4, 4, 72, slipHeight );
-						slip.save( fileName( 'pdf' ) );
-						return;
-					}
-					// A4 at full width (190 mm inside 10 mm margins); a receipt
-					// taller than one page (277 mm) continues on the next
-					// pages, cut between rows, instead of shrinking.
-					var pdf    = new jsPDF( { orientation: 'portrait', unit: 'mm', format: 'a4' } );
-					var pageMm = 277;
-					var pagePx = Math.floor( canvas.width * pageMm / 190 );
-					var slices = pageSlices( canvas.height, pagePx, canvas.rfBreaks || [] );
-					slices.forEach( function ( sl, n ) {
-						var part = canvas;
-						if ( slices.length > 1 ) {
-							part = document.createElement( 'canvas' );
-							part.width = canvas.width;
-							part.height = sl[1] - sl[0];
-							var ctx = part.getContext( '2d' );
-							ctx.fillStyle = '#ffffff';
-							ctx.fillRect( 0, 0, part.width, part.height );
-							ctx.drawImage( canvas, 0, sl[0], canvas.width, part.height, 0, 0, canvas.width, part.height );
-						}
-						if ( n ) {
-							pdf.addPage( 'a4', 'portrait' );
-						}
-						pdf.addImage( slices.length > 1 ? part.toDataURL( 'image/jpeg', 0.92 ) : imgData, 'JPEG', 10, 10, 190, ( part.height * 190 ) / canvas.width );
-					} );
-					pdf.save( fileName( 'pdf' ) );
+				checkBeforeExport( function () {
+					withCanvas( true, pdfBtn, savePdf );
 				} );
 			} );
+		}
+
+		function savePdf( canvas ) {
+			// JPEG inside the PDF keeps files ~10x smaller than PNG (was ~5 MB).
+			var imgData   = canvas.toDataURL( 'image/jpeg', 0.92 );
+			var jsPDF     = window.jspdf.jsPDF;
+			if ( design === 'thermal' ) {
+				// A real 80 mm till roll: 72 mm printable, page as long as the slip.
+				var slipHeight = ( canvas.height * 72 ) / canvas.width;
+				var slip = new jsPDF( { orientation: 'portrait', unit: 'mm', format: [ 80, slipHeight + 8 ] } );
+				slip.addImage( imgData, 'JPEG', 4, 4, 72, slipHeight );
+				slip.save( fileName( 'pdf' ) );
+				return;
+			}
+			// A4 at full width (190 mm inside 10 mm margins); a receipt
+			// taller than one page (277 mm) continues on the next
+			// pages, cut between rows, instead of shrinking.
+			var pdf    = new jsPDF( { orientation: 'portrait', unit: 'mm', format: 'a4' } );
+			var pageMm = 277;
+			var pagePx = Math.floor( canvas.width * pageMm / 190 );
+			var slices = pageSlices( canvas.height, pagePx, canvas.rfBreaks || [] );
+			slices.forEach( function ( sl, n ) {
+				var part = canvas;
+				if ( slices.length > 1 ) {
+					part = document.createElement( 'canvas' );
+					part.width = canvas.width;
+					part.height = sl[1] - sl[0];
+					var ctx = part.getContext( '2d' );
+					ctx.fillStyle = '#ffffff';
+					ctx.fillRect( 0, 0, part.width, part.height );
+					ctx.drawImage( canvas, 0, sl[0], canvas.width, part.height, 0, 0, canvas.width, part.height );
+				}
+				if ( n ) {
+					pdf.addPage( 'a4', 'portrait' );
+				}
+				pdf.addImage( slices.length > 1 ? part.toDataURL( 'image/jpeg', 0.92 ) : imgData, 'JPEG', 10, 10, 190, ( part.height * 190 ) / canvas.width );
+			} );
+			pdf.save( fileName( 'pdf' ) );
 		}
 	}
 } )();

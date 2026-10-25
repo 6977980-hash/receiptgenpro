@@ -755,8 +755,12 @@ function rf_currencies() {
 		'INR' => array( '₹', 'Indian Rupee' ),
 		'CAD' => array( 'CA$', 'Canadian Dollar' ),
 		'AUD' => array( 'AU$', 'Australian Dollar' ),
-		'AED' => array( 'د.إ', 'UAE Dirham' ),
-		'SAR' => array( '﷼', 'Saudi Riyal' ),
+		// v1.3.8: letter codes. '﷼' is the Iranian rial sign, the new Saudi
+		// riyal sign (U+20C1) isn't in common fonts yet, and 'د.إ' turned
+		// the amount around it right to left. The receipt and the verify
+		// page add a space after them ("SAR 1,000.00").
+		'AED' => array( 'AED', 'UAE Dirham' ),
+		'SAR' => array( 'SAR', 'Saudi Riyal' ),
 	);
 }
 

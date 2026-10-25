@@ -111,7 +111,7 @@ test( 'the form is saved in the tab and restored on reload', { skip }, async () 
 	await new Promise( ( r ) => setTimeout( r, 450 ) ); // saved once typing pauses
 	const saved = JSON.parse( w.sessionStorage.getItem( 'rgp-form:/' ) );
 	assert.equal( saved.fields[ 'rf-business-name' ], 'Saved Shop' );
-	assert.deepEqual( saved.items[0], { name: 'Widget', qty: '2', price: '4' } );
+	assert.deepEqual( saved.items[0], { name: 'Widget', qty: '2', price: '4', hsn: '' } );
 
 	const w2 = openGenerator( {
 		before( win ) {

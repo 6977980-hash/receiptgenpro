@@ -649,3 +649,68 @@ p a:not(.rf-btn), li a:not(.rf-btn), .rf-field-hint a, .rf-sources-note a, .rf-l
 /* An in-kind gift with no value (donation receipts). */
 .rf-receipt-table .rf-no-value { font-style: italic; color: var(--rf-ink-soft); }
 .rf-business-details[hidden], #rf-more-options[hidden], #rf-tax-rate-field[hidden] { display: none; }
+
+/* ==========================================================================
+   v1.3.8 — audit of 25 Oct, v2 Phase 2 (generator on phones, tax)
+   ========================================================================== */
+/* Thermal Slip: whole words wrap instead of "deliverab / le". Price and
+   Total are as wide as the longest amount (the script sets --rf-amount-ch;
+   Courier is .6em a character) up to 10 characters ("$12,345.67"), so
+   the description keeps about half the slip; a longer amount wraps after
+   a thousands comma. (A table cell ignores min() with a percentage.) No hyphens: auto, since the PNG /
+   PDF export (html2canvas) would draw the split without the hyphen. The
+   columns keep a gap, so DESCRIPTION and QTY never touch. */
+.rf-design-thermal .rf-receipt-table th, .rf-design-thermal .rf-receipt-table td { overflow-wrap: anywhere; word-break: normal; hyphens: manual; }
+.rf-design-thermal .rf-receipt-table th { letter-spacing: 0; }
+.rf-design-thermal .rf-receipt-table th:first-child { width: auto; }
+.rf-design-thermal .rf-receipt-table th:nth-child(2) { width: 3em; }
+.rf-design-thermal .rf-receipt-table { --rf-thermal-fs: .8rem; font-size: var(--rf-thermal-fs); }
+.rf-design-thermal .rf-receipt-table th:nth-child(3), .rf-design-thermal .rf-receipt-table th:nth-child(4) { width: calc(var(--rf-amount-ch, 9) * var(--rf-thermal-fs) * .6 + .8rem); }
+@media (max-width: 560px) {
+	.rf-design-thermal .rf-receipt-table { --rf-thermal-fs: .74rem; }
+}
+.rf-design-thermal .rf-receipt-table th + th, .rf-design-thermal .rf-receipt-table td + td { padding-left: .5rem; }
+
+/* Prices that include tax: "Includes VAT (20%)" under the total. */
+.rf-receipt-totals > .rf-receipt-tax-incl { font-size: .85em; }
+
+/* GST bill mode: an HSN/SAC box under each item's description, and the
+   code printed under the item name. */
+.rf-item-hsn { display: none; }
+.rf-gst-mode .rf-item-hsn { display: block; grid-column: 1 / 2; margin-top: -.25rem; padding: .4rem .6rem; border: 1px solid var(--rf-input-border); border-radius: 6px; font-size: .82rem; }
+.rf-gst-mode .rf-item-row { margin-bottom: .85rem; }
+.rf-item-code { display: block; font-size: .78em; color: var(--rf-ink-soft); }
+#rf-place-of-supply-field[hidden] { display: none; }
+.rf-field-check-inline { align-self: end; }
+.rf-field-warn { color: #92400e; }
+.rf-field-hint[hidden] { display: none; }
+
+/* Asked before downloading a receipt with no business name or a 0 total. */
+.rf-export-check { margin-top: 1rem; padding: .75rem .9rem; border: 1px solid #fde68a; border-radius: 8px; background: #fffbeb; color: #78350f; font-size: .9rem; }
+.rf-export-check:focus { outline: 2px solid #d97706; outline-offset: 2px; }
+.rf-export-check[hidden] { display: none; }
+.rf-export-check p { margin: 0 0 .6rem; }
+.rf-export-check-actions { display: flex; gap: .6rem; flex-wrap: wrap; }
+.rf-export-check-actions .rf-btn { padding: .5rem 1rem; font-size: .88rem; }
+
+/* Verify page: the lines in the code don't add up to its total. */
+.rf-verify-note { margin: .75rem 0 0; padding: .55rem .75rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; color: #334155; font-size: .88rem; }
+
+/* Phones: the total and "Preview & download" at the bottom of the screen
+   while the form fills it (the script hides it once the preview or the
+   download buttons are in view, and lifts it above the cookie banner). */
+.rf-sticky-bar { display: none; }
+#rf-receipt-preview { scroll-margin-top: 80px; }
+@media (max-width: 900px) {
+	.rf-sticky-bar:not([hidden]) {
+		display: flex; align-items: center; justify-content: space-between; gap: .75rem;
+		position: fixed; left: 0; right: 0; bottom: 0; z-index: 90;
+		padding: .6rem 1rem calc(.6rem + env(safe-area-inset-bottom)); padding-left: calc(1rem + env(safe-area-inset-left)); padding-right: calc(1rem + env(safe-area-inset-right));
+		background: #fff; border-top: 1px solid var(--rf-border); box-shadow: 0 -4px 16px rgba(15,23,42,.08);
+	}
+	.rf-sticky-total { font-weight: 800; font-size: 1rem; color: var(--rf-ink); min-width: 0; overflow-wrap: anywhere; }
+	.rf-sticky-bar .rf-btn { flex: 0 0 auto; padding: .6rem 1rem; font-size: .9rem; }
+}
+@media print {
+	.rf-sticky-bar, .rf-export-check { display: none !important; }
+}
