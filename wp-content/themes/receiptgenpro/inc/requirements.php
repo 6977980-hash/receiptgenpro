@@ -104,7 +104,8 @@ function rf_receipt_purposes() {
 				array( 'label' => 'Address of the rented premises (and apartment number)', 'field' => 'x:property' ),
 				array( 'label' => 'Landlord or agent name', 'field' => 'business' ),
 				array( 'label' => 'Tenant name', 'field' => 'client', 'optional' => true ),
-				array( 'label' => 'Signature of the person who received the payment, with their title', 'field' => 'signature', 'manual' => true ),
+				array( 'label' => 'Name and title of the person who received the payment', 'field' => 'x:received_by' ),
+				array( 'label' => 'Signature of the person who received the payment', 'field' => 'signature', 'manual' => true ),
 			),
 		),
 

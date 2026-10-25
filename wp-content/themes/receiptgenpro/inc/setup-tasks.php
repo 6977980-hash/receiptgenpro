@@ -19,6 +19,7 @@ function rf_setup_needed() {
 	return get_option( 'rf_feature_pages_hash' ) !== rf_feature_pages_hash()
 		|| ! rf_migration_done()
 		|| ! rf_migration_v135_done()
+		|| ! rf_migration_v137_done()
 		|| get_option( 'rf_rewrite_version' ) !== RF_THEME_VERSION;
 }
 
@@ -29,6 +30,7 @@ function rf_run_setup_tasks() {
 	rf_ensure_feature_pages();
 	rf_migrate_phase5_content();
 	rf_migrate_v135_content();
+	rf_migrate_v137_content();
 	if ( rf_flush_rewrites_v110() ) {
 		rf_setup_once_per_version();
 	}
@@ -52,7 +54,7 @@ add_action( 'init', 'rf_schedule_setup_tasks', 30 );
  * flags of the removed one-shot flushes are deleted.
  */
 function rf_setup_once_per_version() {
-	$names = array( 'rf_feature_pages_hash', 'rf_migration_phase5', 'rf_migration_v135', 'rf_rewrite_version' );
+	$names = array( 'rf_feature_pages_hash', 'rf_migration_phase5', 'rf_migration_v135', 'rf_migration_v137', 'rf_rewrite_version' );
 	if ( function_exists( 'wp_set_option_autoload_values' ) ) {
 		wp_set_option_autoload_values( array_fill_keys( $names, true ) );
 	} else {

@@ -66,7 +66,7 @@ $rf_seen  = rf_rent_laws_reviewed();
 				<p><?php echo esc_html( $rf_law['penalty'] ); ?></p>
 			<?php endif; ?>
 
-			<p class="rf-law-disclaimer">Checked against the statute text on <?php echo esc_html( $rf_law['checked'] ); ?>. This is general information, not legal advice; city or county rules and your lease can add to it. Read the <a href="<?php echo esc_url( $rf_law['url'] ); ?>" rel="noopener" target="_blank">statute</a> or ask a local tenant organization or lawyer about your situation.</p>
+			<p class="rf-law-disclaimer">Checked against the statute text in <?php echo esc_html( $rf_law['checked'] ); ?>. This is general information, not legal advice; city or county rules and your lease can add to it. Read the <a href="<?php echo esc_url( $rf_law['url'] ); ?>" rel="noopener" target="_blank">statute</a> or ask a local tenant organization or lawyer about your situation.</p>
 		</section>
 	</div>
 

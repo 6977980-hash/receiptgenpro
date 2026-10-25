@@ -33,6 +33,15 @@ while ( have_posts() ) :
 						<span aria-hidden="true">·</span>
 						<span>Updated <?php the_modified_date(); ?></span>
 					<?php endif; ?>
+					<?php
+					// Audit 25 Oct (A25-M7): the date the official sources were
+					// last checked, next to the byline as well as in the Sources box.
+					$rf_sources = rf_get_post_sources( get_post_field( 'post_name' ), get_the_ID() );
+					if ( $rf_sources['sources'] || $rf_sources['facts'] ) :
+						?>
+						<span aria-hidden="true">·</span>
+						<span>Sources checked <?php echo esc_html( date_i18n( 'F j, Y', strtotime( RF_SOURCES_REVIEWED ) ) ); ?></span>
+					<?php endif; ?>
 					<span aria-hidden="true">·</span>
 					<span><?php echo esc_html( rf_reading_time() ); ?> min read</span>
 				</div>

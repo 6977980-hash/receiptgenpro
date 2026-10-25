@@ -40,6 +40,8 @@ function rf_schema_organization() {
 		'@type' => 'Organization',
 		'@id'   => home_url( '/#organization' ),
 		'name'  => RF_BRAND_NAME,
+		// Audit 25 Oct (A25-L8): the other ways people write the brand.
+		'alternateName' => array( 'Receipt Gen Pro', 'receiptgenpro.com' ),
 		'url'   => home_url( '/' ),
 		'logo'  => array(
 			'@type' => 'ImageObject',
@@ -70,6 +72,7 @@ function rf_schema_website() {
 		'@id'             => home_url( '/#website' ),
 		'url'             => home_url( '/' ),
 		'name'            => RF_BRAND_NAME,
+		'alternateName'   => array( 'Receipt Gen Pro', 'receiptgenpro.com' ),
 		'description'     => RF_BRAND_DESCRIPTION,
 		'publisher'       => array( '@id' => home_url( '/#organization' ) ),
 		'inLanguage'      => 'en',

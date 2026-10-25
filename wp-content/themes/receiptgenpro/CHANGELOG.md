@@ -1,5 +1,16 @@
 # ReceiptGenPro theme — Changelog
 
+## 1.3.7 — 25 Oct 2026 (audit of 25 Oct, v2 Phase 1: content, trust and SEO)
+
+- **Donation guidance** (A25-H3): `/donation-receipt/` and the nonprofit donation guide follow IRS Publication 1771: describe an in-kind gift without valuing it (the donor values it); a gift is fully deductible when the donor got nothing in return, otherwise only the amount above a good-faith estimate of the benefit. The FAQPage schema follows, since it is built from the visible FAQ.
+- **Privacy and cookie policies** (A25-M6): split into "What Happens Today" (no cookies from our code; the browser storage keys `rgp-design`, `rgp-last-receipt-number` and `rgp-form:<path>`; Hostinger CDN / LiteSpeed and cdnjs (Cloudflare) receive the visitor's IP) and "If We Turn On Ads or Analytics" (the AdSense / DART / opt-out text, behind the cookie banner). "Last updated" changes to the day the patch runs.
+- **Who checks the facts** (A25-M7): new section on `/editorial-policy/` (sources re-checked on the stated date; no accountant or lawyer reviews the guides). Posts with a Sources box show "Sources checked <date>" in the byline.
+- **Guides** (A25-L7): GST guide gains e-invoicing (IRP / IRN, ₹5 crore threshold), place of supply and reverse charge, and cites the e-invoice portal; the UK VAT guide notes voluntary registration; rent-law pages say "Checked against the statute text in October 2026".
+- **Rent receipt** (A25-L2): the Indian "Landlord PAN" extra is gone from the US rent form (the HRA form keeps its own); new optional "Received by (name and title)" field, and the `rent-us` check asks for it (NY RPL §235-e), with the signature kept as a reminder.
+- **Feeds** (A25-L10): `/comments/feed/` and `/<slug>/feed/` redirect (301) to `/feed/`.
+- **Schema** (A25-L8): Organization and WebSite have `alternateName` "Receipt Gen Pro" and "receiptgenpro.com".
+- The page text changes run once from `rf_migrate_v137_content()` (option `rf_migration_v137`, admin or WP-Cron, with revisions). Each patch matches straight or curly quotes, and does nothing if its text is gone. Tests: `tests/php/v137-test.php` applies every patch to the 25 Oct page text (`tests/php/fixtures/v137/`).
+
 ## 1.3.6 — 25 Oct 2026 (audit of 25 Oct, Phase 1: receipt tools)
 
 - **Receipt numbers** (A25-H1): a download no longer moves the number on. A PDF, PNG and JPEG of the same receipt all carry the same number; the first change to the receipt after a download (any field except the number, the design, the logo or the QR option; an empty new item row doesn't count) moves the field to the next number, once, and only if it still holds the downloaded number. The last downloaded number is still kept in `localStorage` (`rgp-last-receipt-number`), so a reload starts after it. The hint under the field says so.
