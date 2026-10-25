@@ -5,6 +5,7 @@
  *  /receipt-requirements/      what a receipt needs for HRA, FSA, $250+ gifts…
  *  /verify-receipt/            reads the QR code printed on a receipt
  *  /missing-receipt-form/      lost-receipt declaration (generator template)
+ *  /refund-receipt/            refund receipt or credit note (generator template, 1.4.1)
  *  /rent-receipt-laws/<state>/ rent receipt laws by US state
  *  /receipt-generator-widget/  embed code for other websites
  *  /embed/<template>/          the generator alone, for iframes (noindex)
@@ -12,7 +13,8 @@
  * The pages are real WordPress Pages (so they are in the sitemap, menus and
  * IndexNow pings) created automatically once per change of the list below.
  * Their text lives in the theme templates, except the missing receipt
- * form's article, which is normal page content you can edit in wp-admin.
+ * form's and the refund receipt's articles, which are normal page content
+ * you can edit in wp-admin.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -41,6 +43,13 @@ function rf_feature_pages() {
 			'template' => 'page-receipt-category.php',
 			'excerpt'  => 'Free missing receipt declaration for expense reports.',
 			'content'  => 'rf_missing_receipt_page_content',
+		),
+		// 1.4.1 (G-9): a template page like the one above (rf_receipt_categories()).
+		'refund-receipt'           => array(
+			'title'    => 'Refund Receipt Generator',
+			'template' => 'page-receipt-category.php',
+			'excerpt'  => 'Free refund receipt and credit note template for businesses that give money back.',
+			'content'  => 'rf_refund_receipt_page_content',
 		),
 		'receipt-generator-widget' => array(
 			'title'       => 'Free Receipt Generator Widget',
@@ -385,6 +394,47 @@ function rf_missing_receipt_page_content() {
 <p>No. A missing receipt form is your own signed statement that you paid an expense whose receipt you no longer have. Creating a receipt that looks like it came from the merchant is not allowed and can be fraud.</p>
 <h3>Can I list several lost receipts on one form?</h3>
 <p>Yes. Add one line per expense with its own description and amount. If the expenses were on different dates or with different vendors, note them in each line's description.</p>
+</div>
+HTML;
+}
+
+/* ==========================================================================
+   Article for the refund receipt page (stored as page content, 1.4.1)
+   ========================================================================== */
+function rf_refund_receipt_page_content() {
+	return <<<'HTML'
+<h2>What Is a Refund Receipt?</h2>
+<p>A refund receipt is the record a business gives a customer when it pays money back: for returned goods, a cancelled service, an overcharge or a faulty item. It names the original receipt or invoice, says what was refunded and why, and shows how the money went back (to the card, in cash, by bank transfer or as store credit). Keep a copy with your sales records so the refund matches the original sale.</p>
+<p>When the money is kept as store credit instead of being paid back, many businesses call the same document a <strong>credit note</strong>. Choose "Credit note" in the Document menu and the receipt says "Credit Note" and "Total credited".</p>
+
+<h2>What to Include</h2>
+<ul>
+<li><strong>Your business name</strong>, and your address and contact details (under "Business details").</li>
+<li><strong>The customer</strong> who receives the refund.</li>
+<li><strong>The original receipt or invoice number and its date</strong>, so the refund can be traced to the sale.</li>
+<li><strong>What was refunded</strong>: one line per item or charge, with any tax refunded on it.</li>
+<li><strong>The reason</strong> and <strong>the refund method</strong>.</li>
+<li><strong>The refund date and the total refunded</strong>, and a signature if you hand it over in person.</li>
+</ul>
+
+<h2>How to Fill It In</h2>
+<ol>
+<li>Enter your business name and the customer's name.</li>
+<li>Type the original receipt or invoice number and date, then pick the reason and the refund method.</li>
+<li>Add one line per refunded item as a positive amount. Add the tax rate if you are refunding tax too; it prints as "Tax refunded".</li>
+<li>Download the PDF, PNG or JPEG and give a copy to the customer.</li>
+</ol>
+
+<h2>Refund Receipt FAQ</h2>
+<div class="rf-faq">
+<h3>Do I enter refunded amounts as negative numbers?</h3>
+<p>No. Enter them as positive amounts. The receipt is titled "Refund Receipt" and the total says "Total refunded", which makes clear the money went back to the customer. Your own bookkeeping can record it as a negative sale.</p>
+<h3>What is the difference between a refund receipt and a credit note?</h3>
+<p>A refund receipt records money paid back to the customer. A credit note records an amount the customer can use later, such as store credit. Pick the one that matches what you gave; the layout is the same.</p>
+<h3>Is this a GST credit note?</h3>
+<p>No. In India, a GST-registered supplier issues a credit note under <a href="https://cbic-gst.gov.in/pdf/CGST-Act-2017-amended-01012022.pdf" rel="noopener" target="_blank">section 34 of the CGST Act, 2017</a>, with the details listed in rule 53(1A) of the <a href="https://cbic-gst.gov.in/pdf/20082020_CGST-Rules-2017-Part-A-Rules.pdf" rel="noopener" target="_blank">CGST Rules, 2017</a>, such as your GSTIN, the original invoice's number and date, and the tax credited. Businesses that must issue e-invoices also report credit notes on the Invoice Registration Portal. Use this receipt as a record of the refund alongside that document.</p>
+<h3>Should the refund receipt show the original receipt number?</h3>
+<p>Yes. It is the easiest way for you, your customer and your accountant to match the refund to the sale. The checker under the preview reminds you when it is empty.</p>
 </div>
 HTML;
 }

@@ -47,6 +47,14 @@
  * this device" (off by default, never inside an embed) with a "Forget
  * saved details" button, and an "Other (type a code)" currency with its
  * code and decimals fields.
+ *
+ * v1.4.1 (audit of 25 Oct, v2 Phase 5): a "Document" menu for a form with
+ * 'documents' (donations: one gift or a year-end statement with a tax
+ * year; refunds: refund receipt or credit note), "Receipts for several
+ * months" on a form with 'months' (HRA: up to 12 receipts in one PDF), and
+ * on a refund form a note that it is not a GST credit note (shown by the
+ * script in GST bill mode). On the homepage the script rebuilds both parts
+ * when the receipt type changes, from the same config.
  */
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -94,7 +102,8 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 			data-business-label="<?php echo esc_attr( $form['business_label'] ); ?>"
 			data-client-label="<?php echo esc_attr( $form['client_label'] ); ?>"
 			data-no-tax="<?php echo $form['no_tax'] ? '1' : '0'; ?>"
-			data-in-kind="<?php echo $form['in_kind'] ? '1' : '0'; ?>">
+			data-in-kind="<?php echo $form['in_kind'] ? '1' : '0'; ?>"
+			data-refund="<?php echo $form['refund'] ? '1' : '0'; ?>">
 			<h2><?php echo esc_html( $heading ); ?></h2>
 
 			<div class="rf-form-row rf-form-row-2col">
@@ -239,6 +248,32 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 			<?php endif; ?>
 			</div>
 
+			<?php // v1.4.1: the same markup as typeFieldsHtml() in receipt-generator.js. ?>
+			<div id="rf-type-doc">
+			<?php if ( ! empty( $form['documents'] ) ) : ?>
+				<div class="rf-form-row rf-form-row-2col rf-doc-row">
+					<div class="rf-field">
+						<label for="rf-doc-mode">Document</label>
+						<select id="rf-doc-mode">
+							<?php foreach ( $form['documents'] as $rf_value => $rf_label ) : ?>
+								<option value="<?php echo esc_attr( $rf_value ); ?>"><?php echo esc_html( $rf_label ); ?></option>
+							<?php endforeach; ?>
+						</select>
+					</div>
+					<?php if ( isset( $form['documents']['annual'] ) ) : ?>
+						<div class="rf-field" id="rf-tax-year-field" hidden>
+							<label for="rf-tax-year">Tax year</label>
+							<input type="number" id="rf-tax-year" min="2000" max="2100" step="1" inputmode="numeric" aria-describedby="rf-tax-year-hint">
+							<p class="rf-field-hint" id="rf-tax-year-hint">Add one row per gift with its date. Cash gifts are totalled; describe in-kind gifts without a value.</p>
+						</div>
+					<?php endif; ?>
+				</div>
+				<?php if ( $form['refund'] ) : ?>
+					<p class="rf-field-hint" id="rf-refund-gst-note" hidden>This is a record of a refund, not a GST credit note. A GST-registered supplier issues a credit note under section 34 of the CGST Act, 2017, with the details in rule 53(1A) of the CGST Rules (your GSTIN, the original invoice's number and date, the tax credited and more), and reports it on the Invoice Registration Portal if the business issues e-invoices.</p>
+				<?php endif; ?>
+			<?php endif; ?>
+			</div>
+
 			<h3>Items</h3>
 			<div id="rf-items-list"></div>
 			<button type="button" class="rf-btn rf-btn-secondary" id="rf-add-item">+ Add Item</button>
@@ -251,7 +286,7 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 						<input type="number" id="rf-tax-rate" value="0" min="0" max="100" step="0.01">
 					</div>
 				<?php endif; ?>
-				<div class="rf-field">
+				<div class="rf-field" id="rf-payment-method-field"<?php echo $form['refund'] ? ' hidden' : ''; ?>>
 					<label for="rf-payment-method">Payment Method</label>
 					<select id="rf-payment-method">
 						<?php foreach ( $payment_methods as $method ) : ?>
@@ -333,6 +368,43 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 						<?php echo esc_html( $form['statement']['label'] ); ?>
 					</label>
 				</div>
+			<?php endif; ?>
+			</div>
+
+			<?php // v1.4.1 (G-4): the same markup as typeFieldsHtml() in receipt-generator.js. ?>
+			<div id="rf-type-months">
+			<?php if ( $form['months'] ) : ?>
+				<details class="rf-more-options rf-months" id="rf-months">
+					<summary>Receipts for several months (one PDF)</summary>
+					<div class="rf-form-row rf-form-row-2col">
+						<div class="rf-field">
+							<label for="rf-months-from">From month</label>
+							<input type="month" id="rf-months-from">
+						</div>
+						<div class="rf-field">
+							<label for="rf-months-to">To month</label>
+							<input type="month" id="rf-months-to">
+						</div>
+					</div>
+					<div class="rf-form-row rf-form-row-2col">
+						<div class="rf-field">
+							<label for="rf-months-rent">Monthly rent</label>
+							<input type="number" id="rf-months-rent" min="0" max="999999999999.99" step="0.01" aria-describedby="rf-months-rent-hint">
+							<p class="rf-field-hint" id="rf-months-rent-hint">The same for every month. Leave it empty to use the receipt's total.</p>
+						</div>
+						<div class="rf-field">
+							<label for="rf-months-day">Receipt date for each month</label>
+							<select id="rf-months-day">
+								<option value="first">1st of the month</option>
+								<option value="last">Last day of the month</option>
+							</select>
+						</div>
+					</div>
+					<p class="rf-field-hint">Up to 12 months, such as April to March for one financial year. Each month gets its own page, receipt number and QR code, with the landlord, tenant, address, PAN, design and signature from the form above.</p>
+					<p class="rf-field-hint rf-field-warn" id="rf-months-note" hidden></p>
+					<button type="button" class="rf-btn rf-btn-primary" id="rf-download-months">Download all as one PDF</button>
+					<p class="rf-months-progress" id="rf-months-progress" role="status"></p>
+				</details>
 			<?php endif; ?>
 			</div>
 
