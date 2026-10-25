@@ -7,6 +7,11 @@
  *
  * v1.3.3: shows the discount, tax lines and tip (dc, tx, tp), amounts with
  * thousands separators, and strips bidi control characters from the text.
+ *
+ * v1.3.8: taxes included in the prices (ti) print as "VAT (20%, incl.)",
+ * an HSN/SAC code (4th item entry) prints next to its item, a payload
+ * whose lines don't add up to its total gets a neutral note, "SAR 10.00"
+ * has a space, and a payload without a currency says "(no currency)".
  */
 ( function () {
 	'use strict';
@@ -81,15 +86,41 @@
 		return String( str === undefined || str === null ? '' : str ).replace( /[\u202A-\u202E\u2066-\u2069]/g, '' );
 	}
 
-	// "$1,234.50"; INR and PKR group in lakh and crore ("₹12,34,567.00").
+	// "$1,234.50"; INR and PKR group in lakh and crore ("₹12,34,567.00");
+	// a symbol of letters, or a code without a symbol, gets a space
+	// ("SAR 1,000.00"); no currency at all, "1,000.00 (no currency)".
 	function money( p, cents ) {
 		var locale = p.cu === 'INR' || p.cu === 'PKR' ? 'en-IN' : 'en-US';
 		var num = new Intl.NumberFormat( locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 } ).format( cents / 100 );
-		return ( symbol( p.cu ) || ( p.cu ? stripBidi( p.cu ) + ' ' : '' ) ) + num;
+		if ( ! p.cu ) {
+			return num + ' (no currency)';
+		}
+		var sym = symbol( p.cu ) || stripBidi( p.cu );
+		return sym + ( /^[A-Za-z]{2,}$/.test( sym ) ? ' ' : '' ) + num;
+	}
+
+	// The lines − discount + taxes added on top + tip, in cents (taxes
+	// included in the prices, ti, are already in the lines).
+	function linesTotal( p ) {
+		var cents = p.i.reduce( function ( sum, it ) {
+			return sum + Math.round( ( parseFloat( it[1] ) || 0 ) * it[2] );
+		}, 0 ) - ( p.dc || 0 ) + ( p.tp || 0 );
+		if ( ! p.ti ) {
+			( p.tx || [] ).forEach( function ( t ) {
+				cents += t[2];
+			} );
+		}
+		return cents;
+	}
+
+	// True when the payload's lines don't come to its total (more than a
+	// cent off), unless not every line fit in the code (more).
+	function doesNotAddUp( p ) {
+		return ! p.more && Math.abs( linesTotal( p ) - p.tot ) > 1;
 	}
 
 	if ( typeof module !== 'undefined' && module.exports ) {
-		module.exports = { decodePayload: decodePayload, b64urlDecode: b64urlDecode, money: money, stripBidi: stripBidi };
+		module.exports = { decodePayload: decodePayload, b64urlDecode: b64urlDecode, money: money, stripBidi: stripBidi, linesTotal: linesTotal, doesNotAddUp: doesNotAddUp };
 	}
 
 	if ( typeof document === 'undefined' ) {
@@ -152,7 +183,9 @@
 			rows.push( [ 'Discount', '-' + money( p, p.dc ) ] );
 		}
 		( p.tx || [] ).forEach( function ( t ) {
-			rows.push( [ String( t[0] || 'Tax' ) + ( t[1] !== undefined && t[1] !== '' ? ' (' + t[1] + '%)' : '' ), money( p, t[2] ) ] );
+			var rate = t[1] !== undefined && t[1] !== '' ? t[1] + '%' : '';
+			var incl = p.ti ? ( rate ? ', incl.' : 'incl.' ) : '';
+			rows.push( [ String( t[0] || 'Tax' ) + ( rate || incl ? ' (' + rate + incl + ')' : '' ), money( p, t[2] ) ] );
 		} );
 		if ( p.tp ) {
 			rows.push( [ 'Tip', money( p, p.tp ) ] );
@@ -171,12 +204,16 @@
 		if ( p.i.length ) {
 			html += '<div class="rf-table-wrap"><table class="rf-compare-table"><thead><tr><th>Item</th><th class="rf-num">Qty</th><th class="rf-num">Price</th></tr></thead><tbody>' +
 				p.i.map( function ( it ) {
-					return '<tr><td>' + esc( it[0] ) + '</td><td class="rf-num">' + esc( it[1] ) + '</td><td class="rf-num">' + esc( money( p, it[2] ) ) + '</td></tr>';
+					var code = typeof it[3] === 'string' && it[3] ? ' (HSN/SAC ' + it[3] + ')' : '';
+					return '<tr><td>' + esc( String( it[0] ) + code ) + '</td><td class="rf-num">' + esc( it[1] ) + '</td><td class="rf-num">' + esc( money( p, it[2] ) ) + '</td></tr>';
 				} ).join( '' ) +
 				'</tbody></table></div>';
 		}
 		if ( p.more ) {
 			html += '<p class="rf-muted">The receipt has more lines than fit in the QR code; the first ones are shown.</p>';
+		}
+		if ( doesNotAddUp( p ) ) {
+			html += '<p class="rf-verify-note">The lines in this code don\'t add up to the total shown.</p>';
 		}
 		html += '<p class="rf-muted">This shows what was typed when the code was made. It does not confirm who issued the receipt or that it was paid; only the person who received the money, or a bank statement, can.</p>';
 		return html;

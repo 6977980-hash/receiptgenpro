@@ -156,6 +156,7 @@ test( 'A25-H1: PDF, PNG and JPEG of the same receipt carry one number', { skip }
 
 test( 'A25-H1: a number the visitor typed after a download is kept', { skip }, async () => {
 	const w = openGenerator();
+	type( w, 'rf-business-name', 'Ali Store' ); // 1.3.8: an unnamed receipt asks first
 	item( w, 0, 'Tea', '1', '3' );
 	await download( w, 'rf-download-png' );
 	type( w, 'rf-receipt-number', 'INV-500' );

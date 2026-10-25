@@ -34,6 +34,12 @@
  * v1.3.6 (audit of 25 Oct, Phase 1): an optional "Business details" group
  * under the business name on every form (address, contact, tax ID), and
  * no tax rate or discount controls on a form with 'no_tax' (donations).
+ *
+ * v1.3.8 (audit of 25 Oct, v2 Phase 2): a date format menu, a place of
+ * supply field (GST bill mode only; the script shows it), "Prices include
+ * tax" in More options, an option to leave out the "Generated with" line,
+ * the check shown before downloading an empty receipt, and the total bar
+ * at the bottom of the screen on phones.
  */
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -146,6 +152,25 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 				</div>
 			</div>
 
+			<div class="rf-form-row rf-form-row-2col">
+				<div class="rf-field">
+					<label for="rf-date-format">Date format</label>
+					<select id="rf-date-format">
+						<option value="">Automatic (follows the currency)</option>
+						<option value="long">25 Oct 2026</option>
+						<option value="mdy">10/25/2026 (month first)</option>
+						<option value="dmy">25/10/2026 (day first)</option>
+						<option value="iso">2026-10-25</option>
+					</select>
+				</div>
+				<?php // GST bill mode only (INR with tax, or a GSTIN); the script shows it. ?>
+				<div class="rf-field" id="rf-place-of-supply-field" hidden>
+					<label for="rf-place-of-supply">Place of supply (optional)</label>
+					<input type="text" id="rf-place-of-supply" placeholder="e.g. Maharashtra (27)" aria-describedby="rf-gst-hint">
+					<p class="rf-field-hint" id="rf-gst-hint">GST bill: add the state here and an HSN/SAC code under each item if you like. A receipt from this tool is not a GST tax invoice.</p>
+				</div>
+			</div>
+
 			<div id="rf-type-extra">
 			<?php if ( ! empty( $form['extra'] ) ) : ?>
 				<fieldset class="rf-template-fields">
@@ -202,7 +227,7 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 
 			<?php if ( ! $form['no_tax'] || $picker ) : ?>
 			<details class="rf-more-options" id="rf-more-options"<?php echo $form['no_tax'] ? ' hidden' : ''; ?>>
-				<summary>Discount and a second tax (e.g. CGST + SGST)</summary>
+				<summary>Discount, a second tax (e.g. CGST + SGST), prices with tax included</summary>
 				<div class="rf-form-row rf-form-row-2col">
 					<div class="rf-field">
 						<label for="rf-discount">Discount</label>
@@ -221,6 +246,13 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 						<label for="rf-tax-label">Name of the first tax</label>
 						<input type="text" id="rf-tax-label" placeholder="Tax (e.g. CGST, VAT, GST)">
 					</div>
+					<div class="rf-field rf-field-check rf-field-check-inline">
+						<label>
+							<input type="checkbox" id="rf-tax-inclusive" aria-describedby="rf-tax-inclusive-hint">
+							Prices include tax
+						</label>
+						<p class="rf-field-hint" id="rf-tax-inclusive-hint">For prices quoted with VAT or GST in them: the tax is worked out of the total, not added on top.</p>
+					</div>
 				</div>
 				<div class="rf-form-row rf-form-row-2col">
 					<div class="rf-field">
@@ -232,7 +264,7 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 						<input type="number" id="rf-tax2-rate" value="0" min="0" max="100" step="0.01">
 					</div>
 				</div>
-				<p class="rf-field-hint">The discount comes off the subtotal before tax, and both taxes are charged on the discounted amount.</p>
+				<p class="rf-field-hint">The discount comes off the subtotal before tax, and both taxes are charged on (or, with prices that include tax, worked out of) the discounted amount.</p>
 			</details>
 			<?php endif; ?>
 
@@ -278,6 +310,13 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 				</label>
 				<p class="rf-field-hint" id="rf-qr-hint">Scanning it shows the receipt's details on a phone. It is a convenience, not proof the receipt is genuine. <a href="<?php echo esc_url( home_url( '/verify-receipt/' ) ); ?>">How it works</a></p>
 			</div>
+
+			<div class="rf-field rf-field-check">
+				<label>
+					<input type="checkbox" id="rf-show-footer" checked>
+					Show "Generated with <?php echo esc_html( RF_BRAND_NAME ); ?>" at the bottom
+				</label>
+			</div>
 		</form>
 
 		<div class="rf-generator-preview">
@@ -295,6 +334,14 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 			</fieldset>
 			<div id="rf-receipt-preview" class="rf-receipt-paper rf-design-classic"></div>
 			<p id="rf-total-live" class="screen-reader-text" role="status" aria-live="polite"></p>
+			<?php // Shown by the script before downloading a receipt with no business name or a zero total. ?>
+			<div class="rf-export-check" id="rf-export-check" role="alert" tabindex="-1" hidden>
+				<p id="rf-export-check-text"></p>
+				<div class="rf-export-check-actions">
+					<button type="button" class="rf-btn rf-btn-primary" id="rf-export-anyway">Download anyway</button>
+					<button type="button" class="rf-btn rf-btn-secondary" id="rf-export-back">Go back</button>
+				</div>
+			</div>
 			<div class="rf-preview-actions">
 				<button type="button" class="rf-btn rf-btn-primary" id="rf-download-pdf">Download PDF</button>
 				<button type="button" class="rf-btn rf-btn-secondary" id="rf-download-png">Download PNG</button>
@@ -312,6 +359,11 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 				<div id="rf-checker-result" class="rf-checker-result"></div>
 				<p id="rf-checker-status" class="screen-reader-text" role="status"></p>
 				<p class="rf-checker-more"><a href="<?php echo esc_url( home_url( '/receipt-requirements/' ) ); ?>">What each check is based on</a></p>
+			</div>
+			<?php // Phones: the total and a shortcut to the preview while the form fills the screen. ?>
+			<div class="rf-sticky-bar" id="rf-sticky-bar" hidden>
+				<span class="rf-sticky-total" id="rf-sticky-total" aria-hidden="true"></span>
+				<a class="rf-btn rf-btn-primary" href="#rf-receipt-preview" id="rf-sticky-go">Preview &amp; download</a>
 			</div>
 			<p class="rf-usage-note">For receipts you issue for your own business or property. Never create a receipt on behalf of a business you don't own, or for a payment that didn't happen — see our <a href="<?php echo esc_url( home_url( '/terms-and-conditions/' ) ); ?>">Terms</a>.</p>
 		</div>
