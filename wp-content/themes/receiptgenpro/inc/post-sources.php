@@ -41,6 +41,7 @@ function rf_source_library() {
 		'ato_records'  => array( 'ATO — Overview of record-keeping rules for business', 'https://www.ato.gov.au/businesses-and-organisations/preparing-lodging-and-paying/record-keeping-for-business/overview-of-record-keeping-rules-for-business' ),
 		'in_cbic'      => array( 'CBIC — GST portal (Acts, Rules and FAQs)', 'https://cbic-gst.gov.in/' ),
 		'in_gst'       => array( 'Goods and Services Tax Network — GST portal', 'https://www.gst.gov.in/' ),
+		'in_einvoice'  => array( 'GST e-invoice portal (IRP): e-invoicing and IRN', 'https://einvoice1.gst.gov.in/' ),
 	);
 }
 
@@ -76,7 +77,7 @@ function rf_post_sources_map() {
 		'receipt-numbering-system-how-to-number-receipts' => array( array(), array( 'uk_invoice', 'ato_invoice' ) ),
 		'digital-receipts-vs-paper-receipts'             => array( array(), array( 'irs_583', 'cra_records', 'uk_70021' ) ),
 		'how-to-make-a-receipt-on-your-phone'            => array( array(), array( 'irs_583' ) ),
-		'gst-receipt-requirements-in-india'              => array( array(), array( 'in_cbic', 'in_gst' ) ),
+		'gst-receipt-requirements-in-india'              => array( array(), array( 'in_cbic', 'in_gst', 'in_einvoice' ) ),
 		'vat-receipts-in-the-uk'                         => array( array( 'uk_250', 'uk_vat_6yr' ), array( 'uk_700', 'uk_70021' ) ),
 		'receipt-requirements-for-small-businesses-in-the-usa' => array( array( 'us_75', 'us_3yr' ), array( 'irs_583', 'irs_463', 'irs_keep' ) ),
 		'receipt-rules-for-businesses-in-canada'         => array( array( 'ca_6yr' ), array( 'cra_records', 'cra_how_long' ) ),

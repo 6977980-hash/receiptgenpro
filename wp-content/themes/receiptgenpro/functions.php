@@ -31,7 +31,7 @@ define( 'RF_SOCIAL_LINKEDIN', '' ); // e.g. 'https://linkedin.com/company/receip
 define( 'RF_FOUNDER_NAME', 'Ali Ahmad' );
 define( 'RF_FOUNDER_TITLE', 'Web developer' );
 define( 'RF_FOUNDER_LINKEDIN', 'https://www.linkedin.com/in/ali-ahmad-chaudhry-12777486/' );
-define( 'RF_THEME_VERSION', '1.3.6' );
+define( 'RF_THEME_VERSION', '1.3.7' );
 
 /* ==========================================================================
    2. THEME SETUP

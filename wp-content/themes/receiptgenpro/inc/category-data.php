@@ -86,7 +86,9 @@ function rf_receipt_categories() {
 					array( 'id' => 'property', 'label' => 'Property Address', 'type' => 'text', 'ph' => 'e.g. 24 Oak Street, Apt 3B' ),
 					array( 'id' => 'period_from', 'label' => 'Rent Period From', 'type' => 'date' ),
 					array( 'id' => 'period_to', 'label' => 'Rent Period To', 'type' => 'date' ),
-					array( 'id' => 'landlord_pan', 'label' => 'Landlord PAN / Tax ID (optional)', 'type' => 'text', 'ph' => 'Needed for HRA claims in India above ₹1 lakh/year' ),
+					// Audit 25 Oct (A25-L2): the PAN field lives on the HRA form;
+					// New York RPL §235-e asks for the receiver's name and title.
+					array( 'id' => 'received_by', 'label' => 'Received by (name and title)', 'type' => 'text', 'ph' => 'e.g. Sarah Collins, Property Manager' ),
 				),
 				'paid'           => true,
 				'words'          => true,

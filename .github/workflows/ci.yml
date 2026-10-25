@@ -27,6 +27,8 @@ jobs:
         run: php tests/php/requirements-test.php
       - name: Deploy helper (staged swap, removals, roll back, webhook signature)
         run: php tests/php/deploy-test.php
+      - name: 1.3.7 content patches apply to the live page text
+        run: php tests/php/v137-test.php
 
   js-tests:
     runs-on: ubuntu-latest

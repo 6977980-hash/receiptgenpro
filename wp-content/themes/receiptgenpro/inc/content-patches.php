@@ -514,6 +514,301 @@ function rf_migrate_v135_content() {
 }
 
 /**
+ * A find pattern for text copied from a page's rendered HTML (audit 25 Oct,
+ * theme 1.3.7). The REST API only shows the content after wptexturize, so
+ * quotes, apostrophes and dashes may be stored either way; whitespace
+ * between tags may differ too.
+ */
+function rf_v137_loose( $text ) {
+	$re = preg_quote( $text, '~' );
+	$re = str_replace( "'", "(?:'|’|&#8217;|&rsquo;)", $re );
+	$re = str_replace( '"', '(?:"|“|”|&#822[01];|&[lr]dquo;)', $re );
+	$re = str_replace( '—', '(?:—|&mdash;|&#8212;)', $re );
+	return preg_replace( '~\s+~', '\s+', $re );
+}
+
+/** A loose text patch: replaces the first match of $find with $replace. */
+function rf_v137_patch( $label, $find, $replace, $unless = '' ) {
+	return array(
+		'label'   => $label,
+		'regex'   => true,
+		'find'    => '~' . rf_v137_loose( $find ) . '~u',
+		'replace' => $replace,
+		'unless'  => $unless,
+	);
+}
+
+/** A loose patch that inserts $html right after $after. */
+function rf_v137_insert_after( $label, $after, $html, $unless ) {
+	return array(
+		'label'    => $label,
+		'regex'    => true,
+		'find'     => '~(' . rf_v137_loose( $after ) . ')~u',
+		'replace'  => '$1' . "\n" . str_replace( array( '\\', '$' ), array( '\\\\', '\$' ), $html ),
+		'backrefs' => true,
+		'unless'   => $unless,
+	);
+}
+
+/**
+ * Database text of theme 1.3.7 (audit 25 Oct, v2 phase 1). Every 'find' was
+ * copied from the live pages on 25 Oct 2026.
+ *
+ * @param string $today Date for the policies' "Last updated" line.
+ * @return array slug => array( 'type' => post type, 'patches' => list )
+ */
+function rf_v137_patches( $today = '' ) {
+	$today = $today ? $today : date_i18n( 'F j, Y' );
+	$pub   = '<a href="https://www.irs.gov/pub/irs-pdf/p1771.pdf" rel="noopener" target="_blank">IRS Publication 1771</a>';
+
+	return array(
+		// A25-H3: a US charity describes a non-cash gift but does not value
+		// it; a benefit given in return is valued in good faith and only the
+		// amount above it is deductible (IRS Publication 1771).
+		'donation-receipt' => array(
+			'type'    => 'page',
+			'patches' => array(
+				rf_v137_patch(
+					'in-kind step: describe, don\'t value',
+					'<strong>Record the donation date and value.</strong> For cash donations, enter the amount; for in-kind (goods) donations, describe the item and its estimated fair market value.',
+					'<strong>Record the donation date and amount.</strong> For cash donations, enter the amount. For in-kind (goods) donations, describe the items (for example "3 boxes of canned food"). Don\'t put a value on them; the donor works out the value.'
+				),
+				rf_v137_patch(
+					'statement step: good-faith estimate',
+					'whether any goods or services were given in exchange for the donation, and if so, their value.',
+					'whether any goods or services were given in exchange for the donation, and if so, a good-faith estimate of their value.'
+				),
+				rf_v137_patch(
+					'checklist: in-kind without a value',
+					'Cash amount, or a description and estimated value for in-kind donations',
+					'Cash amount, or a description (without a value) for in-kind donations'
+				),
+				rf_v137_patch(
+					'FAQ: when a gift is deductible',
+					'In most countries, a donation is only deductible if the donor received nothing of substantial value in return, and the receipt should say so explicitly. Rules vary by country — check your local tax authority\'s requirements before relying on this for official filings.',
+					'In the US, a gift is fully deductible when the donor got nothing in return. If the donor received goods or services, the receipt must give a good-faith estimate of their value, and only the amount above it is deductible (' . $pub . '). Other countries have their own rules, so check your local tax authority before relying on this for official filings.'
+				),
+				rf_v137_patch(
+					'FAQ: in-kind receipts',
+					'Yes — describe the donated item and its estimated fair market value instead of a cash amount. Note that the responsibility for valuing an in-kind donation typically falls on the donor, not the nonprofit.',
+					'Yes. Describe what was donated, without a value. US charities don\'t value non-cash gifts on the receipt; the donor does.'
+				),
+			),
+		),
+		'how-to-create-a-donation-receipt-for-nonprofits' => array(
+			'type'    => 'post',
+			'patches' => array(
+				rf_v137_patch(
+					'direct answer: in-kind without a value',
+					'the amount (or a description and estimated value for in-kind gifts)',
+					'the amount (or, for in-kind gifts, a description without a value)'
+				),
+				rf_v137_patch(
+					'when a gift is deductible',
+					'In most countries, a donation is only tax-deductible for the donor if they received nothing of substantial value in return.',
+					'In the US, a gift is fully deductible when the donor got nothing in return. If the donor received goods or services, only the amount above a good-faith estimate of their value is deductible (' . $pub . ').'
+				),
+				rf_v137_patch(
+					'benefits: good-faith estimate',
+					'the receipt should note the fair market value of that benefit.',
+					'the receipt should give a good-faith estimate of the value of that benefit.'
+				),
+			),
+		),
+
+		// A25-M6: say what happens today, and keep the ads/analytics text
+		// for the day they are turned on. Storage keys as in
+		// assets/js/receipt-generator.js and consent.js.
+		'privacy-policy'   => array(
+			'type'    => 'page',
+			'patches' => array(
+				array(
+					'label'   => 'last updated',
+					'regex'   => true,
+					'find'    => '#<p><em>Last updated:[^<]*</em></p>#',
+					'replace' => '<p><em>Last updated: ' . $today . '.</em></p>',
+					'unless'  => 'What Happens Today',
+				),
+				array(
+					'label'   => 'today vs. if ads or analytics are turned on',
+					'regex'   => true,
+					'find'    => '#<h2>Information We Do Collect</h2>[\s\S]*?(?=<h2>Your Rights \(GDPR)#',
+					'replace' => rf_v137_privacy_sections() . "\n",
+					'unless'  => 'What Happens Today',
+				),
+			),
+		),
+		'cookie-policy'    => array(
+			'type'    => 'page',
+			'patches' => array(
+				array(
+					'label'   => 'last updated',
+					'regex'   => true,
+					'find'    => '#<p><em>Last updated:[^<]*</em></p>#',
+					'replace' => '<p><em>Last updated: ' . $today . '.</em></p>',
+					'unless'  => 'What This Site Stores Today',
+				),
+				rf_v137_patch(
+					'table: cookies only if turned on',
+					'<h2>How We Use Cookies</h2>',
+					"<h2>Cookies We Would Use</h2>\n<p>Today our own code sets no cookies. The table shows the kinds of cookies the site would use if we turn on analytics or advertising; a banner will ask for your consent before any of them is set.</p>",
+					'What This Site Stores Today'
+				),
+				array(
+					'label'   => 'what the generator stores',
+					'regex'   => true,
+					'find'    => '#<h2>The Receipt Generator Itself Does Not Use Cookies</h2>\s*<p>[\s\S]*?</p>#',
+					'replace' => "<h2>What This Site Stores Today</h2>\n<p>The receipt generator uses no cookies. To save you retyping, it keeps a few things in your browser's own storage. They stay on your device and are never sent to us:</p>\n" . rf_v137_storage_list() . "\n<p>You can clear them at any time in your browser's site settings.</p>",
+					'unless'  => 'What This Site Stores Today',
+				),
+			),
+		),
+
+		// A25-M7: no qualified reviewer; say so, and never invent one.
+		'editorial-policy' => array(
+			'type'    => 'page',
+			'patches' => array(
+				array(
+					'label'   => 'who checks the facts',
+					'regex'   => true,
+					'find'    => '#(?=<h2>How the Receipt Generator Is Built</h2>)#',
+					'replace' => "<h2>Who Checks the Facts</h2>\n<p>Every guide and every rule the generator checks is researched from the official texts linked on the page, and re-checked on the \"Sources last checked\" date shown under each guide's title. The guides are not reviewed by an accountant or a lawyer. For your own situation, confirm with a qualified professional.</p>\n",
+					'unless'  => 'Who Checks the Facts',
+				),
+			),
+		),
+
+		// A25-L7: guide details.
+		'gst-receipt-requirements-in-india' => array(
+			'type'    => 'post',
+			'patches' => array(
+				rf_v137_insert_after(
+					'e-invoicing, place of supply, reverse charge',
+					'which vary by state and business type (goods vs. services).</p>',
+					rf_v137_gst_einvoice_section(),
+					'Invoice Registration Portal'
+				),
+			),
+		),
+		'vat-receipts-in-the-uk' => array(
+			'type'    => 'post',
+			'patches' => array(
+				rf_v137_patch(
+					'voluntary registration',
+					'A business below the VAT registration threshold doesn\'t charge VAT and',
+					'A business below the VAT registration threshold doesn\'t charge VAT (unless it has registered voluntarily) and',
+					'registered voluntarily'
+				),
+			),
+		),
+	);
+}
+
+/** The browser storage the generator uses (privacy and cookie policies). */
+function rf_v137_storage_list() {
+	return "<ul>\n"
+		. "<li><code>rgp-design</code> (localStorage): the receipt design you picked last.</li>\n"
+		. "<li><code>rgp-last-receipt-number</code> (localStorage): the number of the last receipt you downloaded, so the next one continues from it.</li>\n"
+		. "<li><code>rgp-form:&lt;page address&gt;</code> (sessionStorage): the form you are filling in, and your logo, so a reload doesn't lose them. It is deleted when you close the tab.</li>\n"
+		. '</ul>';
+}
+
+/** Privacy policy: what happens today, then what changes with ads or analytics. */
+function rf_v137_privacy_sections() {
+	return "<h2>What Happens Today</h2>\n"
+		. "<p>At the moment no advertising network or analytics service is active on this site, and our own code sets no cookies.</p>\n"
+		. "<h3>Stored in your browser, never uploaded</h3>\n"
+		. "<p>The receipt generator keeps these in your browser's own storage so you don't have to retype things. They never leave your device:</p>\n"
+		. rf_v137_storage_list() . "\n"
+		. "<h3>Services that receive your IP address</h3>\n"
+		. "<ul>\n"
+		. '<li><strong>Hosting.</strong> The site is hosted by Hostinger and served through the Hostinger CDN and LiteSpeed cache. Like any web server, they receive your IP address, browser type and the page you ask for, and the host keeps standard server logs for security and troubleshooting (<a href="https://www.hostinger.com/legal/privacy-policy" rel="noopener" target="_blank">Hostinger privacy policy</a>).</li>' . "\n"
+		. '<li><strong>cdnjs (Cloudflare).</strong> The generator loads three open-source libraries (qrcode-generator, html2canvas and jsPDF) from cdnjs.cloudflare.com, so Cloudflare receives your IP address and browser details for those files (<a href="https://www.cloudflare.com/privacypolicy/" rel="noopener" target="_blank">Cloudflare privacy policy</a>).</li>' . "\n"
+		. "<li><strong>Email.</strong> If you email us, we receive what you send and use it only to reply.</li>\n"
+		. "</ul>\n"
+		. "<h2>If We Turn On Ads or Analytics</h2>\n"
+		. "<p>We may later add Google AdSense or Google Analytics. Before that, we will name each service on this page, and a cookie banner will ask for your consent before any of them loads. Your choice is then kept in your browser's localStorage (<code>rf_cookie_consent</code>).</p>\n"
+		. "<p>Once they are on, these services and their partners automatically collect standard technical information when you visit, such as your IP address, browser type, device type, pages viewed and referring URL, typically through cookies and similar technologies, for analytics and advertising.</p>\n"
+		. "<p>Google and other third-party advertising vendors use cookies (such as the Google DoubleClick DART cookie) to serve ads based on a visitor's prior visits to this site and other sites on the internet.</p>\n"
+		. "<ul>\n"
+		. "<li>Google's use of advertising cookies enables it and its partners to serve ads based on your visits to this site and/or other sites on the internet.</li>\n"
+		. '<li>You may opt out of personalized advertising by visiting <a href="https://www.google.com/settings/ads" rel="noopener" target="_blank">Google\'s Ads Settings</a>.</li>' . "\n"
+		. '<li>You can also opt out of a third-party vendor\'s use of cookies for personalized advertising by visiting <a href="https://www.aboutads.info/choices/" rel="noopener" target="_blank">www.aboutads.info</a>.</li>' . "\n"
+		. "</ul>\n"
+		. "<p>Analytics services such as Google Analytics would be used only to understand, in aggregate, how visitors use the site. You can control or delete cookies through your browser settings.</p>";
+}
+
+/** GST guide: e-invoicing (IRP/IRN), place of supply and reverse charge. */
+function rf_v137_gst_einvoice_section() {
+	return "<h2>E-Invoicing, Place of Supply and Reverse Charge</h2>\n"
+		. '<p>Businesses whose aggregate turnover is above the GST e-invoicing threshold (currently ₹5 crore in any financial year from 2017-18) must report their B2B invoices to the Invoice Registration Portal (IRP), which gives each one an Invoice Reference Number (IRN) and a QR code, on the <a href="https://einvoice1.gst.gov.in/" rel="noopener" target="_blank">GST e-invoice portal</a>. For those businesses, a receipt made with this tool is not a GST tax invoice; use it only as a payment receipt alongside the e-invoice.</p>' . "\n"
+		. "<ul>\n"
+		. "<li><strong>Place of supply</strong> decides whether a sale is intra-state (CGST + SGST) or inter-state (IGST), so a tax invoice for an inter-state supply should name the place of supply (the state).</li>\n"
+		. "<li><strong>Reverse charge:</strong> for some supplies the buyer, not the seller, pays the GST, and the tax invoice must say whether tax is payable on reverse charge.</li>\n"
+		. '</ul>';
+}
+
+/**
+ * One-time migration of theme 1.3.7, run from inc/setup-tasks.php like the
+ * 1.3.5 one: through wp_update_post() (each page keeps a revision), each
+ * finished slug recorded in rf_migration_v137, so it never runs twice.
+ */
+function rf_migration_v137_done() {
+	$state = get_option( 'rf_migration_v137' );
+	return is_array( $state ) && ! empty( $state['done'] );
+}
+
+function rf_migrate_v137_content() {
+	if ( rf_migration_v137_done() || wp_installing() ) {
+		return;
+	}
+	$state = get_option( 'rf_migration_v137' );
+	if ( is_array( $state ) ) {
+		if ( isset( $state['started'] ) && time() - strtotime( $state['started'] ) < 10 * MINUTE_IN_SECONDS ) {
+			return; // another run is still going
+		}
+		$state['started'] = gmdate( 'c' );
+		update_option( 'rf_migration_v137', $state, true );
+	} else {
+		$state = array( 'started' => gmdate( 'c' ), 'slugs' => array(), 'log' => array() );
+		if ( ! add_option( 'rf_migration_v137', $state, '', true ) ) {
+			return;
+		}
+	}
+	$state += array( 'slugs' => array(), 'log' => array() );
+
+	$kses = (bool) has_filter( 'content_save_pre', 'wp_filter_post_kses' );
+	kses_remove_filters();
+
+	foreach ( rf_v137_patches() as $slug => $page ) {
+		if ( in_array( $slug, $state['slugs'], true ) ) {
+			continue;
+		}
+		$found = get_posts( array( 'name' => $slug, 'post_type' => $page['type'], 'post_status' => 'publish', 'numberposts' => 1 ) );
+		if ( ! $found ) {
+			$state['log'][] = "/$slug/: not found";
+		} else {
+			$content = $found[0]->post_content;
+			foreach ( $page['patches'] as $patch ) {
+				list( $content, $status ) = rf_fixes_apply_patch( $content, $patch );
+				$state['log'][]           = "/$slug/: {$patch['label']}: $status";
+			}
+			if ( $content !== $found[0]->post_content ) {
+				wp_update_post( array( 'ID' => $found[0]->ID, 'post_content' => wp_slash( $content ) ) );
+			}
+		}
+		$state['slugs'][] = $slug;
+		update_option( 'rf_migration_v137', $state, true );
+	}
+
+	if ( $kses ) {
+		kses_init_filters();
+	}
+	update_option( 'rf_migration_v137', array( 'done' => gmdate( 'c' ), 'log' => $state['log'] ), true );
+	do_action( 'litespeed_purge_all' );
+}
+
+/**
  * Editorial Policy page (audit H8). Created as a DRAFT by the admin tool so
  * the owner can read it before publishing — it describes commitments the
  * site then has to keep.

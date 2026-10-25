@@ -89,6 +89,17 @@ add_action( 'template_redirect', 'rf_redirect_date_archives', 1 );
 // Audit 20 Oct (#21): comments are off, so no comments feed link in <head>.
 add_filter( 'feed_links_show_comments_feed', '__return_false' );
 
+// Audit 25 Oct (A25-L10): /comments/feed/ and every /<slug>/feed/ still
+// answered 200 with empty comment feeds. Send them to the main feed; /feed/
+// and the category feeds stay.
+function rf_redirect_comment_feeds() {
+	if ( is_comment_feed() || ( is_feed() && is_singular() ) ) {
+		wp_safe_redirect( home_url( '/feed/' ), 301 );
+		exit;
+	}
+}
+add_action( 'template_redirect', 'rf_redirect_comment_feeds', 1 );
+
 /* ==========================================================================
    3. Security headers (M7)
    ========================================================================== */
