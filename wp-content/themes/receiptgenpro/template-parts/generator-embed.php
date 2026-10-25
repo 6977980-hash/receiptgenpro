@@ -18,6 +18,8 @@
  *   'purpose'      (string)  Requirement check selected by default
  *                            (inc/requirements.php), '' for none
  *   'picker'       (bool)    v1.3.0: show the receipt type picker (homepage)
+ *   'embed'        (bool)    v1.4.0: inside /embed/<slug>/ (no "Remember
+ *                            my business details")
  *
  * v1.2.0: requirement checker under the preview, optional verification
  * QR code, a custom number label and a second signature line.
@@ -40,6 +42,11 @@
  * tax" in More options, an option to leave out the "Generated with" line,
  * the check shown before downloading an empty receipt, and the total bar
  * at the bottom of the screen on phones.
+ *
+ * v1.4.0 (audit of 25 Oct, v2 Phase 4): "Remember my business details on
+ * this device" (off by default, never inside an embed) with a "Forget
+ * saved details" button, and an "Other (type a code)" currency with its
+ * code and decimals fields.
  */
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -48,6 +55,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 $heading = $args['heading'] ?? 'Receipt Details';
 $form    = rf_generator_form( $args['form'] ?? array(), $args['item_default'] ?? 'e.g. Service or product name' );
 $picker  = ! empty( $args['picker'] ); // v1.3.0: homepage receipt type picker
+$embed   = ! empty( $args['embed'] ); // v1.4.0: no saved profile inside someone else's page
 $designs = rf_receipt_designs();
 $purpose  = (string) ( $args['purpose'] ?? '' );
 $purposes = rf_receipt_purposes();
@@ -129,6 +137,19 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 				<p class="rf-field-hint">Printed under your business name. VAT and GST receipts usually need your address and registration number. The tax number is never put in the QR code.</p>
 			</details>
 
+			<?php if ( ! $embed ) : ?>
+				<?php // The script ticks it when a saved profile exists and shows "Forget" then. ?>
+				<div class="rf-field rf-field-check rf-remember">
+					<label>
+						<input type="checkbox" id="rf-remember" aria-describedby="rf-remember-hint">
+						Remember my business details on this device
+					</label>
+					<button type="button" class="rf-forget" id="rf-forget" hidden>Forget saved details</button>
+					<p class="rf-field-hint" id="rf-remember-hint">Keeps the name, address, contact, tax number, logo and currency in this browser (localStorage) for your next receipt, of any type. Nothing is uploaded.</p>
+					<p class="rf-field-hint rf-field-warn" id="rf-remember-note" role="status" hidden></p>
+				</div>
+			<?php endif; ?>
+
 			<div class="rf-form-row rf-form-row-2col">
 				<div class="rf-field">
 					<label for="rf-client-name"><?php echo esc_html( $form['client_label'] ); ?></label>
@@ -149,6 +170,23 @@ $payment_methods = array( 'Cash', 'Card', 'Bank Transfer', 'Online Payment', 'Ch
 				<div class="rf-field">
 					<label for="rf-currency">Currency</label>
 					<select id="rf-currency"></select>
+				</div>
+			</div>
+
+			<?php // "Other (type a code)…" in the currency menu shows this (the script adds that option). ?>
+			<div class="rf-form-row rf-form-row-2col" id="rf-currency-other" hidden>
+				<div class="rf-field">
+					<label for="rf-currency-code">Currency code</label>
+					<input type="text" id="rf-currency-code" maxlength="3" placeholder="e.g. CHF" autocapitalize="characters" spellcheck="false" aria-describedby="rf-currency-code-hint">
+					<p class="rf-field-hint" id="rf-currency-code-hint">Three letters (ISO 4217), printed before each amount: "CHF 1,000.00".</p>
+				</div>
+				<div class="rf-field">
+					<label for="rf-currency-dp">Decimals</label>
+					<select id="rf-currency-dp">
+						<option value="2">2 (1,000.00)</option>
+						<option value="0">0 (1,000)</option>
+						<option value="3">3 (1,000.000)</option>
+					</select>
 				</div>
 			</div>
 

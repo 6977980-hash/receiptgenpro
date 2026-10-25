@@ -1,5 +1,5 @@
 /**
- * ReceiptGenPro — Receipt Generator (v1.3.9)
+ * ReceiptGenPro — Receipt Generator (v1.4.0)
  *
  * 100% client-side: no fetch(), no form submission, no data ever leaves
  * the browser.
@@ -73,6 +73,13 @@
  * downloading a receipt with no business name or a zero total, a PAN
  * hint on the HRA form, "SAR" and "AED" as symbols, and on phones a bar
  * at the bottom with the total and a shortcut to the preview.
+ *
+ * v1.4.0 (audit of 25 Oct, v2 Phase 4): "Remember my business details on
+ * this device" (opt-in; the seller fields, logo and currency in
+ * localStorage rgp-business-profile, filled in on every generator page
+ * unless this tab already has a draft; never inside an embed), eight more
+ * currencies, amounts in the currency's own minor unit (JPY 0 decimals,
+ * KWD 3; the QR code says dp when it isn't 2), and "Other (type a code)".
  */
 ( function () {
 	'use strict';
@@ -152,12 +159,42 @@
 		return Math.round( parseFloat( ( n * 100 ).toFixed( 6 ) ) );
 	}
 
+	// The same in the currency's minor unit: `dp` decimals (2 cents, 0 for
+	// yen, 3 for Kuwaiti fils). toMinor( n, 2 ) is toCents( n ).
+	function minorFactor( dp ) {
+		return dp === 0 ? 1 : ( dp === 3 ? 1000 : 100 );
+	}
+
+	function toMinor( n, dp ) {
+		return Math.round( parseFloat( ( n * minorFactor( dp ) ).toFixed( 6 ) ) );
+	}
+
+	// Decimals of a currency: the list from rf_currencies() (rfReceipt
+	// .decimals), else the built-in ones, else 2. Only 0, 2 and 3 exist.
+	var KNOWN_DECIMALS = { JPY: 0, KWD: 3 };
+	function currencyDecimals( code, map ) {
+		var dp = map && Object.prototype.hasOwnProperty.call( map, code ) ? map[ code ] : KNOWN_DECIMALS[ code ];
+		dp = parseInt( dp, 10 );
+		return dp === 0 || dp === 3 ? dp : 2;
+	}
+
+	// "Other (type a code)": three letters, upper-cased; '' when not valid.
+	function customCode( value ) {
+		var v = String( value || '' ).trim();
+		return /^[A-Za-z]{3}$/.test( v ) ? v.toUpperCase() : '';
+	}
+
 	// Highest amount and rate the form accepts (also the inputs' HTML max).
 	// Capping keeps every figure printable: 1e21 or 1e400 printed as
 	// "999999999999999868928.00" or "Infinity" before.
 	var MAX_AMOUNT = 999999999999.99;
 	var MAX_CENTS  = 99999999999999;
 	var MAX_RATE   = 100;
+	// MAX_AMOUNT in each minor unit; 3 decimals stay far below 2^53.
+	var MAX_MINOR  = { 0: 999999999999, 2: MAX_CENTS, 3: 999999999999990 };
+	function maxMinor( dp ) {
+		return MAX_MINOR[ dp ] || MAX_CENTS;
+	}
 
 	// Parse a number field; empty, invalid, non-finite or negative input
 	// counts as 0 (or `fallback` when the field is empty or invalid).
@@ -179,10 +216,12 @@
 		return String( parseFloat( Number( rate ).toFixed( 4 ) ) );
 	}
 
-	// One line's total in cents. The unit price is rounded to cents first,
-	// so the printed price × quantity is what the line shows (3 × 0.33).
-	function lineCents( qty, price ) {
-		return Math.min( toCents( qty * ( toCents( price ) / 100 ) ), MAX_CENTS );
+	// One line's total in cents (or the currency's minor unit, `dp`
+	// decimals). The unit price is rounded to cents first, so the printed
+	// price × quantity is what the line shows (3 × 0.33).
+	function lineCents( qty, price, dp ) {
+		dp = dp === undefined ? 2 : dp;
+		return Math.min( toMinor( qty * ( toMinor( price, dp ) / minorFactor( dp ) ), dp ), maxMinor( dp ) );
 	}
 
 	// Subtotal → discount → taxes → tip → total, all in whole cents.
@@ -193,10 +232,12 @@
 	// worked back out of the discounted amount (taxable × rate / (100 + all
 	// rates)) and not added on top. netCents is what is left without tax,
 	// so any rounding cent stays in the net and net + taxes = gross.
-	function calcTotals( subtotalCents, discount, discountType, taxRates, tipCents, inclusive ) {
+	// Every amount is in the currency's minor unit; `dp` (default 2) only
+	// converts a fixed discount, typed in whole units, into it.
+	function calcTotals( subtotalCents, discount, discountType, taxRates, tipCents, inclusive, dp ) {
 		var discountCents = discountType === 'percent' ?
 			toCents( subtotalCents * Math.min( discount, 100 ) / 10000 ) :
-			toCents( discount );
+			toMinor( discount, dp === undefined ? 2 : dp );
 		var discountClamped = discountCents > subtotalCents;
 		discountCents = Math.min( discountCents, subtotalCents );
 		var taxableCents = subtotalCents - discountCents;
@@ -223,15 +264,17 @@
 	}
 
 	// 1234567.89 → "1,234,567.89"; INR and PKR group in lakh and crore
-	// ("12,34,567.89").
+	// ("12,34,567.89"). `dp` decimals (default 2): yen 4,072, dinars 2.625.
 	var INDIAN_GROUPING = { INR: true, PKR: true };
 	var amountFormats = {};
-	function formatAmount( cents, code ) {
+	function formatAmount( cents, code, dp ) {
+		dp = dp === undefined ? 2 : dp;
 		var locale = INDIAN_GROUPING[ code ] ? 'en-IN' : 'en-US';
-		if ( ! amountFormats[ locale ] ) {
-			amountFormats[ locale ] = new Intl.NumberFormat( locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 } );
+		var key = locale + dp;
+		if ( ! amountFormats[ key ] ) {
+			amountFormats[ key ] = new Intl.NumberFormat( locale, { minimumFractionDigits: dp, maximumFractionDigits: dp } );
 		}
-		return amountFormats[ locale ].format( cents / 100 );
+		return amountFormats[ key ].format( cents / minorFactor( dp ) );
 	}
 
 	// Bidirectional overrides (U+202A–202E, U+2066–2069) can make a printed
@@ -322,14 +365,18 @@
 	// The QR code always keeps ISO dates.
 	var MONTHS_SHORT = [ 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec' ];
 	var DATE_FORMATS = { long: true, mdy: true, dmy: true, iso: true };
-	var DMY_CURRENCIES = { INR: true, PKR: true, GBP: true, AUD: true, AED: true, SAR: true };
+	var DMY_CURRENCIES = { INR: true, PKR: true, GBP: true, AUD: true, AED: true, SAR: true, NZD: true, SGD: true, ZAR: true, NGN: true, MYR: true, KWD: true };
 
-	// The format a currency's receipts usually use: USD month first, the
-	// day-first countries day first, the rest "25 Oct 2026" (no doubt
-	// about which number is the month).
+	// The format a currency's receipts usually use: USD (and the
+	// Philippines, which writes the month first too) month first, Japan
+	// year first, the day-first countries day first, the rest "25 Oct
+	// 2026" (no doubt about which number is the month).
 	function dateFormatFor( currency ) {
-		if ( currency === 'USD' ) {
+		if ( currency === 'USD' || currency === 'PHP' ) {
 			return 'mdy';
+		}
+		if ( currency === 'JPY' ) {
+			return 'iso';
 		}
 		return DMY_CURRENCIES[ currency ] ? 'dmy' : 'long';
 	}
@@ -434,25 +481,38 @@
 		GBP: [ 'pounds', 'pence', 'pound', 'penny' ], PKR: [ 'Pakistani rupees', 'paisa', 'Pakistani rupee', 'paisa' ],
 		INR: [ 'Indian rupees', 'paise', 'Indian rupee', 'paisa' ], CAD: [ 'Canadian dollars', 'cents', 'Canadian dollar', 'cent' ],
 		AUD: [ 'Australian dollars', 'cents', 'Australian dollar', 'cent' ], AED: [ 'UAE dirhams', 'fils', 'UAE dirham', 'fils' ],
-		SAR: [ 'Saudi riyals', 'halalas', 'Saudi riyal', 'halala' ]
+		SAR: [ 'Saudi riyals', 'halalas', 'Saudi riyal', 'halala' ],
+		NZD: [ 'New Zealand dollars', 'cents', 'New Zealand dollar', 'cent' ], SGD: [ 'Singapore dollars', 'cents', 'Singapore dollar', 'cent' ],
+		ZAR: [ 'rand', 'cents', 'rand', 'cent' ], NGN: [ 'naira', 'kobo', 'naira', 'kobo' ],
+		PHP: [ 'Philippine pesos', 'centavos', 'Philippine peso', 'centavo' ], MYR: [ 'ringgit', 'sen', 'ringgit', 'sen' ],
+		JPY: [ 'yen', '', 'yen', '' ], KWD: [ 'Kuwaiti dinars', 'fils', 'Kuwaiti dinar', 'fils' ]
 	};
 
-	function amountInWords( amount, code ) {
+	// `dp` is the currency's decimals (default 2): yen have no subunit, and
+	// 1,000 fils make a Kuwaiti dinar. A typed code ("CHF") is its own name:
+	// "One thousand CHF and fifty cents only", or "… and 125/1000" with 3.
+	function amountInWords( amount, code, dp ) {
+		dp = dp === undefined ? 2 : dp;
+		var unit  = minorFactor( dp );
 		var names = CURRENCY_WORDS[ code ] || [ code, 'cents', code, 'cent' ];
 		// Split in integer cents so 2.999 becomes "three … only", never "one hundred cents".
-		var c     = toCents( amount );
-		var whole = Math.floor( c / 100 );
-		var cents = c % 100;
+		var c     = toMinor( amount, dp );
+		var whole = Math.floor( c / unit );
+		var cents = c % unit;
 		var toWords = INDIAN_GROUPING[ code ] ? intToWordsIndian : intToWords;
 		var parts = [];
+		var name = function ( str ) {
+			return str ? ' ' + str : '';
+		};
 		// "Fifty cents only", not "Zero US dollars and fifty cents only".
 		if ( whole || ! cents ) {
-			parts.push( toWords( whole ) + ' ' + names[ whole === 1 ? 2 : 0 ] );
+			parts.push( toWords( whole ) + name( names[ whole === 1 ? 2 : 0 ] ) );
 		}
 		if ( cents ) {
-			parts.push( toWords( cents ) + ' ' + names[ cents === 1 ? 3 : 1 ] );
+			parts.push( CURRENCY_WORDS[ code ] || unit === 100 ? toWords( cents ) + name( names[ cents === 1 ? 3 : 1 ] ) : cents + '/' + unit );
 		}
-		var text = parts.join( ' and ' );
+		// A code alone ("CHF") follows the whole amount: "fifty cents CHF".
+		var text = parts.join( ' and ' ) + ( ! whole && cents && ! CURRENCY_WORDS[ code ] && code ? ' ' + code : '' );
 		return text.charAt( 0 ).toUpperCase() + text.slice( 1 ) + ' only';
 	}
 
@@ -551,7 +611,9 @@
 	// r.extras are [ label, value, field id ]; r.taxes [ { label, rate, cents } ];
 	// an item's optional `code` (HSN/SAC) is its 4th entry, dropped first
 	// when the code would be too long. r.inclusive sets ti: 1 (the taxes
-	// are inside the prices, not added to the total).
+	// are inside the prices, not added to the total). Amounts are integers
+	// in the currency's minor unit; r.dp (its decimals) is added as dp only
+	// when it isn't 2, so every older code still means 2.
 	function buildPayload( r ) {
 		var p = {
 			v: 1,
@@ -560,7 +622,12 @@
 			c: clip( r.client, 80 ),
 			n: clip( r.number, 30 ),
 			d: r.date,
-			cu: r.currency,
+			cu: r.currency
+		};
+		if ( r.dp === 0 || r.dp === 3 ) {
+			p.dp = r.dp;
+		}
+		Object.assign( p, {
 			i: ( r.items || [] ).map( function ( it ) {
 				var row = [ clip( it.name, 60 ), it.qty, it.priceCents ];
 				if ( it.code ) {
@@ -575,7 +642,7 @@
 			} ).map( function ( e ) {
 				return [ clip( e[0], 40 ), clip( e[1], 80 ) ];
 			} )
-		};
+		} );
 		if ( r.discountCents ) {
 			p.dc = r.discountCents;
 		}
@@ -690,7 +757,7 @@
 	// US and Canada hold, so USD and CAD receipts default to it.
 	var PAPER = { a4: { width: 210, height: 297 }, letter: { width: 215.9, height: 279.4 } };
 	var PAPER_MARGIN = 10;
-	var LETTER_CURRENCIES = { USD: true, CAD: true };
+	var LETTER_CURRENCIES = { USD: true, CAD: true }; // all others, typed codes too: A4
 
 	function paperFor( currency ) {
 		return LETTER_CURRENCIES[ currency ] ? 'letter' : 'a4';
@@ -876,6 +943,9 @@
 			intToWords: intToWords,
 			intToWordsIndian: intToWordsIndian,
 			toCents: toCents,
+			toMinor: toMinor,
+			currencyDecimals: currencyDecimals,
+			customCode: customCode,
 			nonNegative: nonNegative,
 			capped: capped,
 			formatRate: formatRate,
@@ -1337,12 +1407,22 @@
 
 		// ---- Currency dropdown ---------------------------------------------
 		var currencies = ( window.rfReceipt && window.rfReceipt.currencies ) || { USD: '$ — US Dollar' };
+		var decimalsMap = ( window.rfReceipt && window.rfReceipt.decimals ) || {};
 		Object.keys( currencies ).forEach( function ( code ) {
 			var opt = document.createElement( 'option' );
 			opt.value = code;
 			opt.textContent = currencies[ code ];
 			currencySel.appendChild( opt );
 		} );
+		// Last: a currency that isn't listed, typed as its 3-letter code.
+		var OTHER = 'OTHER';
+		var otherBox = document.getElementById( 'rf-currency-other' );
+		if ( otherBox ) {
+			var otherOpt = document.createElement( 'option' );
+			otherOpt.value = OTHER;
+			otherOpt.textContent = 'Other (type a code)…';
+			currencySel.appendChild( otherOpt );
+		}
 
 		// The page's own currency: the template default (e.g. INR for HRA) or USD.
 		var defaultCurrency = form.dataset.currency && currencies[ form.dataset.currency ] ? form.dataset.currency : ( currencies.USD ? 'USD' : currencySel.value );
@@ -1507,11 +1587,12 @@
 		var STORE_KEY = 'rgp-form:' + window.location.pathname;
 
 		// The PDF paper size sits by the download buttons, outside the form,
-		// and is kept with it.
+		// and is kept with it. "Remember my business details" is not: it
+		// shows whether a saved profile exists.
 		var paperSel = document.getElementById( 'rf-paper-size' );
 		function storeFields() {
 			return Array.prototype.filter.call( form.querySelectorAll( 'input[id], select[id], textarea[id]' ), function ( el ) {
-				return el.type !== 'file';
+				return el.type !== 'file' && el.id !== 'rf-remember';
 			} ).concat( paperSel ? [ paperSel ] : [] );
 		}
 
@@ -1551,6 +1632,9 @@
 					window.sessionStorage.setItem( STORE_KEY, JSON.stringify( data ) );
 				} catch ( e2 ) {}
 			}
+			if ( rememberBox && rememberBox.checked ) {
+				saveProfile();
+			}
 		}
 
 		function restoreForm() {
@@ -1561,7 +1645,7 @@
 				data = null;
 			}
 			if ( ! data || ! data.fields ) {
-				return;
+				return false;
 			}
 			if ( data.type && data.type !== 'general' ) {
 				applyType( data.type );
@@ -1585,6 +1669,143 @@
 			if ( isLogoDataUrl( data.logo ) ) {
 				state.logoDataUrl = data.logo;
 			}
+			return true;
+		}
+
+		// ---- Remember my business details (opt-in) ---------------------------
+		// localStorage keeps the seller's details on this device for the next
+		// receipt, on any generator page; nothing is uploaded. The checkbox
+		// is not in an embed (another site's frame), so there the key is
+		// never read or written.
+		var PROFILE_KEY  = 'rgp-business-profile';
+		var PROFILE_TEXT = { name: 'rf-business-name', address: 'rf-business-address', contact: 'rf-business-contact', taxIdLabel: 'rf-tax-id-label', taxId: 'rf-tax-id' };
+		var rememberBox  = document.getElementById( 'rf-remember' );
+		var forgetBtn    = document.getElementById( 'rf-forget' );
+		var rememberNote = document.getElementById( 'rf-remember-note' );
+
+		function readProfile() {
+			if ( ! rememberBox ) {
+				return null;
+			}
+			try {
+				var p = JSON.parse( window.localStorage.getItem( PROFILE_KEY ) || 'null' );
+				return p && typeof p === 'object' && p.v === 1 ? p : null;
+			} catch ( e ) {
+				return null;
+			}
+		}
+
+		function showProfileState( saved, note ) {
+			if ( forgetBtn ) {
+				forgetBtn.hidden = ! saved;
+			}
+			if ( rememberNote ) {
+				rememberNote.textContent = note || '';
+				rememberNote.hidden = ! note;
+			}
+		}
+
+		// Saves { v, name, address, contact, taxIdLabel, taxId, logo,
+		// currency [, code, dp] }. A logo over the quota is left out (with a
+		// note); private mode or a full storage only shows a note.
+		function saveProfile() {
+			var p = { v: 1 };
+			Object.keys( PROFILE_TEXT ).forEach( function ( key ) {
+				var el = document.getElementById( PROFILE_TEXT[ key ] );
+				p[ key ] = el ? el.value : '';
+			} );
+			p.logo = isLogoDataUrl( state.logoDataUrl ) ? state.logoDataUrl : null;
+			// A page or type with its own currency (INR for HRA) keeps the
+			// saved one, as applyProfile() leaves it alone there.
+			var before = ( form.dataset.currency || typeCurrency ) && readProfile();
+			if ( before ) {
+				[ 'currency', 'code', 'dp' ].forEach( function ( key ) {
+					if ( before[ key ] !== undefined ) {
+						p[ key ] = before[ key ];
+					}
+				} );
+			} else {
+				p.currency = currencySel.value;
+				if ( p.currency === OTHER ) {
+					p.code = fieldValue( 'rf-currency-code' );
+					p.dp = fieldValue( 'rf-currency-dp' );
+				}
+			}
+			try {
+				window.localStorage.setItem( PROFILE_KEY, JSON.stringify( p ) );
+				showProfileState( true, '' );
+				return;
+			} catch ( e ) {}
+			if ( p.logo ) {
+				try {
+					p.logo = null;
+					window.localStorage.setItem( PROFILE_KEY, JSON.stringify( p ) );
+					showProfileState( true, 'Your logo is too large to remember on this device; the other details are saved.' );
+					return;
+				} catch ( e2 ) {}
+			}
+			showProfileState( !! readProfile(), 'This browser doesn\'t allow saving here (private mode, or its storage is full), so your details will not be remembered.' );
+		}
+
+		function deleteProfile() {
+			try {
+				window.localStorage.removeItem( PROFILE_KEY );
+			} catch ( e ) {}
+			showProfileState( false, '' );
+		}
+
+		// Fills the seller fields, logo and currency from the profile. The
+		// currency is kept on a page with its own (INR on the HRA form), and
+		// saveProfile() doesn't save that one.
+		function applyProfile( p ) {
+			Object.keys( PROFILE_TEXT ).forEach( function ( key ) {
+				var el = document.getElementById( PROFILE_TEXT[ key ] );
+				if ( ! el || typeof p[ key ] !== 'string' ) {
+					return;
+				}
+				var before = el.value;
+				el.value = p[ key ];
+				if ( el.tagName === 'SELECT' && el.value !== p[ key ] ) {
+					el.value = before; // not one of the options
+				}
+			} );
+			if ( isLogoDataUrl( p.logo ) ) {
+				state.logoDataUrl = p.logo;
+			}
+			if ( ! form.dataset.currency && ( currencies[ p.currency ] || ( p.currency === OTHER && otherBox ) ) ) {
+				currencySel.value = p.currency;
+				defaultCurrency = p.currency; // what a type without its own currency goes back to
+				if ( p.currency === OTHER ) {
+					var codeEl = document.getElementById( 'rf-currency-code' );
+					var dpEl = document.getElementById( 'rf-currency-dp' );
+					if ( codeEl && typeof p.code === 'string' ) {
+						codeEl.value = p.code;
+					}
+					if ( dpEl && /^[023]$/.test( String( p.dp ) ) ) {
+						dpEl.value = String( p.dp );
+					}
+				}
+			}
+		}
+
+		if ( rememberBox ) {
+			rememberBox.addEventListener( 'change', function () {
+				if ( rememberBox.checked ) {
+					saveProfile();
+				} else {
+					deleteProfile();
+				}
+			} );
+		}
+		if ( forgetBtn ) {
+			// Removes the saved copy; what is on screen now stays.
+			forgetBtn.addEventListener( 'click', function () {
+				deleteProfile();
+				if ( rememberBox ) {
+					rememberBox.checked = false;
+					rememberBox.focus();
+				}
+			} );
 		}
 
 		// ---- Receipt number continues from the last download ----------------
@@ -1649,7 +1870,16 @@
 			usedNumber = null;
 		}
 
-		restoreForm();
+		// A draft in this tab is newer than the profile, so it wins.
+		var hadDraft = restoreForm();
+		var profile = readProfile();
+		if ( profile ) {
+			if ( ! hadDraft ) {
+				applyProfile( profile );
+			}
+			rememberBox.checked = true;
+			showProfileState( true, '' );
+		}
 
 		var urlType = ( window.location.search.match( /[?&]type=([a-z0-9-]+)/ ) || [] )[1];
 		if ( urlType && urlType !== currentType ) {
@@ -1711,6 +1941,49 @@
 			return currencies[ code ] ? currencySymbol( currencies[ code ] ) : code + ' ';
 		}
 
+		// The receipt's currency: { code, symbol, dp }. A typed code is its
+		// own symbol ("CHF 1,000.00"); until it is 3 letters, code and
+		// symbol are ''.
+		function activeCurrency() {
+			var v = currencySel.value || 'USD';
+			if ( v !== OTHER ) {
+				return { code: v, symbol: getCurrencySymbol( v ), dp: currencyDecimals( v, decimalsMap ) };
+			}
+			var code = customCode( fieldValue( 'rf-currency-code' ) );
+			var dpSel = parseInt( fieldValue( 'rf-currency-dp' ), 10 );
+			return { code: code, symbol: code, dp: dpSel === 0 || dpSel === 3 ? dpSel : 2 };
+		}
+
+		// The active currency's decimals and code, set by renderReceipt().
+		var dp = 2;
+		var unit = 100;
+		var curCode = 'USD';
+
+		// Amount inputs step by the currency's minor unit (1 yen, 0.001
+		// dinar); a % discount keeps 0.01.
+		var STEPS = { 0: [ '1', '0' ], 2: [ '0.01', '0.00' ], 3: [ '0.001', '0.000' ] };
+		function applySteps() {
+			var st = STEPS[ dp ];
+			var amountInputs = Array.prototype.slice.call( itemsList.querySelectorAll( '.rf-item-price' ) );
+			[ 'rf-tip', 'rf-amount-paid', 'rf-x-qpq_value' ].forEach( function ( id ) {
+				var el = document.getElementById( id );
+				if ( el ) {
+					amountInputs.push( el );
+				}
+			} );
+			amountInputs.forEach( function ( el ) {
+				if ( el.step !== st[0] ) {
+					el.step = st[0];
+					el.placeholder = st[1];
+				}
+			} );
+			var disc = document.getElementById( 'rf-discount' );
+			var discStep = fieldValue( 'rf-discount-type' ) === 'amount' ? st[0] : '0.01';
+			if ( disc && disc.step !== discStep ) {
+				disc.step = discStep;
+			}
+		}
+
 		function escapeHtml( str ) {
 			var div = document.createElement( 'div' );
 			div.textContent = stripBidi( str );
@@ -1723,7 +1996,7 @@
 		}
 
 		function money( symbol, n ) {
-			return symbolPrefix( symbol ) + formatAmount( toCents( n ), currencySel.value );
+			return symbolPrefix( symbol ) + formatAmount( toMinor( n, dp ), curCode, dp );
 		}
 
 		// The visitor's date format, or the one their currency usually uses.
@@ -1784,16 +2057,16 @@
 				var priceRaw = row.querySelector( '.rf-item-price' ).value;
 				var code     = gst ? row.querySelector( '.rf-item-hsn' ).value.trim() : '';
 				var qty      = nonNegative( qtyRaw, 1 );
-				var price    = toCents( capped( priceRaw, MAX_AMOUNT ) ) / 100;
+				var price    = toMinor( capped( priceRaw, MAX_AMOUNT ), dp ) / unit;
 				if ( isNegative( qtyRaw ) || isNegative( priceRaw ) ) {
 					notes.negative = true;
 				}
-				if ( isOver( priceRaw, MAX_AMOUNT ) || toCents( qty * price ) > MAX_CENTS ) {
+				if ( isOver( priceRaw, MAX_AMOUNT ) || toMinor( qty * price, dp ) > maxMinor( dp ) ) {
 					notes.max = true;
 				}
 				if ( name || price ) {
 					// An in-kind gift is described, not valued (IRS Pub. 1771).
-					items.push( { name: name || 'Item', qty: qty, price: price, lineCents: lineCents( qty, price ), noValue: cfg.inKind && ! price, code: code } );
+					items.push( { name: name || 'Item', qty: qty, price: price, lineCents: lineCents( qty, price, dp ), noValue: cfg.inKind && ! price, code: code } );
 				}
 			} );
 			return items;
@@ -1921,9 +2194,13 @@
 			var number    = document.getElementById( 'rf-receipt-number' ).value.trim() || '1001';
 			// A cleared date prints a dash, not today's date.
 			var isoDate   = dateInput.value;
-			var currency  = currencySel.value || 'USD';
+			var cur       = activeCurrency();
+			var currency  = cur.code;
+			dp            = cur.dp;
+			unit          = minorFactor( dp );
+			curCode       = currency;
 			var date      = isoDate ? formatDate( isoDate, dateFormat( currency ) ) : '—';
-			var symbol    = getCurrencySymbol( currency );
+			var symbol    = cur.symbol;
 			var fix       = {};
 			// A no-tax type (donation) ignores whatever the hidden controls hold.
 			var taxRaw    = cfg.noTax ? '' : fieldValue( 'rf-tax-rate' );
@@ -1943,8 +2220,12 @@
 			var items     = collectItems( fix, gst );
 			showGstFields( gst );
 			updatePanHint();
+			applySteps();
+			if ( otherBox ) {
+				otherBox.hidden = currencySel.value !== OTHER;
+			}
 			var tipRaw    = tipInput && ! cfg.noTax ? tipInput.value : '';
-			var tipCents  = toCents( capped( tipRaw, MAX_AMOUNT ) );
+			var tipCents  = toMinor( capped( tipRaw, MAX_AMOUNT ), dp );
 			var paidRaw   = paidInput ? paidInput.value.trim() : '';
 
 			[ taxRaw, tax2Raw, discRaw, tipRaw, paidRaw ].forEach( function ( v ) {
@@ -1962,18 +2243,19 @@
 			var subtotalCents = items.reduce( function ( sum, it ) {
 				return sum + it.lineCents;
 			}, 0 );
-			if ( subtotalCents > MAX_CENTS ) {
-				subtotalCents = MAX_CENTS;
+			if ( subtotalCents > maxMinor( dp ) ) {
+				subtotalCents = maxMinor( dp );
 				fix.max = true;
 			}
-			var calc       = calcTotals( subtotalCents, discount, discType, [ taxRate, tax2Rate ], tipCents, inclusive );
+			// Amounts in "cents" are in the currency's minor unit (`unit` a whole one).
+			var calc       = calcTotals( subtotalCents, discount, discType, [ taxRate, tax2Rate ], tipCents, inclusive, dp );
 			var totalCents = calc.totalCents;
-			var subtotal   = subtotalCents / 100;
-			var tip        = tipCents / 100;
-			var total      = totalCents / 100;
-			var paid       = paidRaw === '' ? null : toCents( capped( paidRaw, MAX_AMOUNT ) ) / 100;
+			var subtotal   = subtotalCents / unit;
+			var tip        = tipCents / unit;
+			var total      = totalCents / unit;
+			var paid       = paidRaw === '' ? null : toMinor( capped( paidRaw, MAX_AMOUNT ), dp ) / unit;
 			if ( calc.discountClamped && subtotalCents ) {
-				fix.discount = calc.discountCents / 100;
+				fix.discount = calc.discountCents / unit;
 			}
 			showNotices( fix, symbol );
 
@@ -1996,7 +2278,7 @@
 						( it.noValue ?
 							'<td class="rf-num rf-no-value">No value stated</td><td class="rf-num rf-no-value">No value stated</td>' :
 							'<td class="rf-num">' + cellMoney( it.price ) + '</td>' +
-							'<td class="rf-num">' + cellMoney( it.lineCents / 100 ) + '</td>' ) +
+							'<td class="rf-num">' + cellMoney( it.lineCents / unit ) + '</td>' ) +
 						'</tr>'
 					);
 				} )
@@ -2056,12 +2338,12 @@
 			var taxLines = function ( prefix ) {
 				var cls = prefix ? ' class="rf-receipt-tax-incl"' : '';
 				return [ [ taxRate, taxLabel, 0 ], [ tax2Rate, tax2Label, 1 ] ].map( function ( t ) {
-					return t[0] ? '<div' + cls + '><span>' + prefix + escapeHtml( t[1] ) + ' (' + formatRate( t[0] ) + '%)</span><span>' + money( symbol, calc.taxCents[ t[2] ] / 100 ) + '</span></div>' : '';
+					return t[0] ? '<div' + cls + '><span>' + prefix + escapeHtml( t[1] ) + ' (' + formatRate( t[0] ) + '%)</span><span>' + money( symbol, calc.taxCents[ t[2] ] / unit ) + '</span></div>' : '';
 				} ).join( '' );
 			};
 			var totalsHtml =
 				'<div><span>Subtotal</span><span>' + money( symbol, subtotal ) + '</span></div>' +
-				( calc.discountCents ? '<div><span>Discount' + ( discType === 'percent' ? ' (' + formatRate( Math.min( discount, 100 ) ) + '%)' : '' ) + '</span><span>-' + money( symbol, calc.discountCents / 100 ) + '</span></div>' : '' ) +
+				( calc.discountCents ? '<div><span>Discount' + ( discType === 'percent' ? ' (' + formatRate( Math.min( discount, 100 ) ) + '%)' : '' ) + '</span><span>-' + money( symbol, calc.discountCents / unit ) + '</span></div>' : '' ) +
 				( inclusive ? '' : taxLines( '' ) ) +
 				( tip ? '<div><span>Tip</span><span>' + money( symbol, tip ) + '</span></div>' : '' ) +
 				'<div class="rf-receipt-total-final"><span>Total</span><span>' + money( symbol, total ) + '</span></div>' +
@@ -2069,18 +2351,18 @@
 				( inclusive ? taxLines( 'Includes ' ) : '' );
 
 			if ( paid !== null ) {
-				var diffCents = totalCents - toCents( paid );
+				var diffCents = totalCents - toMinor( paid, dp );
 				totalsHtml += '<div><span>Amount Paid</span><span>' + money( symbol, paid ) + '</span></div>';
 				if ( diffCents < 0 ) {
-					totalsHtml += '<div class="rf-receipt-balance"><span>Change / Credit</span><span>' + money( symbol, -diffCents / 100 ) + '</span></div>';
+					totalsHtml += '<div class="rf-receipt-balance"><span>Change / Credit</span><span>' + money( symbol, -diffCents / unit ) + '</span></div>';
 				} else {
-					totalsHtml += '<div class="rf-receipt-balance"><span>Balance Due</span><span>' + money( symbol, diffCents / 100 ) + '</span></div>';
+					totalsHtml += '<div class="rf-receipt-balance"><span>Balance Due</span><span>' + money( symbol, diffCents / unit ) + '</span></div>';
 				}
 			}
 
 			var wordsAmount = paid !== null ? paid : total;
 			var wordsHtml = ( cfg.words && wordsAmount > 0 ) ?
-				'<p class="rf-receipt-words"><strong>Amount received in words:</strong> ' + escapeHtml( amountInWords( wordsAmount, currency ) ) + '</p>' : '';
+				'<p class="rf-receipt-words"><strong>Amount received in words:</strong> ' + escapeHtml( amountInWords( wordsAmount, currency, dp ) ) + '</p>' : '';
 
 			var statementHtml = qpqHtml || ( ( statement && statement.checked ) ?
 				'<p class="rf-receipt-statement">' + escapeHtml( statement.dataset.text ) + '</p>' : '' );
@@ -2101,8 +2383,9 @@
 					number: number,
 					date: isoDate,
 					currency: currency,
+					dp: dp,
 					items: items.map( function ( it ) {
-						return { name: it.name, qty: it.qty, priceCents: toCents( it.price ), code: it.code };
+						return { name: it.name, qty: it.qty, priceCents: toMinor( it.price, dp ), code: it.code };
 					} ),
 					discountCents: calc.discountCents,
 					taxes: [
@@ -2112,7 +2395,7 @@
 					inclusive: inclusive,
 					tipCents: tipCents,
 					totalCents: totalCents,
-					paidCents: paid === null ? null : toCents( paid ),
+					paidCents: paid === null ? null : toMinor( paid, dp ),
 					payMethod: payMethod,
 					extras: qrExtras
 				} );
@@ -2374,15 +2657,15 @@
 		// The visitor's paper size, or the one their currency usually uses.
 		function paperChoice() {
 			var v = paperSel ? paperSel.value : '';
-			return PAPER[ v ] ? v : paperFor( currencySel.value );
+			return PAPER[ v ] ? v : paperFor( curCode );
 		}
 
 		// The receipt's text on page 1 in invisible ink over the image, so the
 		// PDF can be searched, copied and read aloud. It is shrunk to fit the
 		// box (x, y, width, height in mm) when the receipt is long.
 		function addPdfText( pdf, x, y, width, height ) {
-			var code  = currencySel.value || 'USD';
-			var lines = pdfTextLines( preview, getCurrencySymbol( code ), code );
+			var cur   = activeCurrency();
+			var lines = pdfTextLines( preview, cur.symbol, cur.code );
 			var brand = pdfText( ( window.rfReceipt && window.rfReceipt.brand ) || 'ReceiptGenPro' ) || 'ReceiptGenPro';
 			pdf.setProperties( {
 				title: 'Receipt ' + pdfText( document.getElementById( 'rf-receipt-number' ).value.trim() || '1001' ),

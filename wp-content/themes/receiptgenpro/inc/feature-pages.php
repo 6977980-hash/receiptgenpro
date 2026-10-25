@@ -475,6 +475,7 @@ function rf_receipt_script_data() {
 	return array(
 		'brand'      => RF_BRAND_NAME,
 		'currencies' => rf_supported_currencies(),
+		'decimals'   => rf_currency_decimals(),
 		'purposes'   => rf_receipt_purposes_for_js(),
 		'verifyUrl'  => home_url( '/verify-receipt/' ),
 		// Subresource Integrity: the browser refuses the file if cdnjs ever

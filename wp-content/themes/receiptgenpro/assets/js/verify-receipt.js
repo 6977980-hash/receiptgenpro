@@ -1,5 +1,5 @@
 /**
- * ReceiptGenPro — Verify a Receipt (v1.2.0)
+ * ReceiptGenPro — Verify a Receipt (v1.4.0)
  *
  * Reads the receipt details that receipt-generator.js put after the # of
  * the QR code's link (/verify-receipt/#r=<base64url JSON>) and shows them.
@@ -12,6 +12,11 @@
  * an HSN/SAC code (4th item entry) prints next to its item, a payload
  * whose lines don't add up to its total gets a neutral note, "SAR 10.00"
  * has a space, and a payload without a currency says "(no currency)".
+ *
+ * v1.4.0: amounts are in the currency's minor unit with dp decimals (the
+ * payload's dp, else the currency's from rfVerify.decimals, else 2), so
+ * yen print "¥4,072" and Kuwaiti dinars "KWD 2.625". Codes made before
+ * 1.4.0 have no dp and read exactly as before.
  */
 ( function () {
 	'use strict';
@@ -21,6 +26,19 @@
 	function symbol( code ) {
 		var map = ( typeof window !== 'undefined' && window.rfVerify && window.rfVerify.symbols ) || {};
 		return Object.prototype.hasOwnProperty.call( map, code ) ? map[ code ] : '';
+	}
+
+	// Decimals of the payload's amounts: dp when the code has one, else the
+	// currency's (rfVerify.decimals, then yen 0 and dinars 3), else 2.
+	var KNOWN_DECIMALS = { JPY: 0, KWD: 3 };
+	function decimals( p ) {
+		if ( p.dp === 0 || p.dp === 2 || p.dp === 3 ) {
+			return p.dp;
+		}
+		var map = ( typeof window !== 'undefined' && window.rfVerify && window.rfVerify.decimals ) || {};
+		var dp = Object.prototype.hasOwnProperty.call( map, p.cu ) ? map[ p.cu ] : KNOWN_DECIMALS[ p.cu ];
+		dp = parseInt( dp, 10 );
+		return dp === 0 || dp === 3 ? dp : 2;
 	}
 
 	function b64urlDecode( str ) {
@@ -89,9 +107,11 @@
 	// "$1,234.50"; INR and PKR group in lakh and crore ("₹12,34,567.00");
 	// a symbol of letters, or a code without a symbol, gets a space
 	// ("SAR 1,000.00"); no currency at all, "1,000.00 (no currency)".
+	// `cents` is in the minor unit: "¥4,072", "KWD 2.625".
 	function money( p, cents ) {
 		var locale = p.cu === 'INR' || p.cu === 'PKR' ? 'en-IN' : 'en-US';
-		var num = new Intl.NumberFormat( locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 } ).format( cents / 100 );
+		var dp = decimals( p );
+		var num = new Intl.NumberFormat( locale, { minimumFractionDigits: dp, maximumFractionDigits: dp } ).format( cents / ( dp === 0 ? 1 : ( dp === 3 ? 1000 : 100 ) ) );
 		if ( ! p.cu ) {
 			return num + ' (no currency)';
 		}
@@ -99,8 +119,9 @@
 		return sym + ( /^[A-Za-z]{2,}$/.test( sym ) ? ' ' : '' ) + num;
 	}
 
-	// The lines − discount + taxes added on top + tip, in cents (taxes
-	// included in the prices, ti, are already in the lines).
+	// The lines − discount + taxes added on top + tip, in cents or the
+	// currency's minor unit (taxes included in the prices, ti, are already
+	// in the lines).
 	function linesTotal( p ) {
 		var cents = p.i.reduce( function ( sum, it ) {
 			return sum + Math.round( ( parseFloat( it[1] ) || 0 ) * it[2] );
@@ -113,14 +134,15 @@
 		return cents;
 	}
 
-	// True when the payload's lines don't come to its total (more than a
-	// cent off), unless not every line fit in the code (more).
+	// True when the payload's lines don't come to its total (more than one
+	// minor unit off: a cent, a yen, a fils), unless not every line fit in
+	// the code (more).
 	function doesNotAddUp( p ) {
 		return ! p.more && Math.abs( linesTotal( p ) - p.tot ) > 1;
 	}
 
 	if ( typeof module !== 'undefined' && module.exports ) {
-		module.exports = { decodePayload: decodePayload, b64urlDecode: b64urlDecode, money: money, stripBidi: stripBidi, linesTotal: linesTotal, doesNotAddUp: doesNotAddUp };
+		module.exports = { decodePayload: decodePayload, b64urlDecode: b64urlDecode, money: money, decimals: decimals, stripBidi: stripBidi, linesTotal: linesTotal, doesNotAddUp: doesNotAddUp };
 	}
 
 	if ( typeof document === 'undefined' ) {
