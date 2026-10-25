@@ -33,6 +33,13 @@
  *                  that prints a fixed statement on the receipt.
  *   number_label   Label for the number field (default "Receipt #").
  *   signature2     Label for a second signature line (e.g. an approver).
+ *   documents      v1.4.1: value => label for a "Document" menu: 'single' /
+ *                  'annual' (donations: one gift, or a year-end statement
+ *                  with a gift date per row) or 'refund' / 'credit'.
+ *   months         v1.4.1: true → "Receipts for several months" (HRA: up
+ *                  to 12 monthly receipts in one PDF).
+ *   refund         v1.4.1: true → a refund record: "Refunded item",
+ *                  "Tax refunded", "Total refunded" (or "Total credited").
  *
  * 'purpose' (v1.2.0) is the requirement check selected by default on that
  * page; see inc/requirements.php.
@@ -166,7 +173,7 @@ function rf_receipt_categories() {
 			'seo_title'        => 'Cash Receipt Template — Free Cash Payment Receipt',
 			'meta_description' => 'Create a simple cash receipt online free. Received from, amount in words, payment for, received by and balance due. Download instantly as PDF.',
 			'primary_keyword'  => 'cash receipt generator',
-			'related'          => array( 'rent-receipt', 'donation-receipt', 'freelance-receipt', 'construction-receipt' ),
+			'related'          => array( 'rent-receipt', 'donation-receipt', 'freelance-receipt', 'refund-receipt' ),
 			'icon'             => '💵',
 			'default_fields'   => array( 'Received From', 'Amount (figures & words)', 'Payment For', 'Received By + Signature', 'Date', 'Balance Due' ),
 			'highlights'       => array(
@@ -195,7 +202,7 @@ function rf_receipt_categories() {
 			'seo_title'        => 'Freelance Receipt Template — Payment Receipt for Services',
 			'meta_description' => 'Generate a professional freelance payment receipt online free. Client, project, hours or milestone, rate and invoice reference. Download as PDF.',
 			'primary_keyword'  => 'freelance receipt generator',
-			'related'          => array( 'construction-receipt', 'cleaning-receipt', 'cash-receipt', 'salon-spa-receipt' ),
+			'related'          => array( 'construction-receipt', 'cleaning-receipt', 'cash-receipt', 'refund-receipt' ),
 			'icon'             => '💻',
 			'default_fields'   => array( 'Client Name', 'Project / Service', 'Hours or Milestone (qty)', 'Rate', 'Invoice Reference', 'Amount Paid' ),
 			'highlights'       => array(
@@ -315,6 +322,12 @@ function rf_receipt_categories() {
 				),
 				'no_tax'         => true,
 				'in_kind'        => true,
+				// v1.4.1 (G-7): one acknowledgment may cover several gifts,
+				// such as an annual summary (IRS Publication 1771).
+				'documents'      => array(
+					'single' => 'Single gift receipt',
+					'annual' => 'Year-end statement (all gifts from one donor)',
+				),
 				'signature'      => 'Authorized Signature',
 				'statement'      => array(
 					'label'   => 'No goods or services were provided in exchange',
@@ -514,6 +527,7 @@ function rf_receipt_categories() {
 					array( 'id' => 'landlord_address', 'label' => 'Landlord Address (optional)', 'type' => 'text', 'ph' => 'e.g. 12 MG Road, Pune' ),
 				),
 				'words'          => true,
+				'months'         => true, // v1.4.1 (G-4): a year of monthly receipts in one PDF
 				'signature'      => 'Landlord Signature (affix revenue stamp if required)',
 			),
 		),
@@ -523,7 +537,7 @@ function rf_receipt_categories() {
 			'seo_title'        => 'Payment Receipt Template — Free Proof of Payment',
 			'meta_description' => 'Make a free payment receipt online: who paid, amount, what it was for, payment method and reference number. Download proof of payment as PDF, PNG or JPEG.',
 			'primary_keyword'  => 'payment receipt template',
-			'related'          => array( 'cash-receipt', 'deposit-receipt', 'freelance-receipt', 'rent-receipt' ),
+			'related'          => array( 'cash-receipt', 'deposit-receipt', 'refund-receipt', 'freelance-receipt' ),
 			'icon'             => '🧾',
 			'default_fields'   => array( 'Received From', 'Payment For', 'Transaction / Reference No.', 'Invoice Reference', 'Amount Paid & Balance', 'Signature' ),
 			'highlights'       => array(
@@ -581,6 +595,48 @@ function rf_receipt_categories() {
 				'paid'           => true,
 				'words'          => true,
 				'signature'      => 'Received By (Signature)',
+			),
+		),
+
+		// v1.4.1 (G-9): money given back, written for the business that
+		// gives the refund. Amounts are typed as positive numbers; the
+		// labels ("Total refunded") say which way the money went.
+		'refund-receipt' => array(
+			'h1'               => 'Free Refund Receipt Generator',
+			'seo_title'        => 'Refund Receipt Template — Free Refund & Credit Note',
+			'meta_description' => 'Make a free refund receipt or credit note: original receipt number, reason, refund method, items and tax refunded. Download it as a PDF, PNG or JPEG.',
+			'primary_keyword'  => 'refund receipt template',
+			'related'          => array( 'payment-receipt', 'cash-receipt', 'freelance-receipt', 'hardware-store-receipt' ),
+			'icon'             => '↩️',
+			'default_fields'   => array( 'Customer (Refunded To)', 'Original Receipt / Invoice # and Date', 'Reason for the Refund', 'Refund Method', 'Refunded Items & Tax', 'Total Refunded' ),
+			'highlights'       => array(
+				'For shops, freelancers and service businesses that give money back',
+				'Prints "Refund Receipt" or "Credit Note" (for store credit)',
+				'Names the original receipt, so you and your customer can match the two',
+			),
+			'purpose'          => 'refund',
+			'form'             => array(
+				'title'          => 'REFUND RECEIPT',
+				'business_label' => 'Business / Store Name',
+				'business_ph'    => 'e.g. Northstar Supplies',
+				'client_label'   => 'Customer (Refunded To)',
+				'client_ph'      => 'e.g. Daniel Evans',
+				'item_ph'        => array( 'e.g. Returned: wireless headphones', 'e.g. Delivery charge' ),
+				'notes_ph'       => 'e.g. Refunded to the card used for the original purchase.',
+				'payment'        => 'Card',
+				'extra'          => array(
+					array( 'id' => 'original_ref', 'label' => 'Original Receipt / Invoice #', 'type' => 'text', 'ph' => 'e.g. INV-' . $y . '-031' ),
+					array( 'id' => 'original_date', 'label' => 'Original Receipt Date', 'type' => 'date' ),
+					array( 'id' => 'reason', 'label' => 'Reason for the Refund', 'type' => 'select', 'options' => array( 'Returned goods', 'Cancelled service', 'Overcharge', 'Damaged or faulty', 'Other' ) ),
+					array( 'id' => 'refund_method', 'label' => 'Refund Method', 'type' => 'select', 'options' => array( 'Original payment card', 'Cash', 'Bank transfer', 'Store credit' ) ),
+				),
+				'refund'         => true,
+				'documents'      => array(
+					'refund' => 'Refund receipt',
+					'credit' => 'Credit note',
+				),
+				'signature'      => 'Authorized Signature',
+				'signature2'     => 'Customer Signature',
 			),
 		),
 
@@ -688,6 +744,9 @@ function rf_generator_form( $form, $item_default = 'e.g. Service or product name
 			'statement'      => array(),
 			'no_tax'         => false, // v1.3.6: no tax, discount or tip (donations)
 			'in_kind'        => false, // v1.3.6: an item with no price prints "No value stated"
+			'documents'      => array(), // v1.4.1: the "Document" menu, value => label
+			'months'         => false, // v1.4.1: several monthly receipts in one PDF (HRA)
+			'refund'         => false, // v1.4.1: a refund record
 		)
 	);
 }

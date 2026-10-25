@@ -172,6 +172,33 @@ function rf_receipt_purposes() {
 			),
 		),
 
+		// 1.4.1 (G-9). Rule 53(1A) of the CGST Rules, 2017 (read in CBIC's
+		// copy, 25 Oct 2026) lists what a GST credit note under section 34
+		// of the CGST Act must show; the checks are the parts of it that
+		// apply to any refund record. The GSTIN and tax lines are left out:
+		// this template is not a GST credit note.
+		'refund'    => array(
+			'label'    => 'A refund receipt or credit note',
+			'heading'  => 'Refund receipt or credit note for a customer',
+			'template' => 'refund-receipt',
+			'intro'    => 'No general law says what a refund receipt must show. Indian GST law lists the details of a credit note (CGST Rules, rule 53(1A)), and the parts that fit any refund make a clear record: who gives the refund and to whom, the number and date of the original receipt or invoice, what was refunded, the amount and the date. A GST-registered business that needs a GST credit note must also show its GSTIN and the tax credited, which this checker does not cover.',
+			'sources'  => array(
+				array( 'CGST Rules, 2017, rule 53(1A) (particulars of a credit or debit note)', 'https://cbic-gst.gov.in/pdf/20082020_CGST-Rules-2017-Part-A-Rules.pdf' ),
+				array( 'CGST Act, 2017, section 34 (credit and debit notes)', 'https://cbic-gst.gov.in/pdf/CGST-Act-2017-amended-01012022.pdf' ),
+			),
+			'checks'   => array(
+				array( 'label' => 'Name of the business giving the refund', 'field' => 'business' ),
+				array( 'label' => 'Date of the refund', 'field' => 'date' ),
+				array( 'label' => 'Customer who receives the refund', 'field' => 'client' ),
+				array( 'label' => 'Number of the original receipt or invoice', 'field' => 'x:original_ref' ),
+				array( 'label' => 'Date of the original receipt or invoice', 'field' => 'x:original_date' ),
+				array( 'label' => 'What was refunded', 'field' => 'items' ),
+				array( 'label' => 'Amount refunded', 'field' => 'total' ),
+				array( 'label' => 'Business address', 'field' => 'business_address', 'optional' => true ),
+				array( 'label' => 'Signature of the business or its representative', 'field' => 'signature', 'manual' => true ),
+			),
+		),
+
 		'missing'   => array(
 			'label'    => 'A missing receipt declaration',
 			'heading'  => 'Missing receipt declaration for an expense report',

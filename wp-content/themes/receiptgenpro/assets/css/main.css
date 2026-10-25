@@ -728,3 +728,28 @@ p a:not(.rf-btn), li a:not(.rf-btn), .rf-field-hint a, .rf-sources-note a, .rf-l
 @media print {
 	.rf-sticky-bar, .rf-export-check { display: none !important; }
 }
+
+/* v1.4.1 (audit of 25 Oct, v2 Phase 5). A year-end donation statement:
+   a date box under each gift, and a Date / Description / Amount table. */
+.rf-item-date { display: none; }
+.rf-annual-mode .rf-item-date { display: block; grid-column: 1 / 2; margin-top: -.25rem; padding: .4rem .6rem; border: 1px solid var(--rf-input-border); border-radius: 6px; font-size: .82rem; }
+.rf-annual-mode .rf-item-row { margin-bottom: .85rem; }
+.rf-receipt-table.rf-statement-table th:nth-child(1) { width: 8.5em; }
+.rf-receipt-table.rf-statement-table td:first-child { white-space: nowrap; }
+.rf-receipt-table.rf-statement-table th:nth-child(2) { width: auto; }
+.rf-receipt-table.rf-statement-table th:nth-child(3) { width: 30%; }
+.rf-design-thermal .rf-receipt-table.rf-statement-table th:nth-child(1) { width: 7.4em; }
+.rf-design-thermal .rf-receipt-table.rf-statement-table th:nth-child(2) { width: auto; }
+.rf-design-thermal .rf-receipt-table.rf-statement-table th:nth-child(3) { width: calc(var(--rf-amount-ch, 9) * var(--rf-thermal-fs) * .6 + .8rem); }
+#rf-tax-year-field[hidden], #rf-payment-method-field[hidden] { display: none; }
+/* "Total cash contributions", "Total refunded": the amount stays on one line. */
+.rf-receipt-totals.rf-receipt-totals-wide { max-width: 340px; }
+/* When both don't fit (Thermal on a phone), the amount moves under the label. */
+.rf-receipt-totals-wide > div { flex-wrap: wrap; }
+.rf-receipt-totals-wide > div > span:first-child { padding-right: .75rem; }
+.rf-receipt-totals-wide > div > span:last-child { margin-left: auto; white-space: nowrap; }
+
+/* HRA: receipts for several months in one PDF. */
+.rf-months .rf-btn { margin-top: .25rem; }
+.rf-months-progress { margin: .5rem 0 0; font-size: .88rem; color: var(--rf-ink-soft); }
+.rf-months-progress:empty { display: none; }

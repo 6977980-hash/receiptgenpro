@@ -928,6 +928,102 @@ function rf_migrate_v140_content() {
 }
 
 /**
+ * Theme 1.4.1 (audit 25 Oct, v2 phase 5, G-7): the donation page's FAQ on
+ * one statement for a whole year. Every point is in IRS Publication 1771
+ * (Rev. 11-2023): one acknowledgment "such as an annual summary" may cover
+ * several contributions; separate gifts under $250 are not added together;
+ * "contemporaneous" means received by the filing date or the due date,
+ * whichever is earlier; charities typically send them by January 31.
+ */
+function rf_v141_donation_faq() {
+	return '<h3>Can I give a donor one statement for the whole year?</h3>' . "\n"
+		. '<p>Yes. One written acknowledgment, such as an annual summary, can cover several gifts (<a href="https://www.irs.gov/pub/irs-pdf/p1771.pdf" rel="noopener" target="_blank">IRS Publication 1771</a>). Choose "Year-end statement" in the Document menu and add one row per gift with its date: cash gifts are totalled, and in-kind gifts are described without a value. Each gift still counts on its own for the $250 rule, so gifts under $250 are not added together. The donor needs the statement by the day they file their tax return (or its due date, if that is earlier), which is why charities usually send it by January 31.</p>';
+}
+
+/**
+ * Database text of theme 1.4.1. The 'find' was copied from the live REST
+ * content on 25 Oct 2026 (tests/php/fixtures/v141/). The FAQPage schema is
+ * built from the visible FAQ, so it follows.
+ *
+ * @return array slug => array( 'type' => post type, 'patches' => list )
+ */
+function rf_v141_patches() {
+	return array(
+		'donation-receipt' => array(
+			'type'    => 'page',
+			'patches' => array(
+				rf_v137_insert_after(
+					'FAQ: one statement for the whole year',
+					'<p>Yes. Describe what was donated, without a value. US charities don\'t value non-cash gifts on the receipt; the donor does.</p>',
+					rf_v141_donation_faq(),
+					'one statement for the whole year'
+				),
+			),
+		),
+	);
+}
+
+/**
+ * One-time migration of theme 1.4.1, run from inc/setup-tasks.php like the
+ * 1.4.0 one: through wp_update_post() (each page keeps a revision), each
+ * finished slug recorded in rf_migration_v141, so it never runs twice.
+ */
+function rf_migration_v141_done() {
+	$state = get_option( 'rf_migration_v141' );
+	return is_array( $state ) && ! empty( $state['done'] );
+}
+
+function rf_migrate_v141_content() {
+	if ( rf_migration_v141_done() || wp_installing() ) {
+		return;
+	}
+	$state = get_option( 'rf_migration_v141' );
+	if ( is_array( $state ) ) {
+		if ( isset( $state['started'] ) && time() - strtotime( $state['started'] ) < 10 * MINUTE_IN_SECONDS ) {
+			return; // another run is still going
+		}
+		$state['started'] = gmdate( 'c' );
+		update_option( 'rf_migration_v141', $state, true );
+	} else {
+		$state = array( 'started' => gmdate( 'c' ), 'slugs' => array(), 'log' => array() );
+		if ( ! add_option( 'rf_migration_v141', $state, '', true ) ) {
+			return;
+		}
+	}
+	$state += array( 'slugs' => array(), 'log' => array() );
+
+	$kses = (bool) has_filter( 'content_save_pre', 'wp_filter_post_kses' );
+	kses_remove_filters();
+
+	foreach ( rf_v141_patches() as $slug => $page ) {
+		if ( in_array( $slug, $state['slugs'], true ) ) {
+			continue;
+		}
+		$found = get_posts( array( 'name' => $slug, 'post_type' => $page['type'], 'post_status' => 'publish', 'numberposts' => 1 ) );
+		if ( ! $found ) {
+			$state['log'][] = "/$slug/: not found";
+		} else {
+			$content = $found[0]->post_content;
+			foreach ( $page['patches'] as $patch ) {
+				list( $content, $status ) = rf_fixes_apply_patch( $content, $patch );
+				$state['log'][]           = "/$slug/: {$patch['label']}: $status";
+			}
+			if ( $content !== $found[0]->post_content ) {
+				wp_update_post( array( 'ID' => $found[0]->ID, 'post_content' => wp_slash( $content ) ) );
+			}
+		}
+		$state['slugs'][] = $slug;
+		update_option( 'rf_migration_v141', $state, true );
+	}
+
+	if ( $kses ) {
+		kses_init_filters();
+	}
+	update_option( 'rf_migration_v141', array( 'done' => gmdate( 'c' ), 'log' => $state['log'] ), true );
+	do_action( 'litespeed_purge_all' );
+}
+
+/**
  * Editorial Policy page (audit H8). Created as a DRAFT by the admin tool so
  * the owner can read it before publishing — it describes commitments the
  * site then has to keep.

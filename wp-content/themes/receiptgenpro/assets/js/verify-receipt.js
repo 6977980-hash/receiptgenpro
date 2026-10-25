@@ -1,5 +1,5 @@
 /**
- * ReceiptGenPro — Verify a Receipt (v1.4.0)
+ * ReceiptGenPro — Verify a Receipt (v1.4.1)
  *
  * Reads the receipt details that receipt-generator.js put after the # of
  * the QR code's link (/verify-receipt/#r=<base64url JSON>) and shows them.
@@ -17,6 +17,11 @@
  * payload's dp, else the currency's from rfVerify.decimals, else 2), so
  * yen print "¥4,072" and Kuwaiti dinars "KWD 2.625". Codes made before
  * 1.4.0 have no dp and read exactly as before.
+ *
+ * v1.4.1: a year-end donation statement (st: <tax year>) prints "Annual
+ * statement <year>" and "Total cash contributions"; a refund (rf: 1) or
+ * credit note (rf: 2) prints "Refund" / "Credit note", "Tax refunded" and
+ * "Total refunded" / "Total credited". The sum check is the same.
  */
 ( function () {
 	'use strict';
@@ -141,8 +146,20 @@
 		return ! p.more && Math.abs( linesTotal( p ) - p.tot ) > 1;
 	}
 
+	// v1.4.1: the kind of document a code holds, from st and rf (anything
+	// else in them is ignored): { kind, total, taxSuffix }.
+	function documentKind( p ) {
+		if ( p.rf === 1 || p.rf === 2 ) {
+			return { kind: p.rf === 2 ? 'Credit note' : 'Refund', total: p.rf === 2 ? 'Total credited' : 'Total refunded', taxSuffix: ' refunded' };
+		}
+		if ( isCents( p.st ) && p.st >= 1900 && p.st <= 2100 ) {
+			return { kind: 'Annual statement ' + p.st, total: 'Total cash contributions', taxSuffix: '' };
+		}
+		return { kind: '', total: 'Total', taxSuffix: '' };
+	}
+
 	if ( typeof module !== 'undefined' && module.exports ) {
-		module.exports = { decodePayload: decodePayload, b64urlDecode: b64urlDecode, money: money, decimals: decimals, stripBidi: stripBidi, linesTotal: linesTotal, doesNotAddUp: doesNotAddUp };
+		module.exports = { documentKind: documentKind, decodePayload: decodePayload, b64urlDecode: b64urlDecode, money: money, decimals: decimals, stripBidi: stripBidi, linesTotal: linesTotal, doesNotAddUp: doesNotAddUp };
 	}
 
 	if ( typeof document === 'undefined' ) {
@@ -190,8 +207,10 @@
 	}
 
 	function detailsHtml( p ) {
+		var doc = documentKind( p );
 		var rows = [
 			[ 'Document', p.t ],
+			[ 'Type', doc.kind ],
 			[ 'Issued by', p.b ],
 			[ 'Issued to', p.c ],
 			[ 'Number', p.n ],
@@ -207,12 +226,12 @@
 		( p.tx || [] ).forEach( function ( t ) {
 			var rate = t[1] !== undefined && t[1] !== '' ? t[1] + '%' : '';
 			var incl = p.ti ? ( rate ? ', incl.' : 'incl.' ) : '';
-			rows.push( [ String( t[0] || 'Tax' ) + ( rate || incl ? ' (' + rate + incl + ')' : '' ), money( p, t[2] ) ] );
+			rows.push( [ String( t[0] || 'Tax' ) + doc.taxSuffix + ( rate || incl ? ' (' + rate + incl + ')' : '' ), money( p, t[2] ) ] );
 		} );
 		if ( p.tp ) {
 			rows.push( [ 'Tip', money( p, p.tp ) ] );
 		}
-		rows.push( [ 'Total', money( p, p.tot ) ] );
+		rows.push( [ doc.total, money( p, p.tot ) ] );
 		if ( typeof p.pd === 'number' ) {
 			rows.push( [ 'Amount paid', money( p, p.pd ) ] );
 		}

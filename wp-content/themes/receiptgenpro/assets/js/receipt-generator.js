@@ -1,5 +1,5 @@
 /**
- * ReceiptGenPro — Receipt Generator (v1.4.0)
+ * ReceiptGenPro — Receipt Generator (v1.4.1)
  *
  * 100% client-side: no fetch(), no form submission, no data ever leaves
  * the browser.
@@ -80,6 +80,13 @@
  * unless this tab already has a draft; never inside an embed), eight more
  * currencies, amounts in the currency's own minor unit (JPY 0 decimals,
  * KWD 3; the QR code says dp when it isn't 2), and "Other (type a code)".
+ *
+ * v1.4.1 (audit of 25 Oct, v2 Phase 5): on the HRA form, "Receipts for
+ * several months" makes up to 12 monthly receipts (consecutive numbers,
+ * one QR code each) into one PDF, one month per page; a year-end donation
+ * statement (a gift date per row, cash gifts totalled, QR st: <year>);
+ * and refund receipts and credit notes ("Tax refunded", "Total
+ * refunded", QR rf: 1 or 2).
  */
 ( function () {
 	'use strict';
@@ -358,6 +365,102 @@
 			return ( n < 10 ? '0' : '' ) + n;
 		};
 		return d.getFullYear() + '-' + pad( d.getMonth() + 1 ) + '-' + pad( d.getDate() );
+	}
+
+	// ---- Several monthly receipts (HRA) -----------------------------------------
+	var MAX_MONTHS = 12;
+	var MONTH_NAMES = [ 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December' ];
+
+	function pad2( n ) {
+		return ( n < 10 ? '0' : '' ) + n;
+	}
+
+	// 'YYYY-MM' → { y, m } (m 1-12), or null.
+	function parseMonth( value ) {
+		var m = /^(\d{4})-(\d{2})$/.exec( String( value || '' ).trim() );
+		return m && +m[2] >= 1 && +m[2] <= 12 ? { y: +m[1], m: +m[2] } : null;
+	}
+
+	// The months from `from` to `to` ('YYYY-MM'), both included, as
+	// { months: [ '2026-04', … ], error }. error is 'invalid' (a month
+	// missing, or To before From) or 'max' (more than MAX_MONTHS, with
+	// `count`); months is then empty.
+	function monthRange( from, to ) {
+		var a = parseMonth( from );
+		var b = parseMonth( to );
+		if ( ! a || ! b ) {
+			return { months: [], error: 'invalid' };
+		}
+		var count = ( b.y - a.y ) * 12 + b.m - a.m + 1;
+		if ( count < 1 ) {
+			return { months: [], error: 'invalid' };
+		}
+		if ( count > MAX_MONTHS ) {
+			return { months: [], error: 'max', count: count };
+		}
+		var out = [];
+		for ( var i = 0; i < count; i++ ) {
+			var t = a.y * 12 + a.m - 1 + i;
+			out.push( Math.floor( t / 12 ) + '-' + pad2( t % 12 + 1 ) );
+		}
+		return { months: out, error: '' };
+	}
+
+	// A month's receipt date (YYYY-MM-DD): the 1st, or with 'last' its last day.
+	function monthReceiptDate( ym, choice ) {
+		var p = parseMonth( ym );
+		if ( ! p ) {
+			return '';
+		}
+		var day = choice === 'last' ? new Date( Date.UTC( p.y, p.m, 0 ) ).getUTCDate() : 1;
+		return p.y + '-' + pad2( p.m ) + '-' + pad2( day );
+	}
+
+	// '2026-04' → 'April 2026'.
+	function monthLabel( ym ) {
+		var p = parseMonth( ym );
+		return p ? MONTH_NAMES[ p.m - 1 ] + ' ' + p.y : String( ym || '' );
+	}
+
+	// The Indian financial year (April to March) a YYYY-MM-DD date is in:
+	// 25 Oct 2026 → { from: '2026-04', to: '2027-03' }.
+	function financialYear( iso ) {
+		var m = /^(\d{4})-(\d{2})/.exec( String( iso || '' ) );
+		if ( ! m ) {
+			return null;
+		}
+		var start = +m[2] >= 4 ? +m[1] : +m[1] - 1;
+		return { from: start + '-04', to: ( start + 1 ) + '-03' };
+	}
+
+	// `count` receipt numbers from `first` on, through nextReceiptNumber():
+	// RENT-0007 × 12 → RENT-0007 … RENT-0018.
+	function receiptNumbers( first, count ) {
+		var out = [];
+		var n = String( first || '' ).trim() || '1001';
+		for ( var i = 0; i < count; i++ ) {
+			out.push( n );
+			n = nextReceiptNumber( n );
+		}
+		return out;
+	}
+
+	// ---- Year-end donation statement ---------------------------------------------
+	// The tax year a statement is for: last year from January to March
+	// (charities usually send them by 31 January, IRS Publication 1771),
+	// this year from April on.
+	function statementYear( iso ) {
+		var m = /^(\d{4})-(\d{2})/.exec( String( iso || '' ) );
+		if ( ! m ) {
+			return new Date().getFullYear();
+		}
+		return +m[2] <= 3 ? +m[1] - 1 : +m[1];
+	}
+
+	// A tax year typed in the form, or null when it isn't one.
+	function taxYear( value ) {
+		var y = parseInt( value, 10 );
+		return /^\s*\d{4}\s*$/.test( String( value || '' ) ) && y >= 1900 && y <= 2100 ? y : null;
 	}
 
 	// ---- Date formats --------------------------------------------------------
@@ -663,6 +766,14 @@
 		if ( r.paidCents !== null && r.paidCents !== undefined ) {
 			p.pd = r.paidCents;
 		}
+		// v1.4.1: a year-end donation statement (st: its tax year) and a
+		// refund (rf: 1) or credit note (rf: 2); older codes have neither.
+		if ( r.statementYear ) {
+			p.st = r.statementYear;
+		}
+		if ( r.refund ) {
+			p.rf = r.refund;
+		}
 
 		// Over the limit: shorten the texts, then drop extra fields, then
 		// shorten item names, then drop items from the end (p.more tells the
@@ -847,9 +958,12 @@
 		} );
 	}
 
+	// The refund form's note in GST bill mode (generator-embed.php has the same).
+	var REFUND_GST_NOTE = 'This is a record of a refund, not a GST credit note. A GST-registered supplier issues a credit note under section 34 of the CGST Act, 2017, with the details in rule 53(1A) of the CGST Rules (your GSTIN, the original invoice\'s number and date, the tax credited and more), and reports it on the Invoice Registration Portal if the business issues e-invoices.';
+
 	function typeFieldsHtml( f ) {
 		f = f || {};
-		var out = { extra: '', tippaid: '', statement: '' };
+		var out = { extra: '', tippaid: '', statement: '', doc: '', months: '' };
 		var extra = f.extra || [];
 		if ( extra.length ) {
 			out.extra = '<fieldset class="rf-template-fields"><legend>' + esc( titleCase( f.title || 'Receipt' ) ) + ' Details</legend><div class="rf-form-row rf-form-row-2col">' +
@@ -879,6 +993,29 @@
 		var st = f.statement;
 		if ( st && st.text ) {
 			out.statement = '<div class="rf-field rf-field-check"><label><input type="checkbox" id="rf-statement" data-text="' + esc( st.text ) + '"' + ( st.checked ? ' checked' : '' ) + '> ' + esc( st.label ) + '</label></div>';
+		}
+		// v1.4.1: the "Document" menu (donation statement, credit note).
+		var docs = f.documents && typeof f.documents === 'object' ? f.documents : {};
+		if ( Object.keys( docs ).length ) {
+			out.doc = '<div class="rf-form-row rf-form-row-2col rf-doc-row"><div class="rf-field"><label for="rf-doc-mode">Document</label><select id="rf-doc-mode">' +
+				Object.keys( docs ).map( function ( v ) {
+					return '<option value="' + esc( v ) + '">' + esc( docs[ v ] ) + '</option>';
+				} ).join( '' ) + '</select></div>' +
+				( docs.annual ? '<div class="rf-field" id="rf-tax-year-field" hidden><label for="rf-tax-year">Tax year</label><input type="number" id="rf-tax-year" min="2000" max="2100" step="1" inputmode="numeric" aria-describedby="rf-tax-year-hint"><p class="rf-field-hint" id="rf-tax-year-hint">Add one row per gift with its date. Cash gifts are totalled; describe in-kind gifts without a value.</p></div>' : '' ) +
+				'</div>' +
+				( f.refund ? '<p class="rf-field-hint" id="rf-refund-gst-note" hidden>' + esc( REFUND_GST_NOTE ) + '</p>' : '' );
+		}
+		// v1.4.1: several monthly receipts in one PDF (HRA).
+		if ( f.months ) {
+			out.months = '<details class="rf-more-options rf-months" id="rf-months"><summary>Receipts for several months (one PDF)</summary>' +
+				'<div class="rf-form-row rf-form-row-2col"><div class="rf-field"><label for="rf-months-from">From month</label><input type="month" id="rf-months-from"></div>' +
+				'<div class="rf-field"><label for="rf-months-to">To month</label><input type="month" id="rf-months-to"></div></div>' +
+				'<div class="rf-form-row rf-form-row-2col"><div class="rf-field"><label for="rf-months-rent">Monthly rent</label><input type="number" id="rf-months-rent" min="0" max="' + MAX_AMOUNT + '" step="0.01" aria-describedby="rf-months-rent-hint"><p class="rf-field-hint" id="rf-months-rent-hint">The same for every month. Leave it empty to use the receipt\'s total.</p></div>' +
+				'<div class="rf-field"><label for="rf-months-day">Receipt date for each month</label><select id="rf-months-day"><option value="first">1st of the month</option><option value="last">Last day of the month</option></select></div></div>' +
+				'<p class="rf-field-hint">Up to 12 months, such as April to March for one financial year. Each month gets its own page, receipt number and QR code, with the landlord, tenant, address, PAN, design and signature from the form above.</p>' +
+				'<p class="rf-field-hint rf-field-warn" id="rf-months-note" hidden></p>' +
+				'<button type="button" class="rf-btn rf-btn-primary" id="rf-download-months">Download all as one PDF</button>' +
+				'<p class="rf-months-progress" id="rf-months-progress" role="status"></p></details>';
 		}
 		return out;
 	}
@@ -961,6 +1098,15 @@
 			pdfText: pdfText,
 			pdfTextLines: pdfTextLines,
 			pageSlices: pageSlices,
+			monthRange: monthRange,
+			monthReceiptDate: monthReceiptDate,
+			monthLabel: monthLabel,
+			financialYear: financialYear,
+			receiptNumbers: receiptNumbers,
+			statementYear: statementYear,
+			taxYear: taxYear,
+			MAX_MONTHS: MAX_MONTHS,
+			REFUND_GST_NOTE: REFUND_GST_NOTE,
 			MAX_AMOUNT: MAX_AMOUNT,
 			QR_MAX: QR_MAX,
 			calcTotals: calcTotals,
@@ -1017,7 +1163,8 @@
 			businessLabel: form.dataset.businessLabel || 'From',
 			clientLabel: form.dataset.clientLabel || 'Received From',
 			noTax: form.dataset.noTax === '1',
-			inKind: form.dataset.inKind === '1'
+			inKind: form.dataset.inKind === '1',
+			refund: form.dataset.refund === '1'
 		};
 		var itemPlaceholders = [];
 		try {
@@ -1224,6 +1371,7 @@
 			cfg.clientLabel   = f.client_label || 'Received From';
 			cfg.noTax         = !! f.no_tax;
 			cfg.inKind        = !! f.in_kind;
+			cfg.refund        = !! f.refund;
 			itemPlaceholders  = [].concat( f.item_ph || [] );
 			showTaxControls();
 
@@ -1259,7 +1407,7 @@
 				}
 			} );
 			var parts = typeFieldsHtml( f );
-			[ 'extra', 'tippaid', 'statement' ].forEach( function ( key ) {
+			[ 'extra', 'tippaid', 'statement', 'doc', 'months' ].forEach( function ( key ) {
 				var box = document.getElementById( 'rf-type-' + key );
 				if ( box ) {
 					box.innerHTML = parts[ key ];
@@ -1279,6 +1427,7 @@
 			tipInput  = document.getElementById( 'rf-tip' );
 			paidInput = document.getElementById( 'rf-amount-paid' );
 			statement = document.getElementById( 'rf-statement' );
+			fillDocDefaults();
 
 			itemsList.querySelectorAll( '.rf-item-name' ).forEach( function ( input, i ) {
 				input.placeholder = itemPlaceholders[ i ] || itemPlaceholders[0] || 'Item or service';
@@ -1307,7 +1456,8 @@
 			return true;
 		}
 
-		// A no-tax type (donation) has no tax rate or discount controls.
+		// A no-tax type (donation) has no tax rate or discount controls; a
+		// refund has its own refund method instead of a payment method.
 		function showTaxControls() {
 			[ 'rf-tax-rate-field', 'rf-more-options' ].forEach( function ( id ) {
 				var el = document.getElementById( id );
@@ -1315,6 +1465,27 @@
 					el.hidden = cfg.noTax;
 				}
 			} );
+			var payField = document.getElementById( 'rf-payment-method-field' );
+			if ( payField ) {
+				payField.hidden = cfg.refund;
+			}
+		}
+
+		// Empty "Tax year" and month range fields start at this year's
+		// statement and the current Indian financial year (April to March).
+		function fillDocDefaults() {
+			var today = todayLocal();
+			var year = document.getElementById( 'rf-tax-year' );
+			if ( year && ! year.value ) {
+				year.value = String( statementYear( today ) );
+			}
+			var fy = financialYear( today );
+			var from = document.getElementById( 'rf-months-from' );
+			var to = document.getElementById( 'rf-months-to' );
+			if ( from && to && ! from.value && ! to.value ) {
+				from.value = fy.from;
+				to.value = fy.to;
+			}
 		}
 
 		// ?type=<slug> in the address bar, so a reload or a shared link opens
@@ -1469,6 +1640,12 @@
 			hsn.placeholder = 'HSN/SAC code (optional)';
 			hsn.setAttribute( 'aria-label', 'HSN/SAC code' );
 
+			// Year-end donation statement only: the date of each gift.
+			var giftDate = document.createElement( 'input' );
+			giftDate.type = 'date';
+			giftDate.className = 'rf-item-date';
+			giftDate.setAttribute( 'aria-label', 'Gift date' );
+
 			var remove = document.createElement( 'button' );
 			remove.type = 'button';
 			remove.className = 'rf-item-remove';
@@ -1480,6 +1657,7 @@
 				qty.value   = values.qty !== undefined ? values.qty : '1';
 				price.value = values.price || '';
 				hsn.value   = values.hsn || '';
+				giftDate.value = values.date || '';
 			}
 
 			row.appendChild( name );
@@ -1487,6 +1665,7 @@
 			row.appendChild( price );
 			row.appendChild( remove );
 			row.appendChild( hsn );
+			row.appendChild( giftDate );
 			itemsList.appendChild( row );
 
 			remove.addEventListener( 'click', function () {
@@ -1505,6 +1684,7 @@
 				row.querySelector( '.rf-item-qty' ).setAttribute( 'aria-label', 'Item ' + n + ' quantity' );
 				row.querySelector( '.rf-item-price' ).setAttribute( 'aria-label', 'Item ' + n + ' price' );
 				row.querySelector( '.rf-item-hsn' ).setAttribute( 'aria-label', 'Item ' + n + ' HSN/SAC code' );
+				row.querySelector( '.rf-item-date' ).setAttribute( 'aria-label', 'Gift ' + n + ' date' );
 				row.querySelector( '.rf-item-remove' ).setAttribute( 'aria-label', 'Remove item ' + n );
 			} );
 		}
@@ -1620,7 +1800,8 @@
 					name: row.querySelector( '.rf-item-name' ).value,
 					qty: row.querySelector( '.rf-item-qty' ).value,
 					price: row.querySelector( '.rf-item-price' ).value,
-					hsn: row.querySelector( '.rf-item-hsn' ).value
+					hsn: row.querySelector( '.rf-item-hsn' ).value,
+					date: row.querySelector( '.rf-item-date' ).value
 				} );
 			} );
 			try {
@@ -1822,7 +2003,8 @@
 		// What the receipt says, apart from its number and its look (design,
 		// logo, QR code, footer line, date format, paper size): a download of the same receipt in another format
 		// keeps the number, and the first real change moves it on.
-		var NOT_CONTENT = { 'rf-receipt-number': true, 'rf-qr': true, 'rf-show-footer': true, 'rf-date-format': true, 'rf-paper-size': true };
+		// The months for "Receipts for several months" don't change this receipt either.
+		var NOT_CONTENT = { 'rf-receipt-number': true, 'rf-qr': true, 'rf-show-footer': true, 'rf-date-format': true, 'rf-paper-size': true, 'rf-months-from': true, 'rf-months-to': true, 'rf-months-rent': true, 'rf-months-day': true };
 		function receiptPrint() {
 			var data = { type: currentType, fields: {}, items: [] };
 			storeFields().forEach( function ( el ) {
@@ -1832,6 +2014,10 @@
 			} );
 			itemsList.querySelectorAll( '.rf-item-row' ).forEach( function ( row ) {
 				var it = [ row.querySelector( '.rf-item-name' ).value, row.querySelector( '.rf-item-qty' ).value, row.querySelector( '.rf-item-price' ).value, row.querySelector( '.rf-item-hsn' ).value ];
+				var gift = row.querySelector( '.rf-item-date' ).value;
+				if ( gift ) {
+					it.push( gift ); // only when set, so older prints compare the same
+				}
 				if ( it[0].trim() || it[2].trim() ) {
 					data.items.push( it ); // an empty row changes nothing
 				}
@@ -1885,6 +2071,8 @@
 		if ( urlType && urlType !== currentType ) {
 			applyType( urlType );
 		}
+
+		fillDocDefaults();
 
 		// A number saved in this tab that was already downloaded moves on too.
 		if ( lastNumber && numberInput && isUsedNumber( numberInput.value, lastNumber ) ) {
@@ -2005,9 +2193,14 @@
 			return DATE_FORMATS[ v ] ? v : dateFormatFor( currency );
 		}
 
+		// One month of "Receipts for several months" while its page is drawn:
+		// { month, date, number, rent }; null otherwise.
+		var monthJob = null;
+
 		// An extra field's value as printed; dates in `fmt` ('iso' for the QR).
+		// The rent month is the job's month while a month is drawn.
 		function formatExtra( el, fmt ) {
-			var v = ( el.value || '' ).trim();
+			var v = ( monthJob && el.id === 'rf-x-rent_month' ? monthJob.month : el.value || '' ).trim();
 			if ( ! v ) {
 				return '';
 			}
@@ -2016,8 +2209,7 @@
 				return formatDate( v, fmt );
 			}
 			if ( t === 'month' && /^\d{4}-\d{2}$/.test( v ) ) {
-				var mm = [ 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December' ];
-				return mm[ parseInt( v.slice( 5 ), 10 ) - 1 ] + ' ' + v.slice( 0, 4 );
+				return monthLabel( v );
 			}
 			if ( t === 'datetime-local' ) {
 				var dt = v.split( 'T' );
@@ -2047,8 +2239,9 @@
 			return n > max || n === Infinity;
 		}
 
-		// `gst`: GST bill mode, so each item keeps its HSN/SAC code.
-		function collectItems( notes, gst ) {
+		// `gst`: GST bill mode, so each item keeps its HSN/SAC code;
+		// `annual`: a year-end statement, so each gift keeps its date.
+		function collectItems( notes, gst, annual ) {
 			var rows = itemsList.querySelectorAll( '.rf-item-row' );
 			var items = [];
 			rows.forEach( function ( row ) {
@@ -2056,6 +2249,7 @@
 				var qtyRaw   = row.querySelector( '.rf-item-qty' ).value;
 				var priceRaw = row.querySelector( '.rf-item-price' ).value;
 				var code     = gst ? row.querySelector( '.rf-item-hsn' ).value.trim() : '';
+				var giftDate = annual ? row.querySelector( '.rf-item-date' ).value : '';
 				var qty      = nonNegative( qtyRaw, 1 );
 				var price    = toMinor( capped( priceRaw, MAX_AMOUNT ), dp ) / unit;
 				if ( isNegative( qtyRaw ) || isNegative( priceRaw ) ) {
@@ -2066,7 +2260,7 @@
 				}
 				if ( name || price ) {
 					// An in-kind gift is described, not valued (IRS Pub. 1771).
-					items.push( { name: name || 'Item', qty: qty, price: price, lineCents: lineCents( qty, price, dp ), noValue: cfg.inKind && ! price, code: code } );
+					items.push( { name: name || 'Item', qty: qty, price: price, lineCents: lineCents( qty, price, dp ), noValue: cfg.inKind && ! price, code: code, date: giftDate } );
 				}
 			} );
 			return items;
@@ -2075,7 +2269,9 @@
 		function showNotices( notes, symbol ) {
 			var text = [];
 			if ( notes.negative ) {
-				text.push( 'Negative numbers count as 0. For a refund or a reduction, use the discount.' );
+				text.push( cfg.refund ?
+					'Negative numbers count as 0. Enter refunded amounts as positive numbers; the receipt says they were refunded.' :
+					'Negative numbers count as 0. For a refund or a reduction, use the discount.' );
 			}
 			if ( notes.max ) {
 				text.push( 'Amounts are limited to ' + money( symbol, MAX_AMOUNT ) + '.' );
@@ -2105,6 +2301,63 @@
 			if ( field ) {
 				field.hidden = ! gst;
 			}
+		}
+
+		// A year-end statement: the tax year and a date under each gift. A
+		// refund in GST bill mode: the note that it isn't a GST credit note.
+		function showDocFields( annual, refundGst ) {
+			itemsList.classList.toggle( 'rf-annual-mode', annual );
+			var yearField = document.getElementById( 'rf-tax-year-field' );
+			if ( yearField ) {
+				yearField.hidden = ! annual;
+			}
+			var note = document.getElementById( 'rf-refund-gst-note' );
+			if ( note ) {
+				note.hidden = ! refundGst;
+			}
+		}
+
+		// ---- Receipts for several months (HRA) ------------------------------------
+		var lastTotal = 0; // the receipt's total at the last render, in whole units
+
+		// The monthly rent: the panel's amount, or the receipt's total.
+		function monthsRent() {
+			var raw = fieldValue( 'rf-months-rent' );
+			return raw === '' ? lastTotal : toMinor( capped( raw, MAX_AMOUNT ), dp ) / unit;
+		}
+
+		// The panel's notes: a range that can't be used, and the landlord PAN
+		// when a year of this rent is above ₹1,00,000 (the rule and wording
+		// of the HRA check in inc/requirements.php). Neither blocks.
+		function monthsNotes( currency ) {
+			var notes = [];
+			var range = monthRange( fieldValue( 'rf-months-from' ), fieldValue( 'rf-months-to' ) );
+			if ( range.error === 'max' ) {
+				notes.push( 'Choose at most ' + MAX_MONTHS + ' months (' + range.count + ' are selected): one receipt per month, such as April to March for one financial year.' );
+			} else if ( range.error ) {
+				notes.push( 'Choose a From month and a To month on or after it.' );
+			}
+			if ( currency === 'INR' && monthsRent() * 12 > 100000 && ! fieldValue( 'rf-x-landlord_pan' ) ) {
+				notes.push( 'A year of this rent is above ₹1,00,000, so the landlord\'s PAN is needed on the receipts. If the landlord has no PAN, employers usually ask for a signed declaration from the landlord instead.' );
+			}
+			return notes;
+		}
+
+		function updateMonths( symbol, currency ) {
+			var note = document.getElementById( 'rf-months-note' );
+			if ( ! note ) {
+				return;
+			}
+			var rentInput = document.getElementById( 'rf-months-rent' );
+			var ph = 'Receipt total: ' + money( symbol, lastTotal );
+			if ( rentInput && rentInput.placeholder !== ph ) {
+				rentInput.placeholder = ph;
+			}
+			var text = monthsNotes( currency ).join( ' ' );
+			if ( note.textContent !== text ) {
+				note.textContent = text;
+			}
+			note.hidden = ! text;
 		}
 
 		// HRA form: a hint (never a block) when the landlord PAN doesn't
@@ -2147,8 +2400,11 @@
 			pendingExport = null;
 		}
 
-		function checkBeforeExport( run ) {
-			var f = exportFacts;
+		// `facts` (optional): what to check instead of the receipt on screen
+		// (the several-months PDF checks its monthly rent).
+		var pendingFacts = null;
+		function checkBeforeExport( run, facts ) {
+			var f = facts || exportFacts;
 			if ( ! exportCheck || ! f || ( f.business && ! f.zero ) || exportOkPrint === receiptPrint() ) {
 				hideExportCheck();
 				run();
@@ -2164,6 +2420,7 @@
 			}
 			exportCheckText.textContent = 'Before you download: ' + problems.join( ', and ' ) + '.';
 			pendingExport = run;
+			pendingFacts = f;
 			exportCheck.hidden = false;
 			exportCheck.focus();
 		}
@@ -2178,9 +2435,9 @@
 				}
 			} );
 			document.getElementById( 'rf-export-back' ).addEventListener( 'click', function () {
-				var f = exportFacts || {};
+				var f = pendingFacts || exportFacts || {};
 				hideExportCheck();
-				var target = ! f.business ? document.getElementById( 'rf-business-name' ) : itemsList.querySelector( '.rf-item-price' );
+				var target = ! f.business ? document.getElementById( 'rf-business-name' ) : ( f.months ? document.getElementById( 'rf-months-rent' ) : itemsList.querySelector( '.rf-item-price' ) );
 				if ( target ) {
 					target.focus();
 				}
@@ -2188,12 +2445,25 @@
 		}
 
 		function renderReceipt() {
-			advanceNumber();
+			var job       = monthJob;
+			if ( ! job ) {
+				advanceNumber();
+			}
 			var business  = document.getElementById( 'rf-business-name' ).value.trim() || 'Your Business Name';
 			var client    = document.getElementById( 'rf-client-name' ).value.trim();
-			var number    = document.getElementById( 'rf-receipt-number' ).value.trim() || '1001';
+			var number    = job ? job.number : document.getElementById( 'rf-receipt-number' ).value.trim() || '1001';
 			// A cleared date prints a dash, not today's date.
-			var isoDate   = dateInput.value;
+			var isoDate   = job ? job.date : dateInput.value;
+			// v1.4.1: the "Document" menu (donations, refunds).
+			var docMode   = fieldValue( 'rf-doc-mode' );
+			var annual    = docMode === 'annual';
+			var year      = annual ? taxYear( fieldValue( 'rf-tax-year' ) ) : null;
+			var credit    = cfg.refund && docMode === 'credit';
+			var title     = credit ? 'CREDIT NOTE' : ( annual ? 'ANNUAL DONATION STATEMENT' : cfg.title );
+			// "this contribution" → "these contributions" on a statement.
+			var gifts     = function ( text ) {
+				return annual ? String( text ).replace( /\bthis contribution\b/g, 'these contributions' ) : text;
+			};
 			var cur       = activeCurrency();
 			var currency  = cur.code;
 			dp            = cur.dp;
@@ -2217,8 +2487,9 @@
 			var place     = gst ? fieldValue( 'rf-place-of-supply' ) : '';
 			var payMethod = document.getElementById( 'rf-payment-method' ).value;
 			var notes     = document.getElementById( 'rf-notes' ).value.trim();
-			var items     = collectItems( fix, gst );
+			var items     = job ? [ { name: 'House rent for ' + monthLabel( job.month ), qty: 1, price: job.rent, lineCents: lineCents( 1, job.rent, dp ), noValue: false, code: '', date: '' } ] : collectItems( fix, gst, annual );
 			showGstFields( gst );
+			showDocFields( annual, cfg.refund && gst );
 			updatePanHint();
 			applySteps();
 			if ( otherBox ) {
@@ -2269,8 +2540,16 @@
 				amountCh = Math.max( amountCh, Array.from( str ).length );
 				return str.replace( /,/g, ',<wbr>' );
 			};
+			var dateFmt = dateFormat( currency );
 			var rowsHtml = items
 				.map( function ( it ) {
+					if ( annual ) {
+						// Date, description, amount (an in-kind gift has none).
+						return '<tr><td>' + escapeHtml( it.date ? formatDate( it.date, dateFmt ) : '—' ) + '</td>' +
+							'<td>' + escapeHtml( it.name ) + '</td>' +
+							( it.noValue ? '<td class="rf-num rf-no-value">No value stated</td>' : '<td class="rf-num">' + cellMoney( it.lineCents / unit ) + '</td>' ) +
+							'</tr>';
+					}
 					return (
 						'<tr>' +
 						'<td>' + escapeHtml( it.name ) + ( it.code ? '<span class="rf-item-code">HSN/SAC: ' + escapeHtml( it.code ) + '</span>' : '' ) + '</td>' +
@@ -2291,7 +2570,14 @@
 			if ( client ) {
 				meta.push( '<div><strong>' + escapeHtml( cfg.clientLabel.replace( / \(optional\)$/i, '' ) ) + ':</strong> ' + escapeHtml( client ) + '</div>' );
 			}
-			meta.push( '<div><strong>Payment Method:</strong> ' + escapeHtml( payMethod ) + '</div>' );
+			// A statement covers gifts paid in different ways, and a refund
+			// prints its own refund method.
+			if ( annual && year ) {
+				meta.push( '<div><strong>Gifts received:</strong> 1 Jan to 31 Dec ' + year + '</div>' );
+			}
+			if ( ! annual && ! cfg.refund ) {
+				meta.push( '<div><strong>Payment Method:</strong> ' + escapeHtml( payMethod ) + '</div>' );
+			}
 			if ( place ) {
 				meta.push( '<div><strong>Place of supply:</strong> ' + escapeHtml( place ) + '</div>' );
 			}
@@ -2304,6 +2590,9 @@
 				if ( val ) {
 					var label = ( el.dataset.label || '' ).replace( / \(optional\)$/i, '' );
 					var id = el.id.replace( /^rf-x-/, '' );
+					if ( annual && id === 'gift_type' ) {
+						return; // each row says whether it is cash or in kind
+					}
 					if ( ! QPQ_FIELDS[ id ] ) { // printed in their own sentence
 						meta.push( '<div><strong>' + escapeHtml( label ) + ':</strong> ' + escapeHtml( formatExtra( el, fmt ) ) + '</div>' );
 					}
@@ -2328,7 +2617,7 @@
 			var qpqValue = fieldValue( 'rf-x-qpq_value' );
 			var qpqHtml  = '';
 			if ( qpqDesc || qpqValue ) {
-				qpqHtml = '<p class="rf-receipt-statement">In return for this contribution the donor received ' + escapeHtml( qpqDesc || 'goods or services' ) +
+				qpqHtml = '<p class="rf-receipt-statement">' + gifts( 'In return for this contribution' ) + ' the donor received ' + escapeHtml( qpqDesc || 'goods or services' ) +
 					( qpqValue ? ', with an estimated value of ' + money( symbol, capped( qpqValue, MAX_AMOUNT ) ) + '. Only the amount above this value may be tax-deductible.' :
 						'. Only the amount above their value may be tax-deductible.' ) + '</p>';
 			}
@@ -2337,16 +2626,21 @@
 			// include tax, "Includes VAT (20%)" lines after it.
 			var taxLines = function ( prefix ) {
 				var cls = prefix ? ' class="rf-receipt-tax-incl"' : '';
+				// A refund gives the tax back too: "Tax refunded (8%)".
+				var back = cfg.refund ? ' refunded' : '';
 				return [ [ taxRate, taxLabel, 0 ], [ tax2Rate, tax2Label, 1 ] ].map( function ( t ) {
-					return t[0] ? '<div' + cls + '><span>' + prefix + escapeHtml( t[1] ) + ' (' + formatRate( t[0] ) + '%)</span><span>' + money( symbol, calc.taxCents[ t[2] ] / unit ) + '</span></div>' : '';
+					return t[0] ? '<div' + cls + '><span>' + prefix + escapeHtml( t[1] ) + back + ' (' + formatRate( t[0] ) + '%)</span><span>' + money( symbol, calc.taxCents[ t[2] ] / unit ) + '</span></div>' : '';
 				} ).join( '' );
 			};
-			var totalsHtml =
+			var totalLabel = cfg.refund ? ( credit ? 'Total credited' : 'Total refunded' ) : ( annual ? 'Total cash contributions' : 'Total' );
+			var totalsHtml = annual ?
+				// Only the cash gifts add up; there is no tax or discount.
+				'<div class="rf-receipt-total-final"><span>' + totalLabel + '</span><span>' + money( symbol, total ) + '</span></div>' :
 				'<div><span>Subtotal</span><span>' + money( symbol, subtotal ) + '</span></div>' +
 				( calc.discountCents ? '<div><span>Discount' + ( discType === 'percent' ? ' (' + formatRate( Math.min( discount, 100 ) ) + '%)' : '' ) + '</span><span>-' + money( symbol, calc.discountCents / unit ) + '</span></div>' : '' ) +
 				( inclusive ? '' : taxLines( '' ) ) +
 				( tip ? '<div><span>Tip</span><span>' + money( symbol, tip ) + '</span></div>' : '' ) +
-				'<div class="rf-receipt-total-final"><span>Total</span><span>' + money( symbol, total ) + '</span></div>' +
+				'<div class="rf-receipt-total-final"><span>' + totalLabel + '</span><span>' + money( symbol, total ) + '</span></div>' +
 				// Prices with tax in them: the tax worked out, not added.
 				( inclusive ? taxLines( 'Includes ' ) : '' );
 
@@ -2365,7 +2659,7 @@
 				'<p class="rf-receipt-words"><strong>Amount received in words:</strong> ' + escapeHtml( amountInWords( wordsAmount, currency, dp ) ) + '</p>' : '';
 
 			var statementHtml = qpqHtml || ( ( statement && statement.checked ) ?
-				'<p class="rf-receipt-statement">' + escapeHtml( statement.dataset.text ) + '</p>' : '' );
+				'<p class="rf-receipt-statement">' + escapeHtml( gifts( statement.dataset.text ) ) + '</p>' : '' );
 
 			var signatureHtml = [ cfg.signature, cfg.signature2 ].filter( Boolean ).map( function ( label ) {
 				return '<div class="rf-receipt-signature"><span class="rf-sig-line"></span><span>' + escapeHtml( label ) + '</span></div>';
@@ -2377,7 +2671,7 @@
 			var qrHtml = '';
 			if ( qrToggle && qrToggle.checked ) {
 				var verifyLink = verifyBase + '#r=' + buildPayload( {
-					title: cfg.title,
+					title: title,
 					business: document.getElementById( 'rf-business-name' ).value.trim(),
 					client: client,
 					number: number,
@@ -2396,8 +2690,12 @@
 					tipCents: tipCents,
 					totalCents: totalCents,
 					paidCents: paid === null ? null : toMinor( paid, dp ),
-					payMethod: payMethod,
-					extras: qrExtras
+					payMethod: annual || cfg.refund ? '' : payMethod,
+					extras: annual ? qrExtras.filter( function ( e ) {
+						return e[2] !== 'gift_type';
+					} ) : qrExtras,
+					statementYear: annual ? year : null,
+					refund: cfg.refund ? ( credit ? 2 : 1 ) : 0
 				} );
 				var qr = qrDataUrl( verifyLink );
 				var pendingPx = qr ? 0 : qrPixels( qrModulesFor( new TextEncoder().encode( verifyLink ).length ) );
@@ -2411,13 +2709,17 @@
 
 			preview.innerHTML = wrapDesign( design,
 				'<div class="rf-receipt-head">' +
-				'<div><h3>' + escapeHtml( business ) + '</h3>' + sellerHtml + '<p class="rf-receipt-label">' + escapeHtml( cfg.title ) + '</p></div>' +
+				'<div><h3>' + escapeHtml( business ) + '</h3>' + sellerHtml + '<p class="rf-receipt-label">' + escapeHtml( title ) + '</p></div>' +
 				'</div>' +
 				'<div class="rf-receipt-meta">' + meta.join( '' ) + '</div>' +
-				'<table class="rf-receipt-table" style="--rf-amount-ch:' + Math.min( amountCh, 10 ) + '"><thead><tr><th>Description</th><th class="rf-num">Qty</th><th class="rf-num">Price</th><th class="rf-num">Total</th></tr></thead><tbody>' +
-				( rowsHtml || '<tr><td colspan="4" class="rf-empty">Add items in the form to see them here</td></tr>' ) +
+				( annual ?
+					'<table class="rf-receipt-table rf-statement-table" style="--rf-amount-ch:' + Math.min( amountCh, 10 ) + '"><thead><tr><th>Date</th><th>Description</th><th class="rf-num">Amount</th></tr></thead><tbody>' +
+					( rowsHtml || '<tr><td colspan="3" class="rf-empty">Add one row per gift in the form to see them here</td></tr>' ) :
+					'<table class="rf-receipt-table" style="--rf-amount-ch:' + Math.min( amountCh, 10 ) + '"><thead><tr><th>' + ( cfg.refund ? 'Refunded item' : 'Description' ) + '</th><th class="rf-num">Qty</th><th class="rf-num">Price</th><th class="rf-num">Total</th></tr></thead><tbody>' +
+					( rowsHtml || '<tr><td colspan="4" class="rf-empty">Add items in the form to see them here</td></tr>' ) ) +
 				'</tbody></table>' +
-				'<div class="rf-receipt-totals">' + totalsHtml + '</div>' +
+				// Longer labels ("Total cash contributions") get a wider box.
+				'<div class="rf-receipt-totals' + ( annual || cfg.refund ? ' rf-receipt-totals-wide' : '' ) + '">' + totalsHtml + '</div>' +
 				wordsHtml +
 				statementHtml +
 				( notes ? '<div class="rf-receipt-notes">' + escapeHtml( notes ) + '</div>' : '' ) +
@@ -2439,12 +2741,20 @@
 			if ( logoRemove ) {
 				logoRemove.style.display = state.logoDataUrl ? '' : 'none';
 			}
+			if ( job ) {
+				return; // a page of the several-months PDF: the form is unchanged
+			}
 			saveFormSoon();
+			lastTotal = total;
+			updateMonths( symbol, currency );
 
 			renderChecker( {
 				business: !! document.getElementById( 'rf-business-name' ).value.trim(),
 				client: !! client,
-				date: !! dateInput.value,
+				// A statement's contribution dates are the gift dates.
+				date: annual ? items.length > 0 && items.every( function ( it ) {
+					return !! it.date;
+				} ) : !! dateInput.value,
 				items: items.some( function ( it ) {
 					return it.name && it.name !== 'Item';
 				} ),
@@ -2660,18 +2970,23 @@
 			return PAPER[ v ] ? v : paperFor( curCode );
 		}
 
-		// The receipt's text on page 1 in invisible ink over the image, so the
-		// PDF can be searched, copied and read aloud. It is shrunk to fit the
-		// box (x, y, width, height in mm) when the receipt is long.
-		function addPdfText( pdf, x, y, width, height ) {
-			var cur   = activeCurrency();
-			var lines = pdfTextLines( preview, cur.symbol, cur.code );
+		// The PDF's title ("Receipt 1001"), subject (the business) and creator.
+		function setPdfProperties( pdf, title ) {
 			var brand = pdfText( ( window.rfReceipt && window.rfReceipt.brand ) || 'ReceiptGenPro' ) || 'ReceiptGenPro';
 			pdf.setProperties( {
-				title: 'Receipt ' + pdfText( document.getElementById( 'rf-receipt-number' ).value.trim() || '1001' ),
+				title: pdfText( title ),
 				subject: pdfText( document.getElementById( 'rf-business-name' ).value.trim() ),
 				creator: brand
 			} );
+		}
+
+		// The receipt's text on its first page in invisible ink over the
+		// image, so the PDF can be searched, copied and read aloud. It is
+		// shrunk to fit the box (x, y, width, height in mm) when the receipt
+		// is long.
+		function addPdfText( pdf, x, y, width, height ) {
+			var cur   = activeCurrency();
+			var lines = pdfTextLines( preview, cur.symbol, cur.code );
 			if ( ! lines.length ) {
 				return;
 			}
@@ -2689,17 +3004,29 @@
 			pdf.text( wrapped, x, y + size * PT_MM, { renderingMode: 'invisible', lineHeightFactor: LINE } );
 		}
 
-		function savePdf( canvas ) {
+		// A real 80 mm till roll: 72 mm printable, page as long as the slip.
+		function slipFormat( canvas ) {
+			return [ 80, ( canvas.height * 72 ) / canvas.width + 8 ];
+		}
+
+		// A PDF whose first page fits `canvas`: the Thermal slip, else A4 or Letter.
+		function createPdf( canvas ) {
+			var jsPDF = window.jspdf.jsPDF;
+			return new jsPDF( { orientation: 'portrait', unit: 'mm', format: design === 'thermal' ? slipFormat( canvas ) : paperSize( paperChoice() ).format } );
+		}
+
+		// Adds the receipt drawn on `canvas` to `pdf`, on new pages unless
+		// `first` (the PDF's empty first page is used), with its text.
+		function addReceiptPages( pdf, canvas, first ) {
 			// JPEG inside the PDF keeps files ~10x smaller than PNG (was ~5 MB).
 			var imgData   = canvas.toDataURL( 'image/jpeg', 0.92 );
-			var jsPDF     = window.jspdf.jsPDF;
 			if ( design === 'thermal' ) {
-				// A real 80 mm till roll: 72 mm printable, page as long as the slip.
-				var slipHeight = ( canvas.height * 72 ) / canvas.width;
-				var slip = new jsPDF( { orientation: 'portrait', unit: 'mm', format: [ 80, slipHeight + 8 ] } );
-				slip.addImage( imgData, 'JPEG', 4, 4, 72, slipHeight );
-				addPdfText( slip, 4, 4, 72, slipHeight );
-				slip.save( fileName( 'pdf' ) );
+				var format = slipFormat( canvas );
+				if ( ! first ) {
+					pdf.addPage( format, 'portrait' );
+				}
+				pdf.addImage( imgData, 'JPEG', 4, 4, 72, format[1] - 8 );
+				addPdfText( pdf, 4, 4, 72, format[1] - 8 );
 				return;
 			}
 			// A4 or Letter at full width inside 10 mm margins; a receipt
@@ -2708,7 +3035,6 @@
 			var paper  = paperSize( paperChoice() );
 			var m      = paper.margin;
 			var w      = paper.contentWidth;
-			var pdf    = new jsPDF( { orientation: 'portrait', unit: 'mm', format: paper.format } );
 			var pagePx = Math.floor( canvas.width * paper.pageHeight / w );
 			var slices = pageSlices( canvas.height, pagePx, canvas.rfBreaks || [] );
 			slices.forEach( function ( sl, n ) {
@@ -2722,15 +3048,137 @@
 					ctx.fillRect( 0, 0, part.width, part.height );
 					ctx.drawImage( canvas, 0, sl[0], canvas.width, part.height, 0, 0, canvas.width, part.height );
 				}
-				if ( n ) {
+				if ( n || ! first ) {
 					pdf.addPage( paper.format, 'portrait' );
 				}
 				pdf.addImage( slices.length > 1 ? part.toDataURL( 'image/jpeg', 0.92 ) : imgData, 'JPEG', m, m, w, ( part.height * w ) / canvas.width );
 				if ( ! n ) {
 					addPdfText( pdf, m, m, w, paper.pageHeight );
 				}
+				if ( part !== canvas ) {
+					part.width = part.height = 0; // free the page's copy
+				}
 			} );
+		}
+
+		function savePdf( canvas ) {
+			var pdf = createPdf( canvas );
+			addReceiptPages( pdf, canvas, true );
+			setPdfProperties( pdf, 'Receipt ' + ( document.getElementById( 'rf-receipt-number' ).value.trim() || '1001' ) );
 			pdf.save( fileName( 'pdf' ) );
 		}
+
+		// ---- Receipts for several months: one PDF --------------------------------
+		// Each month is drawn into the preview in turn (renderReceipt() with
+		// monthJob set), exported with renderCanvas() and added on its own
+		// page(s); its canvas is freed before the next one. The form itself
+		// never changes, so the preview and the receipt number come back as
+		// they were, except that the number moves on after the last month.
+		function downloadMonths( btn ) {
+			if ( btn.getAttribute( 'aria-busy' ) === 'true' ) {
+				return;
+			}
+			var progress = document.getElementById( 'rf-months-progress' );
+			var range = monthRange( fieldValue( 'rf-months-from' ), fieldValue( 'rf-months-to' ) );
+			renderReceipt(); // the notes, the rent and the currency as they are now
+			if ( range.error ) {
+				var from = document.getElementById( 'rf-months-from' );
+				if ( from ) {
+					from.focus();
+				}
+				return;
+			}
+			var rent = monthsRent();
+			var cur = activeCurrency();
+			var facts = {
+				business: !! fieldValue( 'rf-business-name' ),
+				zero: ! rent,
+				total: money( cur.symbol, rent ),
+				months: true
+			};
+			checkBeforeExport( function () {
+				runMonths( btn, progress, range.months, rent );
+			}, facts );
+		}
+
+		function runMonths( btn, progress, months, rent ) {
+			var original = btn.textContent;
+			btn.setAttribute( 'aria-busy', 'true' );
+			btn.setAttribute( 'aria-disabled', 'true' );
+			btn.textContent = 'Preparing…';
+			var numbers = receiptNumbers( numberInput ? numberInput.value : '', months.length );
+			var day = fieldValue( 'rf-months-day' );
+			var pdf = null;
+			var say = function ( text ) {
+				if ( progress ) {
+					progress.textContent = text;
+				}
+			};
+			var libs = ensureLibs( true );
+			if ( qrToggle && qrToggle.checked && typeof window.qrcode !== 'function' ) {
+				libs = libs.then( function () {
+					return loadScript( LIBS.qrcode );
+				} );
+			}
+			var page = function ( i ) {
+				if ( i >= months.length ) {
+					return null;
+				}
+				say( 'Making ' + ( i + 1 ) + ' of ' + months.length + '…' );
+				monthJob = { month: months[ i ], date: monthReceiptDate( months[ i ], day ), number: numbers[ i ], rent: rent };
+				qrForce = true;
+				renderReceipt();
+				qrForce = false;
+				return renderCanvas().then( function ( canvas ) {
+					if ( ! pdf ) {
+						pdf = createPdf( canvas );
+					}
+					addReceiptPages( pdf, canvas, i === 0 );
+					canvas.width = canvas.height = 0; // free it before the next month
+					return page( i + 1 );
+				} );
+			};
+			libs.then( function () {
+				return Promise.resolve( page( 0 ) ).then( function () {
+					var last = numbers[ numbers.length - 1 ];
+					setPdfProperties( pdf, 'Rent receipts ' + monthLabel( months[0] ) + ' to ' + monthLabel( months[ months.length - 1 ] ) );
+					pdf.save( 'hra-rent-receipts-' + months[0] + '-' + months[ months.length - 1 ] + '.pdf' );
+					// The next receipt starts after the last month's number.
+					try {
+						window.localStorage.setItem( LAST_NUMBER_KEY, last );
+					} catch ( e ) {}
+					monthJob = null;
+					if ( numberInput ) {
+						numberInput.value = nextReceiptNumber( last );
+					}
+					usedNumber = null;
+					say( 'Downloaded ' + months.length + ' receipts in one PDF, numbers ' + numbers[0] + ' to ' + last + '.' );
+				} );
+			}, function () {
+				throw new Error( 'libs' );
+			} ).catch( function ( err ) {
+				if ( window.console ) {
+					window.console.error( err );
+				}
+				say( '' );
+				window.alert( err && err.message === 'libs' ?
+					'The export library could not be loaded. Please check your connection and try again.' :
+					'Sorry, the receipts could not be exported. Please try again.' );
+			} ).then( function () {
+				monthJob = null;
+				renderReceipt();
+				btn.removeAttribute( 'aria-busy' );
+				btn.removeAttribute( 'aria-disabled' );
+				btn.textContent = original;
+			} );
+		}
+
+		// The panel is rebuilt when the homepage switches type, so the click
+		// is caught on the form.
+		form.addEventListener( 'click', function ( e ) {
+			if ( e.target && e.target.id === 'rf-download-months' ) {
+				downloadMonths( e.target );
+			}
+		} );
 	}
 } )();

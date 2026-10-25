@@ -33,6 +33,8 @@ jobs:
         run: php tests/php/v139-test.php
       - name: 1.4.0 privacy patches and currency list
         run: php tests/php/v140-test.php
+      - name: 1.4.1 refund template, form keys and donation FAQ patch
+        run: php tests/php/v141-test.php
 
   js-tests:
     runs-on: ubuntu-latest

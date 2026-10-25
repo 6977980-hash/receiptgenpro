@@ -95,7 +95,7 @@ test( 'typeFieldsHtml builds the extra fields, tip / paid and statement', () => 
 } );
 
 test( 'typeFieldsHtml returns empty parts for the general receipt', () => {
-	assert.deepEqual( rg.typeFieldsHtml( { title: 'RECEIPT', extra: [] } ), { extra: '', tippaid: '', statement: '' } );
+	assert.deepEqual( rg.typeFieldsHtml( { title: 'RECEIPT', extra: [] } ), { extra: '', tippaid: '', statement: '', doc: '', months: '' } );
 } );
 
 test( 'wrapDesign prints two copies only for the copies design', () => {
