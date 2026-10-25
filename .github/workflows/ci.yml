@@ -40,6 +40,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # tests/v141 compares the donation receipt with the 1.4.0 script (git show)
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
