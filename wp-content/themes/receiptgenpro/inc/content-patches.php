@@ -1024,6 +1024,140 @@ function rf_migrate_v141_content() {
 }
 
 /**
+ * Theme 1.4.3: Google Analytics 4 is on (RF_GA4_ID in inc/adsense.php),
+ * so the privacy and cookie policies stop saying no analytics runs and
+ * name it, its cookies and the consent gate. Every 'find' was copied from
+ * the live REST content on 26 Oct 2026 (tests/php/fixtures/v143/).
+ *
+ * @param string $today Date for the policies' "Last updated" line.
+ * @return array slug => array( 'type' => post type, 'patches' => list )
+ */
+function rf_v143_patches( $today = '' ) {
+	$today  = $today ? $today : date_i18n( 'F j, Y' );
+	$ga_id  = defined( 'RF_GA4_ID' ) ? RF_GA4_ID : '';
+	$cookie = '_ga_' . preg_replace( '/^G-/', '', $ga_id );
+	$marker = 'Google Analytics 4';
+	$dated  = array(
+		'label'   => 'last updated',
+		'regex'   => true,
+		'find'    => '#<p><em>Last updated:[^<]*</em></p>#',
+		'replace' => '<p><em>Last updated: ' . $today . '.</em></p>',
+		'unless'  => $marker,
+	);
+
+	return array(
+		'privacy-policy' => array(
+			'type'    => 'page',
+			'patches' => array(
+				$dated,
+				rf_v137_patch(
+					'what happens today: analytics on',
+					'<p>At the moment no advertising network or analytics service is active on this site, and our own code sets no cookies.</p>',
+					'<p>We use Google Analytics 4 to understand, in aggregate, how visitors use the site. It loads only if you click Accept on the cookie banner; until then no analytics script runs. No advertising network is active, and our own code sets no cookies.</p>',
+					$marker
+				),
+				rf_v137_insert_after(
+					'Google Analytics in the services list',
+					'from cdnjs.cloudflare.com, so Cloudflare receives your IP address and browser details for those files (<a href="https://www.cloudflare.com/privacypolicy/" rel="noopener" target="_blank">Cloudflare privacy policy</a>).</li>',
+					'<li><strong>Google Analytics (Google).</strong> Only after you accept cookies: Google receives your IP address, browser and device details, the pages you view and the page you came from, and sets the <code>_ga</code> and <code>' . $cookie . '</code> cookies. We also count which download button (PDF, PNG or JPG) is clicked; nothing you type into a receipt is sent. It never runs on the receipt check page. You can opt out with the cookie banner (&#8220;Cookie settings&#8221; in the footer) or <a href="https://tools.google.com/dlpage/gaoptout" rel="noopener" target="_blank">Google&#8217;s opt-out add-on</a> (<a href="https://policies.google.com/privacy" rel="noopener" target="_blank">Google privacy policy</a>).</li>',
+					'Google Analytics (Google)'
+				),
+				rf_v137_patch(
+					'analytics now, ads later',
+					"<h2>If We Turn On Ads or Analytics</h2>\n<p>We may later add Google AdSense or Google Analytics. Before that, we will name each service on this page, and a cookie banner will ask for your consent before any of them loads.",
+					"<h2>Analytics Now, Ads Later</h2>\n<p>Google Analytics is the only analytics service on this site, and it loads only after you accept cookies. We may later add Google AdSense; before that, we will name it on this page, and it will wait for your consent too.",
+					'Analytics Now, Ads Later'
+				),
+				rf_v137_patch(
+					'analytics is used',
+					'Analytics services such as Google Analytics would be used only to understand',
+					'Google Analytics is used only to understand',
+					'Google Analytics is used only'
+				),
+			),
+		),
+		'cookie-policy'  => array(
+			'type'    => 'page',
+			'patches' => array(
+				$dated,
+				rf_v137_patch(
+					'cookies we use',
+					"<h2>Cookies We Would Use</h2>\n<p>Today our own code sets no cookies. The table shows the kinds of cookies the site would use if we turn on analytics or advertising; a banner will ask for your consent before any of them is set.</p>",
+					"<h2>Cookies We Use</h2>\n<p>Our own code sets no cookies. Google Analytics 4 sets analytics cookies only after you click Accept on the cookie banner, and advertising is not active yet. The table shows the kinds of cookies the site uses, or would use once ads are on.</p>",
+					$marker
+				),
+				rf_v137_patch(
+					'the Google Analytics cookies',
+					'<p>At the moment this site does not run analytics or advertising scripts. If we add Google Analytics or Google AdSense, they will only load after you accept cookies, and we will list the specific cookies they set on this page.',
+					'<p>If you accept, Google Analytics sets <code>_ga</code> (tells visits from different browsers apart) and <code>' . $cookie . '</code> (keeps the state of your visit), each for up to 2 years. If you decline, it does not load and sets neither; you can change your choice with &#8220;Cookie settings&#8221; in the footer. If we add Google AdSense, it will also load only after you accept, and we will list its cookies here.',
+					'If you accept, Google Analytics sets'
+				),
+			),
+		),
+	);
+}
+
+/**
+ * One-time migration of theme 1.4.3, run from inc/setup-tasks.php like the
+ * 1.4.1 one: through wp_update_post() (each page keeps a revision), each
+ * finished slug recorded in rf_migration_v143, so it never runs twice.
+ */
+function rf_migration_v143_done() {
+	$state = get_option( 'rf_migration_v143' );
+	return is_array( $state ) && ! empty( $state['done'] );
+}
+
+function rf_migrate_v143_content() {
+	if ( rf_migration_v143_done() || wp_installing() ) {
+		return;
+	}
+	$state = get_option( 'rf_migration_v143' );
+	if ( is_array( $state ) ) {
+		if ( isset( $state['started'] ) && time() - strtotime( $state['started'] ) < 10 * MINUTE_IN_SECONDS ) {
+			return; // another run is still going
+		}
+		$state['started'] = gmdate( 'c' );
+		update_option( 'rf_migration_v143', $state, true );
+	} else {
+		$state = array( 'started' => gmdate( 'c' ), 'slugs' => array(), 'log' => array() );
+		if ( ! add_option( 'rf_migration_v143', $state, '', true ) ) {
+			return;
+		}
+	}
+	$state += array( 'slugs' => array(), 'log' => array() );
+
+	$kses = (bool) has_filter( 'content_save_pre', 'wp_filter_post_kses' );
+	kses_remove_filters();
+
+	foreach ( rf_v143_patches() as $slug => $page ) {
+		if ( in_array( $slug, $state['slugs'], true ) ) {
+			continue;
+		}
+		$found = get_posts( array( 'name' => $slug, 'post_type' => $page['type'], 'post_status' => 'publish', 'numberposts' => 1 ) );
+		if ( ! $found ) {
+			$state['log'][] = "/$slug/: not found";
+		} else {
+			$content = $found[0]->post_content;
+			foreach ( $page['patches'] as $patch ) {
+				list( $content, $status ) = rf_fixes_apply_patch( $content, $patch );
+				$state['log'][]           = "/$slug/: {$patch['label']}: $status";
+			}
+			if ( $content !== $found[0]->post_content ) {
+				wp_update_post( array( 'ID' => $found[0]->ID, 'post_content' => wp_slash( $content ) ) );
+			}
+		}
+		$state['slugs'][] = $slug;
+		update_option( 'rf_migration_v143', $state, true );
+	}
+
+	if ( $kses ) {
+		kses_init_filters();
+	}
+	update_option( 'rf_migration_v143', array( 'done' => gmdate( 'c' ), 'log' => $state['log'] ), true );
+	do_action( 'litespeed_purge_all' );
+}
+
+/**
  * Editorial Policy page (audit H8). Created as a DRAFT by the admin tool so
  * the owner can read it before publishing — it describes commitments the
  * site then has to keep.

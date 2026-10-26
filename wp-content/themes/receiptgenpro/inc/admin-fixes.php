@@ -337,7 +337,7 @@ function rf_fixes_page() {
 			<li>Settings → Permalinks → <em>Save</em> (refreshes rewrite rules for /llms.txt and IndexNow; the theme also does this once automatically).</li>
 			<li>Search Console → Sitemaps → submit <code><?php echo esc_html( home_url( '/wp-sitemap.xml' ) ); ?></code>, then URL Inspection → Request indexing for the homepage, /receipt-templates/ and the template pages.</li>
 			<li>Bing Webmaster Tools → import the site from Search Console. IndexNow is already active (key file: <code><?php echo esc_html( home_url( '/' . rf_indexnow_key() . '.txt' ) ); ?></code>).</li>
-			<li>Optional: set <code>RF_GA4_ID</code> in <code>inc/adsense.php</code> to turn on consent-gated Google Analytics.</li>
+			<li>Google Analytics: the measurement ID is <code>RF_GA4_ID</code> in <code>inc/adsense.php</code>; it loads only after a visitor accepts cookies.</li>
 		</ol>
 	</div>
 	<?php
