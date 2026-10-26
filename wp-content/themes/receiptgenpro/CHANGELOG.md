@@ -1,5 +1,11 @@
 # ReceiptGenPro theme — Changelog
 
+## 1.4.3 — 26 Oct 2026 (Google Analytics 4)
+
+- **GA4 on**: `RF_GA4_ID` in `inc/adsense.php` is `G-T47P9EX906`, so the existing consent gate turns on: Consent Mode v2 defaults everything to denied in `<head>`, the cookie banner shows, and gtag.js loads only after Accept (or on later visits once accepted). Receipt download clicks are sent as a `receipt_download` event with the format only. Nothing loads on `/verify-receipt/`. The CSP (report-only) already allows www.googletagmanager.com and `connect-src https:`.
+- **Policies** (`rf_v143_patches()`, one-time migration `rf_migration_v143` through `wp_update_post()`, then LiteSpeed purge): the privacy policy no longer says no analytics runs; it names Google Analytics as a service that receives the IP address, its cookies, the download count, the opt-out, and "Analytics Now, Ads Later". The cookie policy becomes "Cookies We Use" and lists `_ga` and `_ga_T47P9EX906` (up to 2 years). Both get a new "Last updated" date.
+- Tests: `tests/php/v143-test.php` (the ID, the consent gate, the CSP, every patch applies once to the live text of 26 Oct in curly and straight quotes, and the migration is registered).
+
 ## 1.4.2 — 25 Oct 2026 (audit of 25 Oct, v2 Phase 6: rent receipt laws by city and country)
 
 - **Massachusetts page** (G-6): `/rent-receipt-laws/massachusetts/`, from M.G.L. c. 186, § 15B read on malegislature.gov: the security deposit receipt and the receipt for last month's rent paid in advance (at the time of payment), the bank receipt within 30 days, what each must show, the deposit record, and the penalties the text gives (immediate return of the deposit, treble damages under § 15B(6)–(7)). The entry is flagged `deposit_only`: the page carries the deposit receipt generator, the FAQ says there is no rule for monthly rent, and the hub keeps it out of the monthly rent table and its count, under "States With a Receipt Rule for Deposits Only" (now a link). `rf_rent_deposit_only_laws()` is derived from the flag.

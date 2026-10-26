@@ -37,6 +37,8 @@ jobs:
         run: php tests/php/v141-test.php
       - name: 1.4.2 rent law pages (Massachusetts, Ohio cities, UK, Canada)
         run: php tests/php/v142-test.php
+      - name: 1.4.3 Google Analytics 4 and the policy text
+        run: php tests/php/v143-test.php
 
   js-tests:
     runs-on: ubuntu-latest

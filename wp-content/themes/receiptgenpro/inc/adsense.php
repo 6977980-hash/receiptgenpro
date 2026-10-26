@@ -33,10 +33,10 @@ if ( ! defined( 'RF_ADSENSE_CLIENT_ID' ) ) {
 /**
  * Google Analytics 4 measurement ID (e.g. 'G-XXXXXXXXXX'). Optional.
  * Loaded only after the visitor accepts cookies (same consent gate as ads).
- * Sept 2026 audit H6: the site had no analytics at all.
+ * Sept 2026 audit H6: the site had no analytics at all. Theme 1.4.3: on.
  */
 if ( ! defined( 'RF_GA4_ID' ) ) {
-	define( 'RF_GA4_ID', '' );
+	define( 'RF_GA4_ID', 'G-T47P9EX906' );
 }
 
 /**
