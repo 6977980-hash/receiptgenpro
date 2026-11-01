@@ -395,7 +395,8 @@ function rf_output_schema() {
 				'publisher'           => array( '@id' => home_url( '/#organization' ) ),
 			);
 		}
-		$faq = rf_schema_faq_from_content( $post->post_content );
+		// 1.4.4: the template page's extra FAQs are part of the same FAQPage.
+		$faq = rf_schema_faq_from_content( $post->post_content . ( function_exists( 'rf_v144_category_faq_html' ) ? rf_v144_category_faq_html( $post->post_name ) : '' ) );
 		if ( $faq ) {
 			$graph[] = $faq;
 		}
@@ -403,7 +404,8 @@ function rf_output_schema() {
 		global $post;
 		$graph[] = rf_schema_article();
 		$graph[] = rf_schema_breadcrumbs();
-		$faq = rf_schema_faq_from_content( $post->post_content );
+		// 1.4.4: the guide's FAQ as shown, with the FAQs added in code.
+		$faq = rf_schema_faq_from_content( function_exists( 'rf_v144_post_content' ) ? rf_v144_post_content( $post->post_content, $post->post_name ) : $post->post_content );
 		if ( $faq ) {
 			$graph[] = $faq;
 		}

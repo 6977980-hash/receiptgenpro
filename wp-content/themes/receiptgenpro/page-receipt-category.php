@@ -51,6 +51,7 @@ while ( have_posts() ) :
 
 			<div class="rf-category-content">
 				<?php the_content(); ?>
+				<?php echo rf_v144_category_extras_html( get_post_field( 'post_name' ) ); // phpcs:ignore WordPress.Security.EscapeOutput -- built from theme strings, escaped in inc/search-opportunities.php. ?>
 			</div>
 
 			<?php if ( ! empty( $cat['highlights'] ) || ! empty( $cat['default_fields'] ) ) : ?>

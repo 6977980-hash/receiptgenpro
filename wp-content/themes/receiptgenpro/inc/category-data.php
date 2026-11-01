@@ -104,8 +104,8 @@ function rf_receipt_categories() {
 		),
 
 		'hotel-receipt' => array(
-			'h1'               => 'Free Hotel Receipt Generator',
-			'seo_title'        => 'Hotel Receipt Template — Free Hotel Bill Generator',
+			'h1'               => 'Free Hotel Receipt & Folio Generator',
+			'seo_title'        => 'Hotel Receipt Generator — Free Hotel Folio Template',
 			'meta_description' => 'Free hotel receipt and folio generator for hotels, guesthouses and B&Bs. Guest, room, check-in/check-out, nightly rate and taxes — download as PDF.',
 			'primary_keyword'  => 'hotel receipt generator',
 			'related'          => array( 'restaurant-receipt', 'taxi-receipt', 'cleaning-receipt', 'cash-receipt' ),
@@ -137,7 +137,7 @@ function rf_receipt_categories() {
 
 		'restaurant-receipt' => array(
 			'h1'               => 'Free Restaurant Receipt Generator',
-			'seo_title'        => 'Restaurant Receipt Generator — Itemized & Printable',
+			'seo_title'        => 'Restaurant Receipt Generator — Free Itemized Template',
 			'meta_description' => 'Free restaurant receipt generator for cafés, food trucks and caterers. Itemized food and drinks, tax, tip and total — download as PDF, PNG or JPEG.',
 			'primary_keyword'  => 'restaurant receipt generator',
 			'related'          => array( 'hotel-receipt', 'hardware-store-receipt', 'cash-receipt', 'salon-spa-receipt' ),
@@ -170,7 +170,7 @@ function rf_receipt_categories() {
 
 		'cash-receipt' => array(
 			'h1'               => 'Free Cash Receipt Generator',
-			'seo_title'        => 'Cash Receipt Template — Free Cash Payment Receipt',
+			'seo_title'        => 'Cash Receipt Template & Format — Free Cash Receipt Maker',
 			'meta_description' => 'Create a simple cash receipt online free. Received from, amount in words, payment for, received by and balance due. Download instantly as PDF.',
 			'primary_keyword'  => 'cash receipt generator',
 			'related'          => array( 'rent-receipt', 'donation-receipt', 'freelance-receipt', 'refund-receipt' ),
@@ -229,8 +229,8 @@ function rf_receipt_categories() {
 		),
 
 		'mechanic-receipt' => array(
-			'h1'               => 'Free Auto Repair Receipt Generator',
-			'seo_title'        => 'Auto Repair Receipt Maker — Free Mechanic Receipt',
+			'h1'               => 'Free Mechanic & Auto Repair Receipt Generator',
+			'seo_title'        => 'Mechanic Receipt Template — Free Auto Repair Receipt Maker',
 			'meta_description' => 'Create a free auto repair receipt online. Vehicle, VIN, odometer, parts and labor lines and warranty notes. Download as a printable PDF.',
 			'primary_keyword'  => 'mechanic receipt generator',
 			'related'          => array( 'hardware-store-receipt', 'construction-receipt', 'cleaning-receipt', 'cash-receipt' ),
@@ -262,7 +262,7 @@ function rf_receipt_categories() {
 
 		'cleaning-receipt' => array(
 			'h1'               => 'Free Cleaning Service Receipt Generator',
-			'seo_title'        => 'Cleaning Receipt Generator — House, Carpet & Office',
+			'seo_title'        => 'Cleaning Receipt Template — House, Carpet & Office (Free)',
 			'meta_description' => 'Make a free cleaning service receipt online — house, office or carpet cleaning. Service address, service date, hours and total. Download as PDF.',
 			'primary_keyword'  => 'cleaning receipt generator',
 			'related'          => array( 'salon-spa-receipt', 'freelance-receipt', 'rent-receipt', 'mechanic-receipt' ),
@@ -338,8 +338,8 @@ function rf_receipt_categories() {
 		),
 
 		'taxi-receipt' => array(
-			'h1'               => 'Free Taxi Receipt Generator for Drivers',
-			'seo_title'        => 'Taxi Receipt Template for Drivers — Free Generator',
+			'h1'               => 'Free Taxi & Cab Receipt Generator for Drivers',
+			'seo_title'        => 'Taxi & Cab Receipt Generator — Free Template & Form',
 			'meta_description' => 'Free taxi receipt generator for drivers and cab companies. Pickup, drop-off, trip date and time, distance, fare, tip and vehicle number — download as PDF.',
 			'primary_keyword'  => 'taxi receipt generator',
 			'related'          => array( 'hotel-receipt', 'restaurant-receipt', 'mechanic-receipt', 'cash-receipt' ),
@@ -466,7 +466,7 @@ function rf_receipt_categories() {
 
 		'construction-receipt' => array(
 			'h1'               => 'Free Construction & Contractor Receipt Generator',
-			'seo_title'        => 'Contractor Receipt Generator — Construction Payments',
+			'seo_title'        => 'Construction Receipt Template — Contractor Payments (Free)',
 			'meta_description' => 'Generate a free contractor or construction payment receipt. Project address, phase, materials and labor lines, amount paid and balance remaining.',
 			'primary_keyword'  => 'contractor receipt generator',
 			'related'          => array( 'hardware-store-receipt', 'freelance-receipt', 'mechanic-receipt', 'rent-receipt' ),
@@ -534,7 +534,7 @@ function rf_receipt_categories() {
 
 		'payment-receipt' => array(
 			'h1'               => 'Free Payment Receipt Generator',
-			'seo_title'        => 'Payment Receipt Template — Free Proof of Payment',
+			'seo_title'        => 'Proof of Payment Receipt — Free Payment Receipt Template',
 			'meta_description' => 'Make a free payment receipt online: who paid, amount, what it was for, payment method and reference number. Download proof of payment as PDF, PNG or JPEG.',
 			'primary_keyword'  => 'payment receipt template',
 			'related'          => array( 'cash-receipt', 'deposit-receipt', 'refund-receipt', 'freelance-receipt' ),
@@ -644,7 +644,7 @@ function rf_receipt_categories() {
 		// original receipt is lost. Written for the employee who really paid.
 		'missing-receipt-form' => array(
 			'h1'               => 'Free Missing Receipt Form',
-			'seo_title'        => 'Missing Receipt Form — Free Lost Receipt Declaration',
+			'seo_title'        => 'Lost / Missing Receipt Form Template — Free Declaration',
 			'meta_description' => 'Lost a receipt? Fill in a free missing receipt declaration for an expense report: vendor, date, amount, business purpose, why it is missing, signatures.',
 			'primary_keyword'  => 'missing receipt form',
 			'related'          => array( 'payment-receipt', 'cash-receipt', 'taxi-receipt', 'restaurant-receipt' ),
