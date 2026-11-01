@@ -436,6 +436,38 @@ function rf_rent_city_rule_states() {
 }
 
 /**
+ * 1.4.4: states whose landlord-tenant law was read in full and has no
+ * rent receipt duty. Search Console showed people looking for these
+ * states' rent receipts (Alaska at position 6, Idaho at 15) with no page
+ * to land on. Same keys as rf_rent_city_rule_states(): 'citation' / 'url'
+ * is the law that was read, 'note' says what it covers. Listed on the hub
+ * under "States With No Rent Receipt Law" and in "Other States", never in
+ * the table of states with a rule or its count.
+ */
+function rf_rent_no_rule_states() {
+	return array(
+		'alaska' => array(
+			'state'    => 'Alaska',
+			'citation' => 'Alaska Stat. ch. 34.03 (Uniform Residential Landlord and Tenant Act)',
+			'url'      => 'https://www.akleg.gov/basis/statutes.asp?media=print&secStart=34.03.010&secEnd=34.03.380',
+			'note'     => 'Alaska\'s Uniform Residential Landlord and Tenant Act, AS 34.03.010 to 34.03.380, sets the landlord\'s and tenant\'s duties, the rules for security deposits and prepaid rent (AS 34.03.070: no more than two months\' rent, with an itemized written notice of any deduction), and how a tenancy ends, but none of its sections requires a receipt for rent.',
+			'summary'  => 'Alaska has no rent receipt law: its Landlord and Tenant Act (AS 34.03) does not require landlords to give receipts, so a receipt depends on the lease or the tenant asking.',
+			'meta'     => 'Alaska has no rent receipt law: the Landlord and Tenant Act (AS 34.03) does not require receipts. What to put on one, and a free generator.',
+			'checked'  => 'November 2026',
+		),
+		'idaho'  => array(
+			'state'    => 'Idaho',
+			'citation' => 'Idaho Code §§ 6-301 to 6-324 (Landlord and Tenant)',
+			'url'      => 'https://legislature.idaho.gov/statutesrules/idstat/title6/t6ch3/',
+			'note'     => 'Idaho\'s landlord and tenant chapter, Idaho Code Title 6, Chapter 3 (§§ 6-301 to 6-324), covers eviction, the tenant\'s action for damages or repairs (§ 6-320) and security deposits (§ 6-321), but none of its sections requires a receipt for rent.',
+			'summary'  => 'Idaho has no rent receipt law: its landlord and tenant chapter (Idaho Code §§ 6-301 to 6-324) does not require landlords to give receipts, so a receipt depends on the lease or the tenant asking.',
+			'meta'     => 'Idaho has no rent receipt law: Idaho Code §§ 6-301 to 6-324 do not require receipts. What to put on one anyway, and a free rent receipt generator.',
+			'checked'  => 'November 2026',
+		),
+	);
+}
+
+/**
  * 1.4.2 (G-6): rules outside the US, keyed by the page path under the hub.
  * Keys: country, region (a province; '' for a country page), citation,
  * url, when_short, trigger, contents, records, penalty, details, summary,
@@ -632,6 +664,9 @@ function rf_rent_law_entries() {
 	foreach ( rf_rent_city_rule_states() as $slug => $state ) {
 		$entries[ $slug ] = array_merge( $base, $state, array( 'kind' => 'city-state', 'name' => $state['state'] ) );
 	}
+	foreach ( rf_rent_no_rule_states() as $slug => $state ) {
+		$entries[ $slug ] = array_merge( $base, $state, array( 'kind' => 'no-rule', 'name' => $state['state'] ) );
+	}
 	foreach ( rf_rent_receipt_city_laws() as $path => $law ) {
 		$entries[ $path ] = array_merge(
 			$base,
@@ -729,7 +764,13 @@ function rf_rent_laws_faqs( $sub ) {
 				array( 'Does ' . $name . ' require landlords to give rent receipts?', $law['summary'] ),
 				array( 'Which ' . $name . ' cities require rent receipts?', 'We have read the ordinances of: ' . implode( '; ', $cities ) . '. Other cities may have their own rules.' ),
 			);
-		case 'country-hub':
+		case 'no-rule':
+			return array(
+				array( 'Does ' . $name . ' require landlords to give rent receipts?', $law['summary'] ),
+				array( 'Should a ' . $name . ' landlord give rent receipts anyway?', 'It is good practice. A receipt for each payment gives the tenant proof of payment and protects the landlord if a payment is ever disputed. Your lease or a local rule can also require one.' ),
+				array( 'What should a ' . $name . ' rent receipt include?', 'The date, the amount, the rent period, the property address, the tenant\'s name, and the landlord\'s or agent\'s name and signature. The generator on this page has a field for each.' ),
+			);
+				case 'country-hub':
 			$regions = array();
 			foreach ( rf_rent_law_children( $sub ) as $region ) {
 				$regions[] = $region['region'] . ': ' . lcfirst( $region['when_short'] );

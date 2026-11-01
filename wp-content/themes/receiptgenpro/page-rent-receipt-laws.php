@@ -32,7 +32,7 @@ $rf_seen  = rf_rent_laws_reviewed();
 if ( $rf_law ) :
 	$rf_kind    = $rf_law['kind'];
 	$rf_name    = $rf_law['name'];
-	$rf_us      = in_array( $rf_kind, array( 'state', 'city-state', 'city' ), true );
+	$rf_us      = in_array( $rf_kind, array( 'state', 'city-state', 'city', 'no-rule' ), true );
 	$rf_deposit = ! empty( $rf_law['deposit_only'] );
 	$rf_doc     = $rf_deposit ? 'deposit receipt' : 'rent receipt';
 	$rf_label   = 'country' === $rf_kind ? 'UK' : $rf_name;
@@ -44,7 +44,7 @@ if ( $rf_law ) :
 			<span class="rf-category-icon" aria-hidden="true">⚖️</span>
 			<h1><?php echo esc_html( $rf_name ); ?> Rent Receipt Law</h1>
 			<p class="rf-hero-sub rf-direct-answer"><?php echo esc_html( $rf_law['summary'] ); ?></p>
-			<p class="rf-law-reviewed">Last reviewed: <?php echo esc_html( $rf_seen['label'] ); ?></p>
+			<p class="rf-law-reviewed">Last reviewed: <?php echo esc_html( $rf_law['checked'] ?? $rf_seen['label'] ); ?></p>
 			<a href="#rf-generator" class="rf-btn rf-btn-primary">Make <?php echo esc_html( ( preg_match( '/^[AEIO]/', $rf_label ) ? 'an ' : 'a ' ) . $rf_label . ' ' . $rf_doc ); ?> ↓</a>
 		</div>
 	</section>
@@ -76,6 +76,17 @@ if ( $rf_law ) :
 					</table>
 				</div>
 				<p>We list a city only after reading its ordinance. Other <?php echo esc_html( $rf_name ); ?> cities may have rules we have not checked yet, and your lease can add to them.</p>
+
+			<?php elseif ( 'no-rule' === $rf_kind ) : ?>
+				<div class="rf-law-facts rf-law-facts-2">
+					<div class="rf-law-fact"><strong>Statewide rule</strong>None: the state's landlord-tenant law has no rent receipt duty.</div>
+					<div class="rf-law-fact"><strong>The law we read</strong><a href="<?php echo esc_url( $rf_law['url'] ); ?>" rel="noopener" target="_blank"><?php echo esc_html( $rf_law['citation'] ); ?></a></div>
+				</div>
+				<p><?php echo esc_html( $rf_law['note'] ); ?></p>
+				<h2>Giving a Receipt Anyway</h2>
+				<p>No receipt duty doesn't mean a receipt is useless. A tenant can ask for one, the lease can require one, and a local rule may add one. For the landlord, a receipt for every payment is the simplest proof in a dispute over what was paid; for the tenant, it is proof of rent for a tax return, a benefits claim or the next rental application.</p>
+				<h2>What to Put on the Receipt</h2>
+				<p>A receipt that shows the date, the amount, the rent period, the property address, the tenant's name and the landlord's or agent's name and signature covers what tenants, courts and employers usually ask for. Say how it was paid (cash, check, transfer) and any balance still owed.</p>
 
 			<?php elseif ( 'country-hub' === $rf_kind ) : ?>
 				<h2>Rent Receipt Rules by Province</h2>
@@ -217,10 +228,10 @@ if ( $rf_law ) :
 			// the other cities or provinces under the same parent, or the
 			// other countries.
 			$rf_links = array();
-			if ( in_array( $rf_kind, array( 'state', 'city-state' ), true ) ) {
+			if ( in_array( $rf_kind, array( 'state', 'city-state', 'no-rule' ), true ) ) {
 				$rf_heading = 'Other States';
 				foreach ( rf_rent_law_children( '' ) as $rf_other => $rf_other_law ) {
-					if ( $rf_other !== $rf_sub && in_array( $rf_other_law['kind'], array( 'state', 'city-state' ), true ) ) {
+					if ( $rf_other !== $rf_sub && in_array( $rf_other_law['kind'], array( 'state', 'city-state', 'no-rule' ), true ) ) {
 						$rf_links[ $rf_other ] = $rf_other_law['name'];
 					}
 				}
@@ -331,6 +342,17 @@ if ( $rf_law ) :
 						</tbody>
 					</table>
 				</div>
+			<?php endif; ?>
+
+			<?php $rf_none = rf_rent_no_rule_states(); ?>
+			<?php if ( $rf_none ) : ?>
+				<h2>States With No Rent Receipt Law</h2>
+				<p>We read these states' landlord-tenant laws and found no duty to give a rent receipt. Each page says what the law does cover and what to put on a receipt anyway.</p>
+				<ul>
+					<?php foreach ( $rf_none as $rf_s => $rf_n ) : ?>
+						<li><strong><a href="<?php echo esc_url( $rf_hub . $rf_s . '/' ); ?>"><?php echo esc_html( $rf_n['state'] ); ?></a>:</strong> no receipt duty in <a href="<?php echo esc_url( $rf_n['url'] ); ?>" rel="noopener" target="_blank"><?php echo esc_html( $rf_n['citation'] ); ?></a></li>
+					<?php endforeach; ?>
+				</ul>
 			<?php endif; ?>
 
 			<h2>Your State Isn't Listed?</h2>
