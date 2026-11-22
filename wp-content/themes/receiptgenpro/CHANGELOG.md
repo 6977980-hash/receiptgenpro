@@ -1,5 +1,15 @@
 # ReceiptGenPro theme — Changelog
 
+## 1.4.5 — 23 Nov 2026 (Search Console export of 23 Nov)
+
+From the Search Console Performance export for the last 28 days (24 Oct to 20 Nov: 2,567 impressions, 12 clicks). Data and notes are in the project files (`gsc/2026-11-23/`).
+
+- **Virginia: rent escrow** ("putting rent in escrow virginia", 13 impressions at position 11, and the page never mentioned it). A new section, "Putting Rent in Escrow in Virginia", from Va. Code § 55.1-1244 read on law.lis.virginia.gov: which conditions qualify, the written notice and the 30-day presumption, paying rent into court within five days of each due date, the change from 1 January 2027 (no need to pay old rent or fees first), what the court can order, the six-month rule and the 15-day hearing. Plus one FAQ.
+- **New York: copy of the lease** ("does a landlord have to provide a copy of the lease in new york", 18 impressions at position 44). A new section from the Rent Stabilization Code, 9 NYCRR § 2522.5: a fully executed copy within 30 days for new and renewal leases, the DHCR order and the loss of guideline increases if the owner still does not comply. It says the rule covers rent-stabilized apartments only. Plus one FAQ.
+- **Louisiana page** ("louisiana rent receipt" at position 14 with no page): a `no-rule` page like Alaska and Idaho. Civil Code arts. 2668–2729 and R.S. 9:3201–3261.2 were read article by article and section by section on legis.la.gov; none requires a rent receipt. The page explains that the receipt rule in R.S. 9:3358, quoted by some websites, belongs to the Rental-Purchase Agreement Act (rent-to-own goods). R.S. 9:3252 is the deposit penalty, not a receipt rule. Arkansas is still not listed.
+- **Law entries can carry `topics` and `faqs`**: `topics` are extra sections shown before the disclaimer, with a source link, and their citations join the page's WebPage citations; `faqs` are added after the generated FAQ (`rf_rent_laws_base_faqs()`), so they are printed and in the FAQPage schema. Virginia and New York are now "Checked … November 2026".
+- Tests: `tests/php/v145-test.php` (the topics, citations, FAQs and rendering for Virginia and New York, the Louisiana entry and page, the hub link, and unchanged FAQs elsewhere). `v144-test.php` now only expects Arkansas to be missing. Checked in Chromium at 375 and 1366 px: no sideways scroll, no script errors.
+
 ## 1.4.4 — 1 Nov 2026 (Search Console queries)
 
 From the Search Console Performance report of 1 Nov 2026 (15 Sep to 30 Oct: 2.78K impressions, 17 clicks, 232 queries, grouped with regex filters). Nothing is written to the database; every change is applied when the page is shown (`inc/search-opportunities.php`).

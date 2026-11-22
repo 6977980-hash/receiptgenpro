@@ -115,7 +115,8 @@ foreach ( array( 'alaska', 'idaho' ) as $slug ) {
 	$faqs = rf_rent_laws_faqs( $slug );
 	check( 3 === count( $faqs ) && $faqs[0][1] === $law['summary'], "$slug FAQ" );
 }
-check( ! isset( $entries['louisiana'] ) && ! isset( $entries['arkansas'] ), 'states whose law we could not read stay off the list' );
+// Louisiana was read in 1.4.5 (tests/php/v145-test.php); Arkansas still could not be.
+check( ! isset( $entries['arkansas'] ), 'states whose law we could not read stay off the list' );
 
 // Rendered law pages.
 $render = __DIR__ . '/render-rent-law.php';

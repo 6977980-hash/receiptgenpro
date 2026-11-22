@@ -181,6 +181,14 @@ if ( $rf_law ) :
 				<?php endif; ?>
 			<?php endif; ?>
 
+			<?php foreach ( (array) ( $rf_law['topics'] ?? array() ) as $rf_topic ) : ?>
+				<h2><?php echo esc_html( $rf_topic['heading'] ); ?></h2>
+				<?php foreach ( $rf_topic['paras'] as $rf_para ) : ?>
+					<p><?php echo esc_html( $rf_para ); ?></p>
+				<?php endforeach; ?>
+				<p class="rf-law-source">Source: <a href="<?php echo esc_url( $rf_topic['url'] ); ?>" rel="noopener" target="_blank"><?php echo esc_html( $rf_topic['citation'] ); ?></a></p>
+			<?php endforeach; ?>
+
 			<?php if ( $rf_us ) : ?>
 				<p class="rf-law-disclaimer">Checked against the <?php echo esc_html( $rf_word ); ?> text in <?php echo esc_html( $rf_law['checked'] ); ?>. This is general information, not legal advice; <?php echo 'city' === $rf_kind ? 'state law' : 'city or county rules'; ?> and your lease can add to it. Read the <a href="<?php echo esc_url( $rf_law['url'] ); ?>" rel="noopener" target="_blank"><?php echo esc_html( $rf_word ); ?></a> or ask a local tenant organization or lawyer about your situation.</p>
 			<?php else : ?>
