@@ -41,6 +41,8 @@ jobs:
         run: php tests/php/v143-test.php
       - name: 1.4.4 Search Console fixes (VAT guides, titles, template FAQs, Alaska and Idaho)
         run: php tests/php/v144-test.php
+      - name: 1.4.5 Search Console fixes (Virginia escrow, New York lease copy, Louisiana)
+        run: php tests/php/v145-test.php
 
   js-tests:
     runs-on: ubuntu-latest

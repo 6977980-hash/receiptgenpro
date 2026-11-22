@@ -20,7 +20,12 @@
  * listed but not counted as having a landlord rule), deposit_only (1.4.2:
  * true when the only receipt rule is for a deposit; 'receipts' then lists
  * each receipt with its title and items, and the page carries the deposit
- * receipt generator).
+ * receipt generator), topics (1.4.5, optional: extra sections, each
+ * array( 'heading', 'paras' => array(), 'citation', 'url' ), shown before
+ * the disclaimer, for a question people search that is not about receipts
+ * but sits in the same law; their citations join the WebPage citations),
+ * faqs (1.4.5, optional: extra array( question, answer ) pairs added to
+ * the page FAQ and its FAQPage schema).
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -256,7 +261,23 @@ function rf_rent_receipt_laws() {
 			),
 			'summary'    => 'Yes. New York landlords must give a written receipt for rent paid in cash or by anything other than a personal check, showing the date, amount, premises, rent period and the receiver\'s signature and title.',
 			'meta'       => 'Yes. New York landlords must give a written receipt for rent paid by anything but a personal check, with date, amount, premises, period and signature.',
-			'checked'    => 'October 2026',
+			// 1.4.5: Search Console showed "does a landlord have to provide a copy of the lease in new york" (18 impressions, position 44).
+			'topics'     => array(
+				array(
+					'heading'  => 'Does a New York Landlord Have to Give You a Copy of the Lease?',
+					'paras'    => array(
+						'For a rent-stabilized apartment, yes. The Rent Stabilization Code (9 NYCRR § 2522.5) says the owner must give the tenant a copy of the fully executed lease, signed by both sides and showing the start and end dates, within 30 days of receiving the lease the tenant signed. The same 30-day rule applies to a renewal lease.',
+						'If the copy does not arrive, the tenant can complain to the state housing agency (DHCR), which will order the owner to provide it. If the owner still has not done so 20 days after that order, the owner cannot collect any rent guideline increase for that lease until the tenant gets the copy.',
+						'This rule is part of the rent stabilization rules, so it covers rent-stabilized apartments only. In any other apartment, ask for a copy signed by both of you when you sign, keep it with your rent receipts, and ask in writing if you do not get one.',
+					),
+					'citation' => '9 NYCRR § 2522.5 (Rent Stabilization Code)',
+					'url'      => 'https://www.law.cornell.edu/regulations/new-york/9-NYCRR-2522.5',
+				),
+			),
+			'faqs'       => array(
+				array( 'Does a landlord have to provide a copy of the lease in New York?', 'For a rent-stabilized apartment, yes: under 9 NYCRR § 2522.5 the owner must give the tenant a copy of the lease signed by both sides within 30 days of receiving the tenant-signed lease, for new and renewal leases, and DHCR can order it. That rule covers rent-stabilized apartments; in any other apartment, ask for a signed copy when you sign.' ),
+			),
+			'checked'    => 'November 2026',
 		),
 		'oregon' => array(
 			'state'      => 'Oregon',
@@ -305,7 +326,25 @@ function rf_rent_receipt_laws() {
 			),
 			'summary'    => 'Virginia landlords must give a written receipt whenever rent is paid in cash or by money order, and an account statement within 10 business days of a written request.',
 			'meta'       => 'Virginia landlords must give a written receipt for rent paid in cash or money order, and an account statement within 10 business days of a written request.',
-			'checked'    => 'October 2026',
+			// 1.4.5: Search Console showed "putting rent in escrow virginia" (13 impressions, position 11).
+			'topics'     => array(
+				array(
+					'heading'  => 'Putting Rent in Escrow in Virginia',
+					'paras'    => array(
+						'Virginia lets a tenant pay rent into court instead of to the landlord when the landlord does not fix a serious problem. It is called a tenant\'s assertion and rent escrow (Va. Code § 55.1-1244). It covers a material breach of the lease or the law, or a condition that is a fire hazard or a serious threat to health or safety, such as no heat or running water, no light, electricity or proper sewage disposal, rodents, or lead paint the landlord knows about.',
+						'First the tenant gives the landlord written notice of the problem, or the landlord gets a violation or condemnation notice from a state or local agency. If the landlord does not fix it within a reasonable time, the tenant files the assertion in the general district court where the home is. More than 30 days after the landlord got the notice is presumed unreasonable.',
+						'Until 1 January 2027, the tenant must also have paid the rent due into court within five days of its due date. From 1 January 2027, the tenant pays each rent that falls due during the case into the court escrow account within five days of the due date, and does not have to pay any old rent, late fees or other charges first in order to file.',
+						'The court can order the escrow money paid to the landlord, to the tenant or to a contractor for the repairs, reduce the rent, keep the escrow going until the problem is fixed, or end the lease. If the problem is not fixed within six months and the landlord has not made reasonable attempts to fix it, the court awards the money in escrow to the tenant. The first hearing is held within 15 days of the landlord being served, or sooner in an emergency such as no heat in winter.',
+						'Keep the court\'s receipt for each payment into escrow: it is the proof that the rent was paid on time.',
+					),
+					'citation' => 'Va. Code § 55.1-1244',
+					'url'      => 'https://law.lis.virginia.gov/vacode/title55.1/chapter12/section55.1-1244/',
+				),
+			),
+			'faqs'       => array(
+				array( 'Can I put rent in escrow in Virginia?', 'Yes, if the landlord has not fixed a serious problem within a reasonable time after written notice. Under Va. Code § 55.1-1244 you file a tenant\'s assertion in the general district court and pay the rent into the court escrow account within five days of each due date. From 1 January 2027 you no longer have to pay any past-due rent or fees before filing.' ),
+			),
+			'checked'    => 'November 2026',
 		),
 		'washington' => array(
 			'state'      => 'Washington',
@@ -462,6 +501,16 @@ function rf_rent_no_rule_states() {
 			'note'     => 'Idaho\'s landlord and tenant chapter, Idaho Code Title 6, Chapter 3 (§§ 6-301 to 6-324), covers eviction, the tenant\'s action for damages or repairs (§ 6-320) and security deposits (§ 6-321), but none of its sections requires a receipt for rent.',
 			'summary'  => 'Idaho has no rent receipt law: its landlord and tenant chapter (Idaho Code §§ 6-301 to 6-324) does not require landlords to give receipts, so a receipt depends on the lease or the tenant asking.',
 			'meta'     => 'Idaho has no rent receipt law: Idaho Code §§ 6-301 to 6-324 do not require receipts. What to put on one anyway, and a free rent receipt generator.',
+			'checked'  => 'November 2026',
+		),
+		// 1.4.5: "louisiana rent receipt" was at position 14 with no page. Read article by article and section by section on legis.la.gov.
+		'louisiana' => array(
+			'state'    => 'Louisiana',
+			'citation' => 'La. Civil Code arts. 2668–2729 (Lease) and La. R.S. 9:3201–3261.2',
+			'url'      => 'https://legis.la.gov/Legis/Law.aspx?d=109729',
+			'note'     => 'Louisiana\'s lease law is in the Civil Code, articles 2668 to 2729, which set when and where rent is due (art. 2703) and what happens if it is not paid (art. 2704), and in Revised Statutes 9:3201 to 9:3261.2, which cover the security deposit (R.S. 9:3251: returned within one month, with an itemized statement of anything kept), application fees and unpaid rent. None of these articles or sections requires a receipt for rent. The receipt rule in R.S. 9:3358, which some websites quote, is part of the Rental-Purchase Agreement Act for rent-to-own goods, not homes.',
+			'summary'  => 'Louisiana has no rent receipt law: neither the Civil Code\'s lease articles (2668–2729) nor R.S. 9:3201–3261.2 require landlords to give receipts, so a receipt depends on the lease or the tenant asking.',
+			'meta'     => 'Louisiana has no rent receipt law: the Civil Code lease articles and R.S. 9:3201–3261.2 do not require receipts. What to put on one, and a free generator.',
 			'checked'  => 'November 2026',
 		),
 	);
@@ -722,6 +771,9 @@ function rf_rent_law_citations( $sub ) {
 	foreach ( (array) ( $entry['sections'] ?? array() ) as $section ) {
 		$list[ $section['citation'] ] = $section['url'];
 	}
+	foreach ( (array) ( $entry['topics'] ?? array() ) as $topic ) {
+		$list[ $topic['citation'] ] = $topic['url'];
+	}
 	foreach ( rf_rent_law_children( $sub ) as $child ) {
 		$list[ $child['citation'] ] = $child['url'];
 	}
@@ -743,8 +795,21 @@ function rf_rent_law_link( $sub, $text ) {
 	return '<a href="' . esc_url( home_url( '/rent-receipt-laws/' . $sub . '/' ) ) . '">' . esc_html( $text ) . '</a>';
 }
 
-/** FAQ for the hub ('') or one law page (printed on the page and in FAQPage schema). */
+/**
+ * FAQ for the hub ('') or one law page (printed on the page and in FAQPage
+ * schema), with the entry's own 'faqs' (1.4.5) after the generated ones.
+ */
 function rf_rent_laws_faqs( $sub ) {
+	$faqs = rf_rent_laws_base_faqs( $sub );
+	$law  = '' === $sub ? null : rf_rent_law_entry( $sub );
+	foreach ( (array) ( $law['faqs'] ?? array() ) as $pair ) {
+		$faqs[] = $pair;
+	}
+	return $faqs;
+}
+
+/** The FAQ every page of its kind gets (before 1.4.5, rf_rent_laws_faqs()). */
+function rf_rent_laws_base_faqs( $sub ) {
 	$law = '' === $sub ? null : rf_rent_law_entry( $sub );
 	if ( ! $law ) {
 		return array(
